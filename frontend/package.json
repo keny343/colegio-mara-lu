@@ -15,9 +15,9 @@
     "recharts": "^2.9.3"
   },
   "scripts": {
-    "start": "react-scripts start",
-    "build": "react-scripts build"
-  },
+  "start": "react-scripts start",
+  "build": "CI=false react-scripts build"
+},
   "proxy": "http://localhost:49152",
   "browserslist": {
     "production": [">0.2%", "not dead", "not op_mini all"],
