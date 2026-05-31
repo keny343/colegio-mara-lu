@@ -202,9 +202,11 @@ const atualizarTurma = async (req, res) => {
   const { nome, turno, ano_letivo, serie_classe, curso_id } = req.body;
   if (!nome) return res.status(400).json({ message: 'Nome é obrigatório.' });
   try {
+    const _turno = (turno || 'manhã').toString().toLowerCase();
+    const turnoMap = _turno.startsWith('man') ? 'manhã' : _turno.startsWith('tar') ? 'tarde' : _turno.startsWith('noi') ? 'noite' : 'manhã';
     await db.query(
       'UPDATE turmas SET nome = ?, turno = ?, ano_letivo = ?, serie_classe = ?, curso_id = ? WHERE id = ?',
-      [nome, turno || 'manhã', ano_letivo || null, serie_classe || null, curso_id || null, id]
+      [nome, turnoMap, ano_letivo || null, serie_classe || null, curso_id || null, id]
     );
     return res.json({ message: 'Turma actualizada.' });
   } catch (err) { return handleDb(res, err); }
@@ -224,9 +226,11 @@ const criarTurma = async (req, res) => {
   }
 
   try {
+    const _turno = (turno || 'manhã').toString().toLowerCase();
+    const turnoMap = _turno.startsWith('man') ? 'manhã' : _turno.startsWith('tar') ? 'tarde' : _turno.startsWith('noi') ? 'noite' : 'manhã';
     const [r] = await db.query(
       'INSERT INTO turmas (nome, ano_letivo, serie_classe, curso_id, turno) VALUES (?,?,?,?,?)',
-      [nome, ano_letivo, serie, curso_id || null, turno || 'manhã']
+      [nome, ano_letivo, serie, curso_id || null, turnoMap]
     );
     return res.status(201).json({ id: r.insertId, message: 'Turma criada.' });
   } catch (err) {
