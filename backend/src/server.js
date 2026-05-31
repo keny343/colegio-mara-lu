@@ -6,10 +6,21 @@ require('dotenv').config();
 const app = express();
 const PORT = process.env.PORT || 49152;
 
-const frontendUrl = (process.env.FRONTEND_URL || 'http://localhost:3000').trim();
+const frontendUrl = (process.env.FRONTEND_URL || 'http://localhost:3000').trim().replace(/\/+$/, '');
+const additionalOrigins = (process.env.ADDITIONAL_ORIGINS || '')
+  .split(',')
+  .map((origin) => origin.trim().replace(/\/+$/, ''))
+  .filter(Boolean);
+const allowedOrigins = Array.from(new Set([frontendUrl, ...additionalOrigins]));
 
 app.use(cors({
-  origin: frontendUrl,
+  origin: (origin, callback) => {
+    if (!origin || allowedOrigins.includes(origin)) {
+      return callback(null, true);
+    }
+    console.warn(`[CORS] Origin denied: ${origin}`);
+    return callback(new Error('Not allowed by CORS'));
+  },
   credentials: true
 }));
 
