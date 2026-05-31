@@ -271,8 +271,8 @@ const dashboardStats = async (req, res) => {
       ORDER BY s.ordem, s.nivel, s.nome
     `, filtro.params);
 
-    const [totalUsuarios] = await db.query('SELECT COUNT(*) as total FROM usuarios WHERE role = "aluno"');
-    const [totalAlunos]   = await db.query('SELECT COUNT(*) as total FROM alunos');
+    const [totalUsuarios] = await db.query("SELECT COUNT(*) as total FROM usuarios WHERE role = 'aluno'");
+const [totalAlunos]   = await db.query('SELECT COUNT(*) as total FROM alunos');
 
     return res.json({
       inscricoes:      stats[0],
