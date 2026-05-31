@@ -215,11 +215,23 @@ const criarTurma = async (req, res) => {
   if (!nome || !ano_letivo || !serie_classe) {
     return res.status(400).json({ message: 'Nome, ano letivo e classe são obrigatórios.' });
   }
-  const [r] = await db.query(
-    'INSERT INTO turmas (nome, ano_letivo, serie_classe, curso_id, turno) VALUES (?,?,?,?,?)',
-    [nome, ano_letivo, serie_classe, curso_id || null, turno || 'manhã']
-  );
-  return res.status(201).json({ id: r.insertId, message: 'Turma criada.' });
+  const serie = Number(serie_classe);
+  if (!Number.isFinite(serie) || serie < 0) {
+    return res.status(400).json({ message: 'Classe inválida.' });
+  }
+  if (serie >= 10 && !curso_id) {
+    return res.status(400).json({ message: 'Da 10ª à 13ª classe, selecione um curso válido.' });
+  }
+
+  try {
+    const [r] = await db.query(
+      'INSERT INTO turmas (nome, ano_letivo, serie_classe, curso_id, turno) VALUES (?,?,?,?,?)',
+      [nome, ano_letivo, serie, curso_id || null, turno || 'manhã']
+    );
+    return res.status(201).json({ id: r.insertId, message: 'Turma criada.' });
+  } catch (err) {
+    return handleDb(res, err);
+  }
 };
 
 // ===== ATRIBUIR PROFESSOR (admin ou coordenador no âmbito) =====
