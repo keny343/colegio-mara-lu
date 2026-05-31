@@ -37,5 +37,7 @@ app.listen(PORT, () => {
   console.log(`\n📁 CWD: ${process.cwd()}`);
   console.log(`\n🎓 Servidor rodando em: http://localhost:${PORT}`);
   console.log(`📡 API disponível em: http://localhost:${PORT}/api`);
+   console.log(`🌐 FRONTEND_URL: ${process.env.FRONTEND_URL}`);
+
   
 });
