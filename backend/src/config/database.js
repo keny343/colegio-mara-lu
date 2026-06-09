@@ -10,16 +10,8 @@ const pool = mysql2.createPool({
   waitForConnections: true,
   connectionLimit: 10,
   queueLimit: 0,
-  charset: 'UTF8MB4',
+charset: 'utf8mb4'
   timezone: '+00:00',
   connectTimeout: 10000,
   ssl: process.env.DB_SSL === 'true' ? { rejectUnauthorized: false } : undefined
 });
-
-// Força UTF-8 em cada nova conexão
-pool.on('connection', (conn) => {
-  conn.query("SET NAMES utf8mb4 COLLATE utf8mb4_unicode_ci");
-  conn.query("SET CHARACTER SET utf8mb4");
-});
-
-module.exports = pool;
