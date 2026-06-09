@@ -19,7 +19,10 @@ export default function ProfessorFaltas() {
   useEffect(() => {
     api.get('/professor/minhas-disciplinas')
       .then(r => setProfDisciplinas(r.data || []))
-      .catch(() => setProfDisciplinas([]))
+      .catch(() => .catch(err => {
+  console.error("ERRO MINHAS DISCIPLINAS:", err);
+  setProfDisciplinas([]);
+})([]))
       .finally(() => setLoading(false));
   }, []);
 
