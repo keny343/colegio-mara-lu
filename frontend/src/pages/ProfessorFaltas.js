@@ -28,6 +28,16 @@ export default function ProfessorFaltas() {
     .finally(() => setLoading(false));
 }, []);
 
+  const turmasUnicas = profDisciplinas.reduce((acc, item) => {
+    if (!acc.some(t => String(t.id) === String(item.turma_id))) {
+      acc.push({
+        id: item.turma_id,
+        nome: item.turma_nome || `Turma ${item.turma_id}`,
+      });
+    }
+    return acc;
+  }, []);
+
   const abrirTurma = async (turmaId) => {
     setSelectedTurma(turmaId);
     setSelectedMatricula('');
