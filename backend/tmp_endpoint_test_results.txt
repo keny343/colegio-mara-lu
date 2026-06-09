@@ -1,0 +1,16 @@
+LOGIN OK admin@gmail.com
+
+ENDPOINT /api/auth/perfil STATUS 200
+{"id":2,"nome":"Administrador","email":"admin@gmail.com","telefone":null,"cpf":null,"endereco":null,"role":"admin","foto_url":null,"curso_coordenado":null,"nivel_coordenado":null,"criado_em":"2026-05-31T13:37:34.000Z"}
+
+ENDPOINT /api/staff/cursos STATUS 200
+[{"id":3,"nome":"Ci├¬ncias Econ├│micas e Jur├¡dicas","descricao":null,"ativo":1},{"id":2,"nome":"Ci├¬ncias F├¡sicas e Biol├│gicas","descricao":null,"ativo":1},{"id":1,"nome":"Inform├ítica","descricao":"II ciclo ÔÇö 13┬¬ classe","ativo":1}]
+
+ENDPOINT /api/staff/disciplinas STATUS 200
+[]
+
+ENDPOINT /api/staff/turmas STATUS 200
+[]
+
+ENDPOINT /api/staff/usuarios STATUS 200
+[{"id":2,"nome":"Administrador","email":"admin@gmail.com","telefone":null,"cpf":null,"role":"admin","curso_coordenado":null,"nivel_coordenado":null,"ativo":1,"criado_em":"2026-05-31T13:37:34.000Z"},{"id":3,"nome":"ADNIRCIO INOCENCIO","email":"123456789LA123@aluno.local","telefone":null,"cpf":"123456789LA123","role":"aluno","curso_coordenado":null,"nivel_coordenado":null,"ativo":1,"criado_em":"2026-05-31T15:56:58.000Z"}]

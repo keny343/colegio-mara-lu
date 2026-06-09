@@ -479,9 +479,26 @@ const enviarNotificacao = async (req, res) => {
   }
 };
 
+// --- LISTAR DOCUMENTOS DO UTILIZADOR ---
+const listarMeusDocumentos = async (req, res) => {
+  try {
+    const usuario_id = req.user.id;
+    const [docs] = await db.query(`
+      SELECT d.* FROM documentos d
+      INNER JOIN inscricoes i ON d.inscricao_id = i.id
+      WHERE i.usuario_id = ?
+      ORDER BY d.enviado_em DESC
+    `, [usuario_id]);
+    return res.json(docs);
+  } catch (err) {
+    console.error('[listarMeusDocumentos] ERRO:', err.message);
+    return res.status(500).json({ message: 'Erro ao buscar documentos.' });
+  }
+};
+
 module.exports = {
   listarSeries, criarSerie, atualizarSerie, deletarSerie,
-  upload, enviarDocumento, atualizarDocumento,
+  upload, enviarDocumento, atualizarDocumento, listarMeusDocumentos,
   listarUsuarios, listarEquipaCoordenador, sincronizarVagasSeries,
   criarUsuario, atualizarUsuario, designarCoordenador, minhasNotificacoes,
   marcarNotificacaoLida, enviarNotificacao

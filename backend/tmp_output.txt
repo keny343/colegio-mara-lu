@@ -1,0 +1,14 @@
+LOGIN OK admin@gmail.com
+
+ENDPOINT /api/auth/perfil STATUS 200
+{"id":2,"nome":"Administrador","email":"admin@gmail.com","telefone":null,"cpf":null,"endereco":null,"role":"admin","foto_url":null,"curso_coordenado":null,"nivel_coordenado":null,"criado_em":"2026-05-31T13:37:34.000Z"}
+
+ENDPOINT /api/staff/cursos STATUS 200
+Traceback (most recent call last):
+  File "c:\Users\kenyd\Desktop\colegio-mara-lu\backend\tmp_endpoint_test.py", line 35, in <module>
+    print(body[:1000])
+    ~~~~~^^^^^^^^^^^^^
+  File "C:\Users\kenyd\AppData\Local\Programs\Python\Python313\Lib\encodings\cp1252.py", line 19, in encode
+    return codecs.charmap_encode(input,self.errors,encoding_table)[0]
+           ~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+UnicodeEncodeError: 'charmap' codec can't encode character '\u251c' in position 19: character maps to <undefined>

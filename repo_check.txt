@@ -1,0 +1,13 @@
+fc276259 Fix CORS origin handling and correct .gitignore
+ M backend/criar_admin.js
+ M backend/criar_aluno.js
+ M backend/criar_coordenador.js
+ M backend/criar_professor.js
+ M backend/database.sql
+?? backend/setup_aiven.sql
+?? cd
+?? commitcheck.txt
+?? git
+?? repo_check.txt
+?? status2.txt
+?? status3.txt

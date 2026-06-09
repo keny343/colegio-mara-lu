@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { FileText, Download, Upload, CheckCircle, Clock } from 'lucide-react';
 import api from '../services/api';
 import { useNotification } from '../contexts/NotificationContext';
@@ -10,13 +10,37 @@ const TIPOS_DOC = [
   { value: 'outro',                label: 'Outro documento' },
 ];
 
+const STATUS_LABELS = {
+  pendente: 'Pendente',
+  aprovado: 'Aprovado',
+  rejeitado: 'Rejeitado'
+};
+
 export default function Documentos() {
   const [uploading, setUploading] = useState(false);
   const [sucesso, setSucesso]     = useState('');
   const [erro, setErro]           = useState('');
+  const [meusDocs, setMeusDocs] = useState([]);
+  const [carregando, setCarregando] = useState(true);
   const { success, error } = useNotification();
   const [tipo, setTipo]           = useState('declaracao_matricula');
   const [ficheiro, setFicheiro]   = useState(null);
+
+  useEffect(() => {
+    carregarDocumentos();
+  }, []);
+
+  const carregarDocumentos = async () => {
+    try {
+      const res = await api.get('/documentos');
+      setMeusDocs(res.data || []);
+    } catch (err) {
+      console.error('Erro ao carregar documentos:', err);
+      setMeusDocs([]);
+    } finally {
+      setCarregando(false);
+    }
+  };
 
   const handleUpload = async (e) => {
     e.preventDefault();
@@ -31,12 +55,18 @@ export default function Documentos() {
       success('Documento enviado com sucesso!');
       setFicheiro(null);
       e.target.reset();
+      carregarDocumentos();
     } catch (err) {
       const message = err.response?.data?.message || 'Erro ao enviar documento.';
       setErro(message);
       error(message);
     }
     setUploading(false);
+  };
+
+  const downloadDocumento = (doc) => {
+    const link = `/uploads/${doc.caminho_arquivo}`;
+    window.open(link, '_blank');
   };
 
   return (
@@ -50,35 +80,55 @@ export default function Documentos() {
 
         <div className="card">
           <h3 style={{ fontSize: '1.1rem', marginBottom: '1.25rem', display: 'flex', alignItems: 'center', gap: 8 }}>
-            <FileText size={18} color="var(--laranja)" /> Documentos escolares
+            <FileText size={18} color="var(--laranja)" /> Meus documentos
           </h3>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-            {[
-              { nome: 'Declaração de Matrícula',  status: 'disponivel', desc: 'Documento oficial de matrícula activa' },
-              { nome: 'Boletim de Notas',          status: 'pendente',   desc: 'Disponível no fim de cada período' },
-              { nome: 'Histórico Escolar',         status: 'pendente',   desc: 'Solicitado junto da secretaria' },
-              { nome: 'Certificado de Frequência', status: 'pendente',   desc: 'Solicitado junto da secretaria' },
-            ].map((doc, i) => (
-              <div key={i} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: 'var(--bege-claro)', borderRadius: 10, padding: '0.9rem 1rem' }}>
-                <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
-                  <div style={{ width: 38, height: 38, borderRadius: 8, background: doc.status === 'disponivel' ? 'var(--laranja-suave)' : 'var(--cinza-claro)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                    <FileText size={18} color={doc.status === 'disponivel' ? 'var(--laranja)' : 'var(--cinza)'} />
+          {carregando ? (
+            <div style={{ textAlign: 'center', padding: '1rem', color: 'var(--cinza)' }}>Carregando...</div>
+          ) : meusDocs.length === 0 ? (
+            <div style={{ textAlign: 'center', padding: '1rem', color: 'var(--cinza)' }}>
+              Nenhum documento enviado ainda.
+            </div>
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+              {meusDocs.map((doc) => (
+                <div key={doc.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: 'var(--bege-claro)', borderRadius: 10, padding: '0.9rem 1rem' }}>
+                  <div style={{ display: 'flex', gap: 12, alignItems: 'center', flex: 1 }}>
+                    <div style={{ width: 38, height: 38, borderRadius: 8, background: doc.status === 'aprovado' ? 'var(--laranja-suave)' : 'var(--cinza-claro)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                      <FileText size={18} color={doc.status === 'aprovado' ? 'var(--laranja)' : 'var(--cinza)'} />
+                    </div>
+                    <div style={{ flex: 1 }}>
+                      <div style={{ fontWeight: 600, fontSize: '0.9rem' }}>{doc.nome_arquivo}</div>
+                      <div style={{ fontSize: '0.75rem', color: 'var(--cinza)', marginTop: 2 }}>
+                        Status: <strong>{STATUS_LABELS[doc.status] || doc.status}</strong>
+                      </div>
+                      {doc.observacao && (
+                        <div style={{ fontSize: '0.75rem', color: 'var(--castanho)', marginTop: 2 }}>
+                          {doc.observacao}
+                        </div>
+                      )}
+                    </div>
                   </div>
-                  <div>
-                    <div style={{ fontWeight: 600, fontSize: '0.9rem' }}>{doc.nome}</div>
-                    <div style={{ fontSize: '0.75rem', color: 'var(--cinza)', marginTop: 2 }}>{doc.desc}</div>
+                  <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                    {doc.status === 'aprovado' && (
+                      <button className="btn btn-primary btn-sm" onClick={() => downloadDocumento(doc)} title="Descarregar documento">
+                        <Download size={14} />
+                      </button>
+                    )}
+                    {doc.status === 'pendente' && (
+                      <span style={{ fontSize: '0.75rem', color: 'var(--cinza)', display: 'flex', alignItems: 'center', gap: 4 }}>
+                        <Clock size={12} /> A processar
+                      </span>
+                    )}
+                    {doc.status === 'rejeitado' && (
+                      <span style={{ fontSize: '0.75rem', color: 'var(--vermelho)', fontWeight: 600 }}>
+                        Rejeitado
+                      </span>
+                    )}
                   </div>
                 </div>
-                {doc.status === 'disponivel' ? (
-                  <button className="btn btn-primary btn-sm"><Download size={14} /> Baixar</button>
-                ) : (
-                  <span style={{ fontSize: '0.75rem', color: 'var(--cinza)', display: 'flex', alignItems: 'center', gap: 4 }}>
-                    <Clock size={12} /> Indisponível
-                  </span>
-                )}
-              </div>
-            ))}
-          </div>
+              ))}
+            </div>
+          )}
         </div>
 
         <div className="card">

@@ -1,9 +1,24 @@
--- ============================================
--- BANCO DE DADOS - COLÉGIO MARA E LU
--- Execute este script no MySQL Workbench ou CLI
--- ============================================
+SET FOREIGN_KEY_CHECKS=0;
 
--- Tabela de Usuários (pais/responsáveis e admins)
+DROP TABLE IF EXISTS justificacoes_falta;
+DROP TABLE IF EXISTS horarios;
+DROP TABLE IF EXISTS materiais;
+DROP TABLE IF EXISTS faltas;
+DROP TABLE IF EXISTS notas;
+DROP TABLE IF EXISTS matriculas;
+DROP TABLE IF EXISTS turma_professores;
+DROP TABLE IF EXISTS turmas;
+DROP TABLE IF EXISTS disciplinas;
+DROP TABLE IF EXISTS cursos;
+DROP TABLE IF EXISTS notificacoes;
+DROP TABLE IF EXISTS documentos;
+DROP TABLE IF EXISTS inscricoes;
+DROP TABLE IF EXISTS alunos;
+DROP TABLE IF EXISTS series;
+DROP TABLE IF EXISTS usuarios;
+
+SET FOREIGN_KEY_CHECKS=1;
+
 CREATE TABLE usuarios (
   id INT AUTO_INCREMENT PRIMARY KEY,
   nome VARCHAR(150) NOT NULL,
@@ -20,7 +35,6 @@ CREATE TABLE usuarios (
   atualizado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 );
 
--- Tabela de Anos/Séries disponíveis
 CREATE TABLE series (
   id INT AUTO_INCREMENT PRIMARY KEY,
   nome VARCHAR(100) NOT NULL,
@@ -33,7 +47,6 @@ CREATE TABLE series (
   ativo TINYINT(1) DEFAULT 1
 );
 
--- Tabela de Alunos
 CREATE TABLE alunos (
   id INT AUTO_INCREMENT PRIMARY KEY,
   usuario_id INT NOT NULL,
@@ -53,7 +66,6 @@ CREATE TABLE alunos (
   FOREIGN KEY (usuario_id) REFERENCES usuarios(id) ON DELETE CASCADE
 );
 
--- Tabela de Inscrições
 CREATE TABLE inscricoes (
   id INT AUTO_INCREMENT PRIMARY KEY,
   usuario_id INT NOT NULL,
@@ -70,7 +82,6 @@ CREATE TABLE inscricoes (
   FOREIGN KEY (serie_id) REFERENCES series(id)
 );
 
--- Tabela de Documentos
 CREATE TABLE documentos (
   id INT AUTO_INCREMENT PRIMARY KEY,
   inscricao_id INT NOT NULL,
@@ -83,7 +94,6 @@ CREATE TABLE documentos (
   FOREIGN KEY (inscricao_id) REFERENCES inscricoes(id) ON DELETE CASCADE
 );
 
--- Tabela de Notificações
 CREATE TABLE notificacoes (
   id INT AUTO_INCREMENT PRIMARY KEY,
   usuario_id INT NOT NULL,
@@ -96,10 +106,6 @@ CREATE TABLE notificacoes (
   FOREIGN KEY (usuario_id) REFERENCES usuarios(id) ON DELETE CASCADE,
   FOREIGN KEY (remetente_id) REFERENCES usuarios(id) ON DELETE SET NULL
 );
-
--- ============================================
--- ESTRUTURA ACADÉMICA (Cursos, Disciplinas, Turmas)
--- ============================================
 
 CREATE TABLE cursos (
   id INT AUTO_INCREMENT PRIMARY KEY,
@@ -154,7 +160,7 @@ CREATE TABLE notas (
   id INT AUTO_INCREMENT PRIMARY KEY,
   matricula_id INT NOT NULL,
   disciplina_id INT NOT NULL,
-  periodo VARCHAR(3) NOT NULL COMMENT '1PP,1PT,2PP,2PT,3PP,3PT',
+  periodo VARCHAR(3) NOT NULL,
   nota DECIMAL(5,2) NOT NULL,
   professor_id INT NULL,
   data_lancamento TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -201,7 +207,6 @@ CREATE TABLE horarios (
   FOREIGN KEY (disciplina_id) REFERENCES disciplinas(id) ON DELETE CASCADE
 );
 
--- Tabela de Justificações de Faltas
 CREATE TABLE IF NOT EXISTS justificacoes_falta (
   id INT AUTO_INCREMENT PRIMARY KEY,
   falta_id INT NOT NULL,
@@ -216,17 +221,11 @@ CREATE TABLE IF NOT EXISTS justificacoes_falta (
   FOREIGN KEY (aluno_id) REFERENCES alunos(id) ON DELETE CASCADE
 );
 
--- ============================================
--- DADOS INICIAIS
--- ============================================
-
--- Cursos iniciais
 INSERT INTO cursos (nome, descricao) VALUES
 ('Informática', 'II ciclo — 13ª classe'),
 ('Ciências Físicas e Biológicas', NULL),
 ('Ciências Económicas e Jurídicas', NULL);
 
--- Séries disponíveis
 INSERT INTO series (nome, nivel, curso, ordem, vagas_total, vagas_disponiveis, ano_letivo) VALUES
 ('Pré-escolar', 'Ensino Primário (pré até 6ª)', NULL, 0, 25, 25, 2025),
 ('1ª Classe', 'Ensino Primário (pré até 6ª)', NULL, 1, 30, 30, 2025),
