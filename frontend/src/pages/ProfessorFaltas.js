@@ -16,22 +16,17 @@ export default function ProfessorFaltas() {
   const [loading, setLoading] = useState(true);
   const { success, error } = useNotification();
 
-  useEffect(() => {
-    api.get('/professor/minhas-disciplinas')
-      .then(r => setProfDisciplinas(r.data || []))
-      .catch(() => .catch(err => {
-  console.error("ERRO MINHAS DISCIPLINAS:", err);
-  setProfDisciplinas([]);
-})([]))
-      .finally(() => setLoading(false));
-  }, []);
-
-  const turmasUnicas = [...new Map(
-    profDisciplinas.map(d => [
-      d.turma_id,
-      { id: d.turma_id, nome: d.turma_nome }
-    ])
-  ).values()];
+ useEffect(() => {
+  api.get('/professor/minhas-disciplinas')
+    .then(r => {
+      setProfDisciplinas(r.data || []);
+    })
+    .catch(err => {
+      console.error("ERRO MINHAS DISCIPLINAS:", err);
+      setProfDisciplinas([]);
+    })
+    .finally(() => setLoading(false));
+}, []);
 
   const abrirTurma = async (turmaId) => {
     setSelectedTurma(turmaId);
