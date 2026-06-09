@@ -33,8 +33,7 @@ export default function Documentos() {
   const carregarDocumentos = async () => {
     try {
       const res = await api.get('/documentos');
-      setMeusDocs(res.data || []);
-    } catch (err) {
+setMeusDocs(res.data?.data || res.data || []);    } catch (err) {
       console.error('Erro ao carregar documentos:', err);
       setMeusDocs([]);
     } finally {
