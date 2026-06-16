@@ -49,7 +49,7 @@ app.get('/api/debug/usuarios', async (req, res) => {
   }
 });
 
-app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
+app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
 const routes = require('./routes/index');
 app.use('/api', routes);

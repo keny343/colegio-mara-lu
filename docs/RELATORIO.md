@@ -64,7 +64,7 @@ Desenvolver uma plataforma web segura e multi-utilizador para a gestão académi
 | # | Objectivo |
 |---|-----------|
 | O1 | Permitir inscrição pública e fluxo de aprovação |
-| O2 | Gerir utilizadores, séries, cursos, turmas e disciplinas |
+| O2 | Gerir utilizadores, classes, cursos, turmas e disciplinas |
 | O3 | Lançar e consultar notas em 6 períodos (3 trimestres) |
 | O4 | Calcular médias por trimestre, por disciplina e geral (paradigma funcional) |
 | O5 | Restringir acções por papel e âmbito de coordenação |
@@ -133,43 +133,43 @@ flowchart LR
 
 ## 6. Diagrama de casos de uso (UML)
 
-```mermaid
-usecaseDiagram
-  actor Visitante
-  actor Aluno
-  actor Professor
-  actor Coordenador
-  actor Admin
+```plantuml
+@startuml
+left to right direction
+left actor Admin
+left actor Coordenador
+right actor Professor
+right actor Aluno
 
-  rectangle "Sistema Colégio Mara e Lu" {
-    usecase "UC01 Login" as UC01
-    usecase "UC02 Inscrição pública" as UC02
-    usecase "UC03 Gerir inscrições" as UC03
-    usecase "UC04 Gerir utilizadores" as UC04
-    usecase "UC06 Académico" as UC06
-    usecase "UC09 Lançar notas" as UC09
-    usecase "UC10 Alterar notas" as UC10
-    usecase "UC12 Portal notas" as UC12
-    usecase "UC13 Faltas" as UC13
-    usecase "UC15 Materiais" as UC15
-    usecase "UC17 Perfil" as UC17
-  }
+rectangle "Sistema Colégio Mara e Lu" {
+  usecase "UC01 Login" as UC01
+  usecase "UC02 Inscrição pública" as UC02
+  usecase "UC03 Gerir inscrições" as UC03
+  usecase "UC04 Gerir utilizadores" as UC04
+  usecase "UC06 Académico" as UC06
+  usecase "UC09 Lançar notas" as UC09
+  usecase "UC10 Alterar notas" as UC10
+  usecase "UC12 Portal notas" as UC12
+  usecase "UC13 Faltas" as UC13
+  usecase "UC15 Materiais" as UC15
+  usecase "UC17 Perfil" as UC17
+}
 
-  Visitante --> UC02
-  Aluno --> UC01
-  Aluno --> UC12
-  Aluno --> UC17
-  Professor --> UC01
-  Professor --> UC09
-  Professor --> UC13
-  Professor --> UC15
-  Coordenador --> UC03
-  Coordenador --> UC06
-  Coordenador --> UC10
-  Admin --> UC04
-  Admin --> UC06
-  Admin --> UC10
-  UC10 ..> UC09 : extend
+Admin --> UC04
+Admin --> UC06
+Admin --> UC10
+Coordenador --> UC03
+Coordenador --> UC06
+Coordenador --> UC10
+Professor --> UC01
+Professor --> UC09
+Professor --> UC13
+Professor --> UC15
+Aluno --> UC01
+Aluno --> UC12
+Aluno --> UC17
+UC10 ..> UC09 : extend
+@enduml
 ```
 
 ---
@@ -344,41 +344,43 @@ classDiagram
 
 ### 10.2 Diagrama de sequência — Login (UC01)
 
-```mermaid
-sequenceDiagram
-  participant U as Utilizador
-  participant F as Login.js
-  participant A as authController
-  participant DB as MySQL
+```plantuml
+@startuml
+participant Utilizador
+participant "Login.js" as F
+participant authController as A
+participant MySQL as DB
 
-  U->>F: email + senha
-  F->>A: POST /api/auth/login
-  A->>DB: SELECT usuario
-  DB-->>A: hash senha
-  A->>A: bcrypt.compare
-  A->>A: jwt.sign
-  A-->>F: token + usuario
-  F->>F: localStorage
-  F-->>U: redireccionar por role
+Utilizador -> F: email + senha
+F -> A: POST /api/auth/login
+A -> DB: SELECT usuario
+DB --> A: hash senha
+A -> A: bcrypt.compare
+A -> A: jwt.sign
+A --> F: token + usuario
+F -> F: localStorage
+F --> Utilizador: redireccionar por role
+@enduml
 ```
 
 ### 10.3 Diagrama de sequência — Lançar nota (UC09)
 
-```mermaid
-sequenceDiagram
-  participant P as Professor
-  participant C as CoordenadorNotas.js
-  participant API as academicoController
-  participant R as academicoRules
-  participant DB as MySQL
+```plantuml
+@startuml
+participant Professor
+participant "CoordenadorNotas.js" as C
+participant academicoController as API
+participant academicoRules as R
+participant MySQL as DB
 
-  P->>C: guardar nota 1PP
-  C->>API: POST /professor/notas
-  API->>R: validarPeriodo, validarNota
-  API->>DB: INSERT notas
-  DB-->>API: OK
-  API-->>C: 200
-  C-->>P: actualizar tabela trimestre
+Professor -> C: guardar nota 1PP
+C -> API: POST /professor/notas
+API -> R: validarPeriodo, validarNota
+API -> DB: INSERT notas
+DB --> API: OK
+API --> C: 200
+C --> Professor: actualizar tabela trimestre
+@enduml
 ```
 
 ### 10.4 Diagrama de componentes
@@ -419,11 +421,113 @@ flowchart LR
   ReactDev --> Node
 ```
 
+### 10.6 Diagramas de dados adicionais
+
+- Diagrama conceitual: `docs/diagrama_conceitual.puml`
+- Diagrama de entidade-relacionamento: `docs/diagrama_er.puml`
+
 ---
 
 ## 11. Modelo de dados
 
 Script principal: **`backend/database.sql`**
+
+### 11.1 Modelo lógico
+
+O modelo lógico representa as entidades e os relacionamentos do domínio académico antes da definição física das tabelas. As principais entidades são:
+
+- `Usuario`: representa contas de acesso com papel (admin, coordenador, professor, aluno).
+- `Aluno`: perfil académico ligado ao `Usuario` e às `Matriculas`.
+- `Inscricao`: registros de candidaturas públicas que podem evoluir para matrícula.
+- `Matricula`: vínculo do aluno a uma `Turma` e a um ano letivo.
+- `Turma`: agrupamento de alunos por série, curso e disciplina.
+- `Disciplina`: componente curricular associada a notas.
+- `Nota`: avaliação por `periodo` (1PP, 1PT, 2PP, 2PT, 3PP, 3PT).
+- `Falta`: registo de presença/ausência por aluno e sessão.
+- `Documento`: uploads e materiais pedagógicos.
+- `Notificacao`: mensagens e avisos para alunos e encarregados.
+
+Relações lógicas principais:
+
+- Um `Usuario` pode ter um ou mais `Alunos` (caso de encarregados com vários alunos).
+- Um `Aluno` pode ter várias `Matriculas` ao longo dos anos.
+- Uma `Matricula` está atribuída a uma única `Turma`.
+- Uma `Turma` contém vários `Alunos` e várias `Notas` por disciplina.
+- Uma `Disciplina` produz várias `Notas` para cada aluno por período.
+- Um `Aluno` pode acumular vários `Faltas` e `Documentos`.
+
+### 11.2 Diagrama lógico (PlantUML)
+
+```plantuml
+@startuml
+entity Usuario {
+  * id : int
+  * nome : string
+  * email : string
+  * senha_hash : string
+  * role : string
+  * curso_coordenado : string
+  * nivel_coordenado : string
+}
+entity Aluno {
+  * id : int
+  * usuario_id : int
+  * nome : string
+  * data_nascimento : date
+}
+entity Inscricao {
+  * id : int
+  * aluno_id : int
+  * serie_id : int
+  * status : string
+  * data_envio : datetime
+}
+entity Matricula {
+  * id : int
+  * aluno_id : int
+  * turma_id : int
+  * status : string
+  * ano_letivo : string
+}
+entity Turma {
+  * id : int
+  * serie_classe : int
+  * curso_id : int
+}
+entity Disciplina {
+  * id : int
+  * nome : string
+}
+entity Nota {
+  * id : int
+  * matricula_id : int
+  * disciplina_id : int
+  * periodo : string
+  * nota : decimal
+}
+entity Falta {
+  * id : int
+  * matricula_id : int
+  * data : date
+  * tipo : string
+}
+entity Documento {
+  * id : int
+  * aluno_id : int
+  * tipo : string
+  * caminho : string
+}
+Usuario ||--o{ Aluno : possui
+Aluno ||--o{ Matricula : possui
+Aluno ||--o{ Inscricao : submete
+Matricula ||--o{ Nota : registra
+Matricula ||--o{ Falta : regista
+Matricula }o--|| Turma : pertence
+Turma ||--o{ Matricula : contém
+Disciplina ||--o{ Nota : usada_em
+Aluno ||--o{ Documento : anexa
+@enduml
+```
 
 Entidades principais: `usuarios`, `alunos`, `inscricoes`, `series`, `cursos`, `turmas`, `disciplinas`, `matriculas`, `notas`, `faltas`, `turma_professores`, `documentos`, `notificacoes`.
 

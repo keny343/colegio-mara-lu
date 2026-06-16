@@ -1,0 +1,117 @@
+@startuml
+left to right direction
+entity Usuario {
+  +id PK
+  nome
+  email
+  role
+}
+entity Aluno {
+  +id PK
+  usuario_id FK
+  nome
+  data_nascimento
+}
+entity Inscricao {
+  +id PK
+  usuario_id FK
+  aluno_id FK
+  serie_id FK
+  status
+}
+entity Serie {
+  +id PK
+  nome
+  ano_letivo
+}
+entity Curso {
+  +id PK
+  nome
+}
+entity Disciplina {
+  +id PK
+  curso_id FK
+  nome
+}
+entity Turma {
+  +id PK
+  curso_id FK
+  nome
+  ano_letivo
+}
+entity TurmaProfessor {
+  +id PK
+  turma_id FK
+  disciplina_id FK
+  professor_id FK
+}
+entity Matricula {
+  +id PK
+  aluno_id FK
+  turma_id FK
+  status
+}
+entity Nota {
+  +id PK
+  matricula_id FK
+  disciplina_id FK
+  periodo
+  nota
+}
+entity Falta {
+  +id PK
+  matricula_id FK
+  disciplina_id FK
+  data_falta
+}
+entity Material {
+  +id PK
+  turma_id FK
+  disciplina_id FK
+}
+entity Horario {
+  +id PK
+  turma_id FK
+  disciplina_id FK
+  dia_semana
+}
+entity Documento {
+  +id PK
+  inscricao_id FK
+  tipo
+}
+entity Notificacao {
+  +id PK
+  usuario_id FK
+}
+entity JustificacaoFalta {
+  +id PK
+  falta_id FK
+  aluno_id FK
+}
+
+Usuario ||--o{ Aluno : possui
+Usuario ||--o{ Inscricao : solicita
+Aluno ||--o{ Inscricao : referencia
+Inscricao }o--|| Serie : para
+Inscricao ||--o{ Documento : anexa
+Usuario ||--o{ Notificacao : recebe
+Curso ||--o{ Disciplina : oferta
+Curso ||--o{ Turma : oferta
+Turma ||--o{ TurmaProfessor : contém
+Disciplina ||--o{ TurmaProfessor : inclui
+Usuario ||--o{ TurmaProfessor : leciona
+Aluno ||--o{ Matricula : registra
+Turma ||--o{ Matricula : contém
+Matricula ||--o{ Nota : inclui
+Disciplina ||--o{ Nota : referencia
+Matricula ||--o{ Falta : registra
+Disciplina ||--o{ Falta : referencia
+Usuario ||--o{ Material : publica
+Turma ||--o{ Material : destino
+Disciplina ||--o{ Material : sobre
+Turma ||--o{ Horario : programa
+Disciplina ||--o{ Horario : associa
+Falta ||--o{ JustificacaoFalta : justifica
+Aluno ||--o{ JustificacaoFalta : faz
+@enduml

@@ -1,0 +1,116 @@
+@startuml
+database "Colégio Mara e Lu" {
+  entity usuarios {
+    +id : INT PK
+    email : VARCHAR
+    role : ENUM
+  }
+  entity alunos {
+    +id : INT PK
+    usuario_id : INT FK
+    nome : VARCHAR
+  }
+  entity inscricoes {
+    +id : INT PK
+    usuario_id : INT FK
+    aluno_id : INT FK
+    serie_id : INT FK
+    status : ENUM
+  }
+  entity series {
+    +id : INT PK
+    nome : VARCHAR
+    ano_letivo : YEAR
+  }
+  entity cursos {
+    +id : INT PK
+    nome : VARCHAR
+  }
+  entity disciplinas {
+    +id : INT PK
+    curso_id : INT FK
+    nome : VARCHAR
+  }
+  entity turmas {
+    +id : INT PK
+    curso_id : INT FK
+    nome : VARCHAR
+    ano_letivo : YEAR
+  }
+  entity turma_professores {
+    +id : INT PK
+    turma_id : INT FK
+    disciplina_id : INT FK
+    professor_id : INT FK
+  }
+  entity matriculas {
+    +id : INT PK
+    aluno_id : INT FK
+    turma_id : INT FK
+    status : ENUM
+  }
+  entity notas {
+    +id : INT PK
+    matricula_id : INT FK
+    disciplina_id : INT FK
+    periodo : VARCHAR
+    nota : DECIMAL
+  }
+  entity faltas {
+    +id : INT PK
+    matricula_id : INT FK
+    disciplina_id : INT FK
+    data_falta : DATE
+  }
+  entity materiais {
+    +id : INT PK
+    turma_id : INT FK
+    disciplina_id : INT FK
+    professor_id : INT FK
+  }
+  entity horarios {
+    +id : INT PK
+    turma_id : INT FK
+    disciplina_id : INT FK
+    dia_semana : ENUM
+  }
+  entity documentos {
+    +id : INT PK
+    inscricao_id : INT FK
+    tipo : ENUM
+  }
+  entity notificacoes {
+    +id : INT PK
+    usuario_id : INT FK
+  }
+  entity justificacoes_falta {
+    +id : INT PK
+    falta_id : INT FK
+    aluno_id : INT FK
+  }
+}
+
+usuarios "1" -- "N" alunos : possui
+usuarios "1" -- "N" inscricoes : solicita
+usuarios "1" -- "N" notificacoes : recebe
+alunos "1" -- "N" inscricoes : referente
+alunos "1" -- "N" matriculas : registra
+series "1" -- "N" inscricoes : corresponde_a
+cursos "1" -- "N" disciplinas : oferta
+cursos "1" -- "N" turmas : forma
+disciplinas "1" -- "N" turma_professores : leciona_em
+disciplinas "1" -- "N" notas : avalia
+disciplinas "1" -- "N" faltas : contabiliza
+disciplinas "1" -- "N" horarios : disciplina_em
+disciplinas "1" -- "N" materiais : material_de
+turmas "1" -- "N" turma_professores : contém
+turmas "1" -- "N" matriculas : acolhe
+turmas "1" -- "N" horarios : inclui
+turmas "1" -- "N" materiais : disponibiliza
+turma_professores "1" -- "1" usuarios : professor
+matriculas "1" -- "N" notas : registra
+matriculas "1" -- "N" faltas : associa
+inscricoes "1" -- "N" documentos : anexa
+faltas "1" -- "1" justificacoes_falta : justifica
+alunos "1" -- "N" justificacoes_falta : autor
+@enduml
