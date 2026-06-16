@@ -27,7 +27,6 @@ app.use(cors({
 app.use(express.json({ charset: 'utf-8' }));
 app.use(express.urlencoded({ extended: true, charset: 'utf-8' }));
 
-// Set UTF-8 charset header for all JSON responses
 app.use((req, res, next) => {
   const originalJson = res.json;
   res.json = function(data) {
@@ -60,10 +59,6 @@ app.listen(PORT, () => {
   console.log(`\n📁 CWD: ${process.cwd()}`);
   console.log(`\n🎓 Servidor rodando em: http://localhost:${PORT}`);
   console.log(`📡 API disponível em: http://localhost:${PORT}/api`);
-   console.log(`🌐 FRONTEND_URL: ${process.env.FRONTEND_URL}`);
-app.listen(PORT, () => {
   console.log(`🌐 FRONTEND_URL: ${process.env.FRONTEND_URL}`);
   console.log(`☁️ CLOUDINARY: ${process.env.CLOUDINARY_CLOUD_NAME}`);
-});
-  
 });
