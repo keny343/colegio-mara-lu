@@ -74,6 +74,8 @@ export default function AdminInscricoes() {
 
   const totalPages = Math.ceil(total / 15);
 
+  const docUrl = (caminho) => caminho.startsWith('http') ? caminho : null;
+
   return (
     <div className="page-container">
       {toast && <Toast message={toast.message} type={toast.type} onClose={clearToast} key={toast.key} />}
@@ -82,7 +84,6 @@ export default function AdminInscricoes() {
         <p style={{ color: 'var(--cinza)' }}>{total} inscrição(ões) encontrada(s)</p>
       </div>
 
-      {/* Filtros */}
       <div className="card" style={{ marginBottom: '1.5rem', padding: '1.25rem' }}>
         <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', alignItems: 'flex-end' }}>
           <div style={{ flex: 1, minWidth: 180 }}>
@@ -112,7 +113,6 @@ export default function AdminInscricoes() {
         </div>
       </div>
 
-      {/* Tabela */}
       {loading ? (
         <div className="loading"><div className="spinner" /></div>
       ) : inscricoes.length === 0 ? (
@@ -123,14 +123,8 @@ export default function AdminInscricoes() {
             <table className="table">
               <thead>
                 <tr>
-                  <th>#</th>
-                  <th>Aluno</th>
-                  <th>Encarregado</th>
-                  <th>Série</th>
-                  <th>Ano</th>
-                  <th>Data</th>
-                  <th>Status</th>
-                  <th>Ações</th>
+                  <th>#</th><th>Aluno</th><th>Encarregado</th><th>Série</th>
+                  <th>Ano</th><th>Data</th><th>Status</th><th>Ações</th>
                 </tr>
               </thead>
               <tbody>
@@ -170,7 +164,6 @@ export default function AdminInscricoes() {
         </div>
       )}
 
-      {/* Modal Detalhe */}
       {detalhe && (
         <div className="modal-overlay" onClick={() => setDetalhe(null)}>
           <div className="modal" style={{ maxWidth: 680 }} onClick={e => e.stopPropagation()}>
@@ -178,7 +171,6 @@ export default function AdminInscricoes() {
               <h3 className="modal-title">Inscrição #{detalhe.id}</h3>
               <button className="modal-close" onClick={() => setDetalhe(null)}><X size={18} /></button>
             </div>
-
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem' }}>
               <div>
                 <h4 style={{ color: 'var(--castanho-medio)', marginBottom: 12, fontSize: '0.85rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Dados do Aluno</h4>
@@ -192,8 +184,7 @@ export default function AdminInscricoes() {
                   ['Tel. Emergência', detalhe.telefone_emergencia],
                 ].map(([label, val]) => val ? (
                   <div key={label} style={{ marginBottom: 8, fontSize: '0.9rem' }}>
-                    <span style={{ color: 'var(--cinza)' }}>{label}: </span>
-                    <strong>{val}</strong>
+                    <span style={{ color: 'var(--cinza)' }}>{label}: </span><strong>{val}</strong>
                   </div>
                 ) : null)}
               </div>
@@ -206,11 +197,9 @@ export default function AdminInscricoes() {
                   ['Endereço', detalhe.responsavel_endereco],
                 ].map(([label, val]) => val ? (
                   <div key={label} style={{ marginBottom: 8, fontSize: '0.9rem' }}>
-                    <span style={{ color: 'var(--cinza)' }}>{label}: </span>
-                    <strong>{val}</strong>
+                    <span style={{ color: 'var(--cinza)' }}>{label}: </span><strong>{val}</strong>
                   </div>
                 ) : null)}
-
                 <h4 style={{ color: 'var(--castanho-medio)', margin: '1rem 0 12px', fontSize: '0.85rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Inscrição</h4>
                 {[
                   ['Série', normalizeSeriesName(detalhe.serie_nome)],
@@ -219,8 +208,7 @@ export default function AdminInscricoes() {
                   ['Status', detalhe.status],
                 ].map(([label, val]) => val ? (
                   <div key={label} style={{ marginBottom: 8, fontSize: '0.9rem' }}>
-                    <span style={{ color: 'var(--cinza)' }}>{label}: </span>
-                    <strong>{val}</strong>
+                    <span style={{ color: 'var(--cinza)' }}>{label}: </span><strong>{val}</strong>
                   </div>
                 ) : null)}
               </div>
@@ -236,30 +224,29 @@ export default function AdminInscricoes() {
               <div style={{ marginTop: '1.5rem' }}>
                 <h4 style={{ color: 'var(--castanho-medio)', marginBottom: 12, fontSize: '0.85rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Documentos Enviados</h4>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                  {detalhe.documentos.map(d => (
-                    <div key={d.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 14px', background: 'var(--bege-claro)', borderRadius: 8 }}>
-                      <div>
-                        <div style={{ fontWeight: 600, fontSize: '0.9rem' }}>{d.tipo.replace(/_/g, ' ')}</div>
-                        <div style={{ fontSize: '0.8rem', color: 'var(--cinza)' }}>{d.nome_arquivo}</div>
+                  {detalhe.documentos.map(d => {
+                    const url = docUrl(d.caminho_arquivo);
+                    return (
+                      <div key={d.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 14px', background: 'var(--bege-claro)', borderRadius: 8 }}>
+                        <div>
+                          <div style={{ fontWeight: 600, fontSize: '0.9rem' }}>{d.tipo.replace(/_/g, ' ')}</div>
+                          <div style={{ fontSize: '0.8rem', color: 'var(--cinza)' }}>{d.nome_arquivo}</div>
+                        </div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                          <span className={`badge badge-${d.status}`}>
+                            {d.status === 'pendente' ? 'Aguarda revisão' : d.status}
+                          </span>
+                          {url && (
+                            <a href={url} target="_blank" rel="noopener noreferrer"
+                              className="btn btn-sm btn-outline"
+                              style={{ fontSize: '0.75rem', padding: '3px 10px' }}>
+                              Ver
+                            </a>
+                          )}
+                        </div>
                       </div>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                        <span className={`badge badge-${d.status}`}>
-                          {d.status === 'pendente' ? 'Aguarda revisão' : d.status}
-                        </span>
-                        {d.caminho_arquivo && d.caminho_arquivo.startsWith('http') && (
-                          
-                            href={d.caminho_arquivo}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="btn btn-sm btn-outline"
-                            style={{ fontSize: '0.75rem', padding: '3px 10px' }}
-                          >
-                            Ver
-                          </a>
-                        )}
-                      </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               </div>
             )}
@@ -278,7 +265,6 @@ export default function AdminInscricoes() {
         </div>
       )}
 
-      {/* Modal Alterar Status */}
       {statusModal && (
         <div className="modal-overlay" onClick={() => setStatusModal(null)}>
           <div className="modal" style={{ maxWidth: 460 }} onClick={e => e.stopPropagation()}>
@@ -313,9 +299,7 @@ export default function AdminInscricoes() {
                   onChange={e => setNovoStatus({ ...novoStatus, turma_id: e.target.value })}>
                   <option value="">Aprovar sem turma (matricular depois)</option>
                   {turmas.map(t => (
-                    <option key={t.id} value={t.id}>
-                      {t.nome} — {t.serie_classe}ª ({t.turno})
-                    </option>
+                    <option key={t.id} value={t.id}>{t.nome} — {t.serie_classe}ª ({t.turno})</option>
                   ))}
                 </select>
                 <p style={{ fontSize: '0.8rem', color: 'var(--cinza)', marginTop: 6 }}>
