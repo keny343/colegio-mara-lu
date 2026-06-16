@@ -30,7 +30,7 @@ const idsTurmasLecionadas = async (professorId) => {
   return new Set(rows.map((r) => Number(r.turma_id)));
 };
 
-const filtrarTurmasPorAcesso = async (user, 1turmas) => {
+const filtrarTurmasPorAcesso = async (user, turmas) => {
   if (!user || user.role === 'admin') return turmas;
   const lecionadas = await idsTurmasLecionadas(user.id);
   return turmas.filter((t) => turmaVisivelParaNotas(user, t, lecionadas));
