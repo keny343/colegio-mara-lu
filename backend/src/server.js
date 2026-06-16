@@ -61,6 +61,9 @@ app.listen(PORT, () => {
   console.log(`\n🎓 Servidor rodando em: http://localhost:${PORT}`);
   console.log(`📡 API disponível em: http://localhost:${PORT}/api`);
    console.log(`🌐 FRONTEND_URL: ${process.env.FRONTEND_URL}`);
-
+app.listen(PORT, () => {
+  console.log(`🌐 FRONTEND_URL: ${process.env.FRONTEND_URL}`);
+  console.log(`☁️ CLOUDINARY: ${process.env.CLOUDINARY_CLOUD_NAME}`);
+});
   
 });
