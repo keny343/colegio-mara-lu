@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { Eye, CheckCircle, XCircle, Search, Filter, FileText, X } from 'lucide-react';
+import { Eye, CheckCircle, FileText, X } from 'lucide-react';
 import api from '../services/api';
 import { normalizeSeriesName } from '../utils/serieName';
 import Toast, { useToast } from '../components/Toast';
@@ -69,15 +69,10 @@ export default function AdminInscricoes() {
     } catch (err) {
       const msg = err.response?.data?.message || 'Erro ao atualizar.';
       showToast(msg, 'error');
-    }
-    finally { setSalvando(false); }
+    } finally { setSalvando(false); }
   };
 
   const totalPages = Math.ceil(total / 15);
-
-  // Para ficheiros estáticos (uploads) precisamos do URL completo do backend
-  // para evitar que o React Router intercepte o caminho e redirecione para a página inicial
-  const apiBase = process.env.REACT_APP_API_URL || 'http://localhost:49152';
 
   return (
     <div className="page-container">
@@ -143,7 +138,6 @@ export default function AdminInscricoes() {
                   <tr key={i.id}>
                     <td style={{ color: 'var(--cinza)', fontSize: '0.85rem' }}>#{i.id}</td>
                     <td><strong>{i.aluno_nome}</strong></td>
-                    {/* CORRIGIDO: mostra nome do encarregado e telefone de emergência */}
                     <td>
                       <div>{i.encarregado_nome || i.responsavel_nome || '—'}</div>
                       <div style={{ fontSize: '0.8rem', color: 'var(--cinza)' }}>
@@ -165,7 +159,6 @@ export default function AdminInscricoes() {
               </tbody>
             </table>
           </div>
-          {/* Paginação */}
           {totalPages > 1 && (
             <div style={{ display: 'flex', justifyContent: 'center', gap: 8, padding: '1rem' }}>
               {Array.from({ length: totalPages }, (_, i) => i + 1).map(p => (
@@ -239,7 +232,6 @@ export default function AdminInscricoes() {
               </div>
             )}
 
-            {/* Documentos — CORRIGIDO: badge com texto mais claro e link de visualização */}
             {detalhe.documentos?.length > 0 && (
               <div style={{ marginTop: '1.5rem' }}>
                 <h4 style={{ color: 'var(--castanho-medio)', marginBottom: 12, fontSize: '0.85rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Documentos Enviados</h4>
@@ -254,9 +246,9 @@ export default function AdminInscricoes() {
                         <span className={`badge badge-${d.status}`}>
                           {d.status === 'pendente' ? 'Aguarda revisão' : d.status}
                         </span>
-                        {d.caminho_arquivo && (
-                          <a
-href={d.caminho_arquivo}
+                        {d.caminho_arquivo && d.caminho_arquivo.startsWith('http') && (
+                          
+                            href={d.caminho_arquivo}
                             target="_blank"
                             rel="noopener noreferrer"
                             className="btn btn-sm btn-outline"
