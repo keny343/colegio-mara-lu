@@ -149,7 +149,7 @@ const atualizarDisciplina = async (req, res) => {
   const campos = {};
   if (nome !== undefined) {
     const [dup] = await db.query(
-      \smbdxss`SELECT id, nome FROM disciplinas WHERE ativo = 1 AND LOWER(TRIM(nome)) = LOWER(TRIM(?)) AND id != ? LIMIT 1`,
+    `SELECT id, nome FROM disciplinas WHERE ativo = 1 AND LOWER(TRIM(nome)) = LOWER(TRIM(?)) AND id != ? LIMIT 1`,
       [nome, id]
     );
     if (dup.length > 0) {
