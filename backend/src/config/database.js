@@ -10,7 +10,7 @@ const pool = mysql2.createPool({
   waitForConnections: true,
   connectionLimit: 10,
   queueLimit: 0,
-charset: 'utf8mb4'
+charset: 'utf8mb4',
   timezone: '+00:00',
   connectTimeout: 10000,
   ssl: process.env.DB_SSL === 'true' ? { rejectUnauthorized: false } : undefined
