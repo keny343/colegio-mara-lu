@@ -256,7 +256,7 @@ export default function AdminInscricoes() {
                         </span>
                         {d.caminho_arquivo && (
                           <a
-                            href={`${apiBase}/uploads/${d.caminho_arquivo}`}
+href={d.caminho_arquivo}
                             target="_blank"
                             rel="noopener noreferrer"
                             className="btn btn-sm btn-outline"

@@ -1,30 +1,10 @@
 const db = require('../config/database');
-const multer = require('multer');
 const path = require('path');
-const fs = require('fs');
 const { coordenadorPodeGerirTurma, temEscopoCoordenacao } = require('../utils/academicoRules');
+const cloudinaryUpload = require('../config/cloudinaryUpload');
 
-const uploadDir = process.env.UPLOAD_PATH || './uploads';
-const materiaisDir = path.join(uploadDir, 'materiais');
-const planosDir = path.join(uploadDir, 'planos');
-for (const d of [uploadDir, materiaisDir, planosDir]) {
-  if (!fs.existsSync(d)) fs.mkdirSync(d, { recursive: true });
-}
-
-const storageMateriais = multer.diskStorage({
-  destination: (_req, _file, cb) => cb(null, materiaisDir),
-  filename: (_req, file, cb) => {
-    cb(null, `mat-${Date.now()}-${Math.round(Math.random() * 1e9)}${path.extname(file.originalname)}`);
-  },
-});
-const storagePlanos = multer.diskStorage({
-  destination: (_req, _file, cb) => cb(null, planosDir),
-  filename: (_req, file, cb) => {
-    cb(null, `plano-${Date.now()}-${Math.round(Math.random() * 1e9)}${path.extname(file.originalname)}`);
-  },
-});
-const uploadMaterial = multer({ storage: storageMateriais, limits: { fileSize: 50 * 1024 * 1024 } });
-const uploadPlano = multer({ storage: storagePlanos, limits: { fileSize: 25 * 1024 * 1024 } });
+const uploadMaterial = cloudinaryUpload('materiais', 50);
+const uploadPlano    = cloudinaryUpload('planos', 25);
 
 const ensureTables = async () => {
   await db.query(`
@@ -92,7 +72,7 @@ const enviarMaterial = async (req, res) => {
         disciplina_id || null,
         titulo || req.file.originalname,
         tipo,
-        req.file.filename,
+        req.file.path,
       ]
     );
 
@@ -179,7 +159,7 @@ const enviarPlanoCurricular = async (req, res) => {
       [
         req.user.id,
         titulo || 'Plano curricular',
-        req.file.filename,
+        req.file.path,
         req.user.nivel_coordenado || null,
         req.user.curso_coordenado || null,
       ]
