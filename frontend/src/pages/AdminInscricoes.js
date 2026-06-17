@@ -339,3 +339,4 @@ export default function AdminInscricoes() {
     </div>
   );
 }
+//agr vai dar certo
