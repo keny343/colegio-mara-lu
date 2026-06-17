@@ -77,7 +77,14 @@ export default function AdminInscricoes() {
   const docUrl = (caminho) => {
     if (!caminho) return null;
     // Cloudinary URLs (https://...)
-    if (caminho.startsWith('http')) return caminho;
+    if (caminho.startsWith('http')) {
+      // PDFs enviados via resource_type:'auto' ficaram como /image/upload/ no Cloudinary
+      // mas devem ser servidos como /raw/upload/ para abrir no browser
+      if (caminho.includes('/image/upload/') && caminho.endsWith('.pdf')) {
+        return caminho.replace('/image/upload/', '/raw/upload/');
+      }
+      return caminho;
+    }
     // Arquivos locais existentes no banco (apenas nome do arquivo)
     // Em produção, usar URL completa do backend via variável de ambiente
     // Em desenvolvimento, usar proxy
