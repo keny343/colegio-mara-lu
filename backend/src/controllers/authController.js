@@ -3,8 +3,8 @@ const jwt = require('jsonwebtoken');
 const db = require('../config/database');
 require('dotenv').config();
 
-const cloudinaryUpload = require('../config/cloudinaryUpload');
-const uploadAvatar = cloudinaryUpload('avatars', 3);
+const supabaseUpload = require('../config/supabaseUpload');
+const uploadAvatar = supabaseUpload('avatars', 3);
 
 let fotoColumnEnsured = false;
 
@@ -137,7 +137,7 @@ const atualizarFotoPerfil = async (req, res) => {
   try {
     await ensureFotoColumn();
     if (!req.file) return res.status(400).json({ message: 'Seleccione uma fotografia.' });
-    const fotoPath = req.file.path;
+    const fotoPath = req.file.secure_url || req.file.path;
     await db.query('UPDATE usuarios SET foto_url = ? WHERE id = ?', [fotoPath, req.user.id]);
     return res.json({ message: 'Fotografia actualizada.', foto_url: fotoPath });
   } catch (err) {

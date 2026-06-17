@@ -11,6 +11,7 @@ async function fixAccess() {
   let total = 0;
   let fixed = 0;
 
+  // --- IMAGENS ---
   do {
     const result = await cloudinary.api.resources({
       type: 'upload',
@@ -41,28 +42,34 @@ async function fixAccess() {
     nextCursor = result.next_cursor;
   } while (nextCursor);
 
-  // PDFs são resource_type 'raw' no Cloudinary
-  nextCursor = null;
-  const rawResult = await cloudinary.api.resources({
-    type: 'upload',
-    prefix: 'colegio_mara_lu/inscricoes',
-    resource_type: 'raw',
-    max_results: 100,
-  });
+  // --- PDFs (resource_type 'raw') ---
+  let rawCursor = null;
+  do {
+    const rawResult = await cloudinary.api.resources({
+      type: 'upload',
+      prefix: 'colegio_mara_lu/inscricoes',
+      resource_type: 'raw',
+      max_results: 100,
+      next_cursor: rawCursor,
+    });
 
-  for (const resource of rawResult.resources) {
-    total++;
-    try {
-      await cloudinary.api.update(resource.public_id, {
-        resource_type: 'raw',
-        access_mode: 'public',
-      });
-      console.log(`✅ Corrigido (raw/pdf): ${resource.public_id}`);
-      fixed++;
-    } catch (err) {
-      console.error(`❌ Erro em ${resource.public_id}:`, err.message);
+    for (const resource of rawResult.resources) {
+      total++;
+      try {
+        await cloudinary.uploader.explicit(resource.public_id, {
+          resource_type: 'raw',
+          type: 'upload',
+          access_mode: 'public',
+        });
+        console.log(`✅ Corrigido (raw/pdf): ${resource.public_id}`);
+        fixed++;
+      } catch (err) {
+        console.error(`❌ Erro em ${resource.public_id}:`, err.message);
+      }
     }
-  }
+
+    rawCursor = rawResult.next_cursor;
+  } while (rawCursor);
 
   console.log(`\n📊 Total encontrado: ${total}`);
   console.log(`🔧 Total corrigido: ${fixed}`);
