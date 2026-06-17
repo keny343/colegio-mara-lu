@@ -74,7 +74,13 @@ export default function AdminInscricoes() {
 
   const totalPages = Math.ceil(total / 15);
 
-  const docUrl = (caminho) => caminho.startsWith('http') ? caminho : null;
+  const docUrl = (caminho) => {
+    if (!caminho) return null;
+    if (caminho.startsWith('http')) return caminho;
+    // Se for um caminho local, construir URL completa usando o proxy
+    const nomeArquivo = caminho.replace(/^uploads\//, '');
+    return `/uploads/${nomeArquivo}`;
+  };
 
   return (
     <div className="page-container">
