@@ -79,7 +79,12 @@ export default function AdminInscricoes() {
     // Cloudinary URLs (https://...)
     if (caminho.startsWith('http')) return caminho;
     // Arquivos locais existentes no banco (apenas nome do arquivo)
-    // Usar o proxy do backend para acessar /uploads/
+    // Em produção, usar URL completa do backend via variável de ambiente
+    // Em desenvolvimento, usar proxy
+    if (process.env.REACT_APP_API_URL) {
+      return `${process.env.REACT_APP_API_URL}/uploads/${caminho}`;
+    }
+    // Fallback para desenvolvimento com proxy
     return `/uploads/${caminho}`;
   };
 
