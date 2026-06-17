@@ -55,8 +55,8 @@ const deletarSerie = async (req, res) => {
 };
 
 // --- DOCUMENTOS ---
-const cloudinaryUpload = require('../config/cloudinaryUpload');
-const upload = cloudinaryUpload('documentos', 5);
+const supabaseUpload = require('../config/supabaseUpload');
+const upload = supabaseUpload('documentos', 5);
 
 const enviarDocumento = async (req, res) => {
   const { inscricao_id, tipo } = req.body;

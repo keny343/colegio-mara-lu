@@ -1,9 +1,9 @@
 const bcrypt = require('bcryptjs');
 const db = require('../config/database');
-const cloudinaryUpload = require('../config/cloudinaryUpload');
+const supabaseUpload = require('../config/supabaseUpload');
 
-// Upload para Cloudinary na pasta 'inscricoes'
-const upload = cloudinaryUpload('inscricoes', 5);
+// Upload para Supabase Storage na pasta 'inscricoes'
+const upload = supabaseUpload('inscricoes', 5);
 
 const classeNumeroDaSerie = (nome) => {
   if (!nome) return null;
@@ -104,7 +104,7 @@ const inscreverAluno = async (req, res) => {
 
     const responsavelEncarregado = precisaBoletim ? String(nome_encarregado).trim() : null;
 
-    // Validar arquivos (enviados via Cloudinary pelo multer-storage-cloudinary)
+    // Validar arquivos (enviados via Supabase Storage pelo multer em memória)
     const biArquivo = req.files?.bi_arquivo?.[0];
     const historicoArquivo = req.files?.historico_arquivo?.[0];
 
@@ -158,9 +158,9 @@ const inscreverAluno = async (req, res) => {
       [usuario_id, aluno_id, serie_id, anoNum, 'pendente']
     );
 
-    // Guardar URLs permanentes do Cloudinary na tabela documentos
-    // req.file.secure_url = URL pública permanente no Cloudinary
-    // req.file.path       = fallback (também é a secure_url no multer-storage-cloudinary)
+    // Guardar URLs permanentes do Supabase Storage na tabela documentos
+    // req.file.secure_url = URL pública permanente no Supabase
+    // req.file.path       = fallback (também é a secure_url no nosso supabaseUpload)
     await conn.query(
       'INSERT INTO documentos (inscricao_id, tipo, nome_arquivo, caminho_arquivo) VALUES (?,?,?,?)',
       [insc.insertId, 'rg', biArquivo.originalname, biArquivo.secure_url || biArquivo.path]

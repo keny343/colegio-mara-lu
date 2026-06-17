@@ -1,10 +1,10 @@
 const db = require('../config/database');
 const path = require('path');
 const { coordenadorPodeGerirTurma, temEscopoCoordenacao } = require('../utils/academicoRules');
-const cloudinaryUpload = require('../config/cloudinaryUpload');
+const supabaseUpload = require('../config/supabaseUpload');
 
-const uploadMaterial = cloudinaryUpload('materiais', 50);
-const uploadPlano    = cloudinaryUpload('planos', 25);
+const uploadMaterial = supabaseUpload('materiais', 50);
+const uploadPlano    = supabaseUpload('planos', 25);
 
 const ensureTables = async () => {
   await db.query(`
