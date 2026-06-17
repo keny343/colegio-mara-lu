@@ -8,6 +8,8 @@ function cloudinaryUpload(folder, maxSizeMB = 10) {
     params: async (req, file) => ({
       folder: `colegio_mara_lu/${folder}`,
       resource_type: 'auto',
+      type: 'upload',           // garante que fica na delivery type pública
+      access_mode: 'public',    // acesso público sem autenticação
       public_id: `${Date.now()}-${Math.round(Math.random() * 1e6)}`,
     }),
   });
