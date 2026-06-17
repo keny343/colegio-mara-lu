@@ -74,7 +74,14 @@ export default function AdminInscricoes() {
 
   const totalPages = Math.ceil(total / 15);
 
-  const docUrl = (caminho) => caminho.startsWith('http') ? caminho : null;
+  const docUrl = (caminho) => {
+    if (!caminho) return null;
+    // Cloudinary URLs (https://...)
+    if (caminho.startsWith('http')) return caminho;
+    // Arquivos locais existentes no banco (apenas nome do arquivo)
+    // Usar o proxy do backend para acessar /uploads/
+    return `/uploads/${caminho}`;
+  };
 
   return (
     <div className="page-container">
