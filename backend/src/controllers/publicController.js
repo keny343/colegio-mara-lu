@@ -1,24 +1,9 @@
 const bcrypt = require('bcryptjs');
 const db = require('../config/database');
-const multer = require('multer');
-const path = require('path');
-const fs = require('fs');
+const cloudinaryUpload = require('../config/cloudinaryUpload');
 
-const uploadDir = process.env.UPLOAD_PATH || './uploads';
-if (!fs.existsSync(uploadDir)) fs.mkdirSync(uploadDir, { recursive: true });
-
-const storage = multer.diskStorage({
-  destination: (req, file, cb) => cb(null, uploadDir),
-  filename: (req, file, cb) => {
-    const unique = `${Date.now()}-${Math.round(Math.random() * 1e9)}`;
-    cb(null, unique + path.extname(file.originalname));
-  }
-});
-
-const upload = multer({
-  storage,
-  limits: { fileSize: 5 * 1024 * 1024 }, // 5MB
-});
+// Upload para Cloudinary na pasta 'inscricoes'
+const upload = cloudinaryUpload('inscricoes', 5);
 
 const classeNumeroDaSerie = (nome) => {
   if (!nome) return null;
@@ -69,11 +54,10 @@ const inscreverAluno = async (req, res) => {
   const nomeCompleto = `${String(primeiro_nome).trim()} ${String(ultimo_nome).trim()}`.trim();
   const biLimpo = String(bi).trim();
 
-  // ✅ PEGAR CONEXÃO PARA TRANSAÇÃO
   let conn;
   try {
     conn = await db.getConnection();
-    await conn.beginTransaction(); // INICIAR TRANSAÇÃO
+    await conn.beginTransaction();
 
     // Evitar duplicações (BI já usado)
     const [exists] = await conn.query('SELECT id FROM usuarios WHERE cpf = ? LIMIT 1', [biLimpo]);
@@ -93,7 +77,6 @@ const inscreverAluno = async (req, res) => {
 
     const hash = await bcrypt.hash(biLimpo, 10);
 
-    // ✅ CORRIGIDO: role = 'aluno' (não 'user')
     const [userResult] = await conn.query(
       'INSERT INTO usuarios (nome, email, senha, cpf, ativo, role) VALUES (?,?,?,?,?,?)',
       [nomeCompleto, emailInterno, hash, biLimpo, 0, 'aluno']
@@ -121,7 +104,7 @@ const inscreverAluno = async (req, res) => {
 
     const responsavelEncarregado = precisaBoletim ? String(nome_encarregado).trim() : null;
 
-    // Validar arquivos
+    // Validar arquivos (enviados via Cloudinary pelo multer-storage-cloudinary)
     const biArquivo = req.files?.bi_arquivo?.[0];
     const historicoArquivo = req.files?.historico_arquivo?.[0];
 
@@ -175,16 +158,18 @@ const inscreverAluno = async (req, res) => {
       [usuario_id, aluno_id, serie_id, anoNum, 'pendente']
     );
 
-    // Guardar documentos enviados na inscrição pública
+    // Guardar URLs permanentes do Cloudinary na tabela documentos
+    // req.file.secure_url = URL pública permanente no Cloudinary
+    // req.file.path       = fallback (também é a secure_url no multer-storage-cloudinary)
     await conn.query(
       'INSERT INTO documentos (inscricao_id, tipo, nome_arquivo, caminho_arquivo) VALUES (?,?,?,?)',
-      [insc.insertId, 'rg', biArquivo.originalname, biArquivo.filename]
+      [insc.insertId, 'rg', biArquivo.originalname, biArquivo.secure_url || biArquivo.path]
     );
 
     if (precisaBoletim && historicoArquivo) {
       await conn.query(
         'INSERT INTO documentos (inscricao_id, tipo, nome_arquivo, caminho_arquivo) VALUES (?,?,?,?)',
-        [insc.insertId, 'historico_escolar', historicoArquivo.originalname, historicoArquivo.filename]
+        [insc.insertId, 'historico_escolar', historicoArquivo.originalname, historicoArquivo.secure_url || historicoArquivo.path]
       );
     }
 
@@ -198,7 +183,6 @@ const inscreverAluno = async (req, res) => {
       ]
     );
 
-    // ✅ SUCESSO - CONFIRMAR TRANSAÇÃO
     await conn.commit();
     conn.release();
 
@@ -208,13 +192,8 @@ const inscreverAluno = async (req, res) => {
     });
 
   } catch (err) {
-    // ❌ ERRO - DESFAZER TUDO
     if (conn) {
-      try {
-        await conn.rollback();
-      } catch (rollbackErr) {
-        console.error('Erro ao fazer rollback:', rollbackErr.message);
-      }
+      try { await conn.rollback(); } catch (e) { console.error('Rollback error:', e.message); }
       conn.release();
     }
 
@@ -226,17 +205,15 @@ const inscreverAluno = async (req, res) => {
       stack: err.stack
     });
 
-    // Retornar erro apropriado baseado no tipo
     if (err.code === 'ER_DUP_ENTRY') {
       return res.status(409).json({ message: 'Dados duplicados. Verifique BI ou email.' });
     }
-
     if (err.code === 'ER_BAD_FIELD_ERROR' || err.code === 'ER_NO_REFERENCED_ROW') {
       return res.status(400).json({ message: 'Dados inválidos. Verifique os campos preenchidos.' });
     }
 
-    return res.status(500).json({ 
-      message: 'Erro ao enviar inscrição. Verifique os dados e tente novamente.' 
+    return res.status(500).json({
+      message: 'Erro ao enviar inscrição. Verifique os dados e tente novamente.'
     });
   }
 };

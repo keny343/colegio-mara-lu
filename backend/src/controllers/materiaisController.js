@@ -72,7 +72,7 @@ const enviarMaterial = async (req, res) => {
         disciplina_id || null,
         titulo || req.file.originalname,
         tipo,
-        req.file.path,
+        req.file.secure_url || req.file.path,
       ]
     );
 
@@ -159,7 +159,7 @@ const enviarPlanoCurricular = async (req, res) => {
       [
         req.user.id,
         titulo || 'Plano curricular',
-        req.file.path,
+        req.file.secure_url || req.file.path,
         req.user.nivel_coordenado || null,
         req.user.curso_coordenado || null,
       ]

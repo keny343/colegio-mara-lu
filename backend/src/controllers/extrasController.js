@@ -65,7 +65,7 @@ const enviarDocumento = async (req, res) => {
   try {
     await db.query(
       'INSERT INTO documentos (inscricao_id, tipo, nome_arquivo, caminho_arquivo) VALUES (?,?,?,?)',
-[inscricao_id, tipo, req.file.originalname, req.file.path]
+[inscricao_id, tipo, req.file.originalname, req.file.secure_url || req.file.path]
     );
     return res.status(201).json({ message: 'Documento enviado com sucesso!' });
   } catch (err) {
