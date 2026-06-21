@@ -35,6 +35,9 @@ export default function Login() {
   return (
     <div className="lp-login-screen">
       <div className="lp-login-grid-bg" aria-hidden="true"></div>
+      <div className="lp-login-blob lp-login-blob-1" aria-hidden="true"></div>
+      <div className="lp-login-blob lp-login-blob-2" aria-hidden="true"></div>
+
       <div className="lp-login-box">
         <div className="lp-login-head">
           <div className="lp-login-mark">
@@ -58,13 +61,16 @@ export default function Login() {
               <label className="form-label">Senha</label>
               <div style={{ position: 'relative' }}>
                 <input name="senha" type={showPass ? 'text' : 'password'} className="form-control" placeholder="••••••••" value={form.senha} onChange={handleChange} required style={{ paddingRight: 44 }} />
-                <button type="button" onClick={() => setShowPass(!showPass)} className="lp-pass-toggle">
-                  {showPass ? <EyeOff size={18} /> : <Eye size={18} />}
+                <button type="button" onClick={() => setShowPass(!showPass)} className="lp-pass-toggle" aria-label={showPass ? 'Esconder senha' : 'Mostrar senha'}>
+                  {showPass
+                    ? <EyeOff key="off" size={18} className="lp-pass-toggle-icon" />
+                    : <Eye key="on" size={18} className="lp-pass-toggle-icon" />}
                 </button>
               </div>
             </div>
 
             <button type="submit" className="btn btn-primary btn-full" disabled={loading}>
+              {loading && <span className="lp-spinner" aria-hidden="true"></span>}
               {loading ? 'Entrando...' : 'Entrar'}
             </button>
           </form>

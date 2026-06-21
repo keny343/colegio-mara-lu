@@ -12,25 +12,61 @@
   position: absolute;
   inset: 0;
   background-image:
-    linear-gradient(rgba(245,230,211,0.07) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(245,230,211,0.07) 1px, transparent 1px);
+    linear-gradient(rgba(245,230,211,0.06) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(245,230,211,0.06) 1px, transparent 1px);
   background-size: 56px 56px;
   -webkit-mask-image: radial-gradient(ellipse 70% 70% at 50% 40%, black 20%, transparent 75%);
   mask-image: radial-gradient(ellipse 70% 70% at 50% 40%, black 20%, transparent 75%);
 }
 
-.lp-login-box { position: relative; width: 100%; max-width: 420px; }
+/* drifting light blobs — premium ambient motion */
+.lp-login-blob {
+  position: absolute;
+  border-radius: 50%;
+  filter: blur(70px);
+  pointer-events: none;
+  opacity: 0.55;
+}
+.lp-login-blob-1 {
+  width: 420px; height: 420px;
+  background: radial-gradient(circle, var(--laranja) 0%, transparent 70%);
+  top: -120px; left: -100px;
+  animation: lp-drift-1 16s ease-in-out infinite alternate;
+}
+.lp-login-blob-2 {
+  width: 360px; height: 360px;
+  background: radial-gradient(circle, var(--castanho-claro) 0%, transparent 70%);
+  bottom: -140px; right: -80px;
+  animation: lp-drift-2 19s ease-in-out infinite alternate;
+}
+@keyframes lp-drift-1 {
+  from { transform: translate(0, 0) scale(1); }
+  to   { transform: translate(60px, 40px) scale(1.12); }
+}
+@keyframes lp-drift-2 {
+  from { transform: translate(0, 0) scale(1); }
+  to   { transform: translate(-50px, -30px) scale(1.08); }
+}
+
+.lp-login-box {
+  position: relative;
+  width: 100%;
+  max-width: 420px;
+}
 
 .lp-login-head { text-align: center; margin-bottom: 1.75rem; }
 .lp-login-mark {
   width: 56px;
   height: 56px;
-  background: var(--laranja);
+  background: linear-gradient(135deg, var(--laranja), var(--laranja-claro));
   border-radius: 14px;
   display: flex;
   align-items: center;
   justify-content: center;
   margin: 0 auto 1.1rem;
+  box-shadow: 0 10px 28px -8px rgba(232,100,26,0.65);
+  opacity: 0;
+  animation: lp-rise 0.6s cubic-bezier(0.16, 1, 0.3, 1) 0.05s forwards;
 }
 .lp-login-eyebrow {
   font-family: 'DM Mono', 'Courier New', monospace;
@@ -40,25 +76,61 @@
   text-transform: uppercase;
   display: block;
   margin-bottom: 8px;
+  opacity: 0;
+  animation: lp-rise 0.6s cubic-bezier(0.16, 1, 0.3, 1) 0.15s forwards;
 }
 .lp-login-head h2 {
   font-family: 'Playfair Display', serif;
   font-weight: 700;
   color: var(--branco);
   font-size: 1.7rem;
+  letter-spacing: -0.01em;
+  opacity: 0;
+  animation: lp-rise 0.6s cubic-bezier(0.16, 1, 0.3, 1) 0.22s forwards;
 }
 .lp-login-head p {
   font-family: 'DM Sans', sans-serif;
   color: var(--bege);
   margin-top: 4px;
   font-size: 0.92rem;
+  opacity: 0;
+  animation: lp-rise 0.6s cubic-bezier(0.16, 1, 0.3, 1) 0.28s forwards;
 }
 
 .lp-login-card {
   background: var(--branco);
-  border: 1px solid rgba(61,31,10,0.1);
+  border: 1px solid rgba(61,31,10,0.08);
   border-radius: var(--radius-lg);
   padding: 2rem;
+  box-shadow:
+    0 1px 2px rgba(61,31,10,0.06),
+    0 24px 60px -20px rgba(61,31,10,0.45),
+    0 0 0 1px rgba(232,100,26,0.04);
+  opacity: 0;
+  animation: lp-rise-card 0.7s cubic-bezier(0.16, 1, 0.3, 1) 0.35s forwards;
+}
+
+@keyframes lp-rise {
+  from { opacity: 0; transform: translateY(10px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+@keyframes lp-rise-card {
+  from { opacity: 0; transform: translateY(22px) scale(0.985); }
+  to   { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+/* input polish — glow on focus */
+.lp-login-card .form-control {
+  transition: border-color 0.2s ease, box-shadow 0.2s ease, transform 0.15s ease;
+}
+.lp-login-card .form-control:focus {
+  border-color: var(--laranja);
+  box-shadow: 0 0 0 4px rgba(232,100,26,0.14);
+  outline: none;
+}
+.lp-login-card .form-group { position: relative; }
+.lp-login-card .form-label {
+  transition: color 0.2s ease;
 }
 
 .lp-login-footer {
@@ -76,8 +148,9 @@
   color: var(--laranja);
   font-weight: 600;
   text-decoration: none;
+  transition: color 0.15s ease;
 }
-.lp-login-footer a:hover { text-decoration: underline; }
+.lp-login-footer a:hover { color: var(--laranja-claro); text-decoration: underline; }
 
 .lp-login-back {
   display: block;
@@ -86,11 +159,12 @@
   font-family: 'DM Mono', 'Courier New', monospace;
   font-size: 12.5px;
   color: var(--bege);
-  opacity: 0.7;
+  opacity: 0;
   text-decoration: none;
-  transition: opacity 0.15s;
+  transition: opacity 0.2s ease;
+  animation: lp-rise 0.6s cubic-bezier(0.16, 1, 0.3, 1) 0.5s forwards;
 }
-.lp-login-back:hover { opacity: 1; }
+.lp-login-back:hover { opacity: 1 !important; }
 
 .lp-pass-toggle {
   position: absolute;
@@ -102,8 +176,66 @@
   cursor: pointer;
   color: var(--cinza);
   display: flex;
+  padding: 4px;
+  border-radius: 6px;
+  transition: color 0.15s ease, background 0.15s ease;
+}
+.lp-pass-toggle:hover { color: var(--laranja); background: rgba(232,100,26,0.08); }
+.lp-pass-toggle-icon { animation: lp-pop 0.25s cubic-bezier(0.34, 1.56, 0.64, 1); }
+@keyframes lp-pop {
+  from { transform: scale(0.6); opacity: 0.4; }
+  to   { transform: scale(1); opacity: 1; }
+}
+
+/* button — gradient, lift, press, spinner */
+.lp-login-card .btn-primary {
+  background: linear-gradient(135deg, var(--laranja), var(--laranja-claro));
+  border: none;
+  position: relative;
+  transition: transform 0.18s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.18s ease, filter 0.18s ease;
+  box-shadow: 0 10px 26px -10px rgba(232,100,26,0.6);
+}
+.lp-login-card .btn-primary:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 16px 32px -12px rgba(232,100,26,0.7);
+  filter: brightness(1.04);
+}
+.lp-login-card .btn-primary:active:not(:disabled) {
+  transform: translateY(0) scale(0.98);
+}
+.lp-login-card .btn-primary:disabled { opacity: 0.85; cursor: default; }
+
+.lp-spinner {
+  display: inline-block;
+  width: 15px; height: 15px;
+  border: 2px solid rgba(255,255,255,0.4);
+  border-top-color: #fff;
+  border-radius: 50%;
+  margin-right: 8px;
+  vertical-align: -2px;
+  animation: lp-spin 0.7s linear infinite;
+}
+@keyframes lp-spin { to { transform: rotate(360deg); } }
+
+.alert-error { animation: lp-shake 0.4s cubic-bezier(0.36, 0.07, 0.19, 0.97); }
+@keyframes lp-shake {
+  10%, 90% { transform: translateX(-1px); }
+  20%, 80% { transform: translateX(2px); }
+  30%, 50%, 70% { transform: translateX(-4px); }
+  40%, 60% { transform: translateX(4px); }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .lp-login-screen * { transition: none !important; }
+  .lp-login-blob-1, .lp-login-blob-2 { animation: none; }
+  .lp-login-mark, .lp-login-eyebrow, .lp-login-head h2, .lp-login-head p,
+  .lp-login-card, .lp-login-back {
+    animation: none !important;
+    opacity: 1 !important;
+    transform: none !important;
+  }
+  .lp-pass-toggle-icon { animation: none; }
+  .lp-login-card .btn-primary:hover:not(:disabled),
+  .lp-login-card .btn-primary:active:not(:disabled) { transform: none; }
+  .alert-error { animation: none; }
+  .lp-spinner { animation-duration: 1.2s; }
 }
