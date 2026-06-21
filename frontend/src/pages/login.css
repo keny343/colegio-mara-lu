@@ -1,0 +1,109 @@
+.lp-login-screen {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--castanho);
+  position: relative;
+  overflow: hidden;
+  padding: 2rem;
+}
+.lp-login-grid-bg {
+  position: absolute;
+  inset: 0;
+  background-image:
+    linear-gradient(rgba(245,230,211,0.07) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(245,230,211,0.07) 1px, transparent 1px);
+  background-size: 56px 56px;
+  -webkit-mask-image: radial-gradient(ellipse 70% 70% at 50% 40%, black 20%, transparent 75%);
+  mask-image: radial-gradient(ellipse 70% 70% at 50% 40%, black 20%, transparent 75%);
+}
+
+.lp-login-box { position: relative; width: 100%; max-width: 420px; }
+
+.lp-login-head { text-align: center; margin-bottom: 1.75rem; }
+.lp-login-mark {
+  width: 56px;
+  height: 56px;
+  background: var(--laranja);
+  border-radius: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0 auto 1.1rem;
+}
+.lp-login-eyebrow {
+  font-family: 'DM Mono', 'Courier New', monospace;
+  font-size: 12px;
+  letter-spacing: 0.08em;
+  color: var(--laranja-claro);
+  text-transform: uppercase;
+  display: block;
+  margin-bottom: 8px;
+}
+.lp-login-head h2 {
+  font-family: 'Playfair Display', serif;
+  font-weight: 700;
+  color: var(--branco);
+  font-size: 1.7rem;
+}
+.lp-login-head p {
+  font-family: 'DM Sans', sans-serif;
+  color: var(--bege);
+  margin-top: 4px;
+  font-size: 0.92rem;
+}
+
+.lp-login-card {
+  background: var(--branco);
+  border: 1px solid rgba(61,31,10,0.1);
+  border-radius: var(--radius-lg);
+  padding: 2rem;
+}
+
+.lp-login-footer {
+  text-align: center;
+  margin-top: 1.5rem;
+  padding-top: 1.5rem;
+  border-top: 1px solid var(--bege);
+}
+.lp-login-footer p {
+  font-family: 'DM Sans', sans-serif;
+  color: var(--cinza);
+  font-size: 0.9rem;
+}
+.lp-login-footer a {
+  color: var(--laranja);
+  font-weight: 600;
+  text-decoration: none;
+}
+.lp-login-footer a:hover { text-decoration: underline; }
+
+.lp-login-back {
+  display: block;
+  text-align: center;
+  margin-top: 1.5rem;
+  font-family: 'DM Mono', 'Courier New', monospace;
+  font-size: 12.5px;
+  color: var(--bege);
+  opacity: 0.7;
+  text-decoration: none;
+  transition: opacity 0.15s;
+}
+.lp-login-back:hover { opacity: 1; }
+
+.lp-pass-toggle {
+  position: absolute;
+  right: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--cinza);
+  display: flex;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .lp-login-screen * { transition: none !important; }
+}

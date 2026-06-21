@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { GraduationCap, Eye, EyeOff } from 'lucide-react';
+import './Login.css';
 
 export default function Login() {
   const { login } = useAuth();
@@ -32,17 +33,19 @@ export default function Login() {
   };
 
   return (
-    <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'linear-gradient(135deg, var(--castanho) 0%, var(--castanho-medio) 100%)', padding: '2rem' }}>
-      <div style={{ width: '100%', maxWidth: 420 }}>
-        <div style={{ textAlign: 'center', marginBottom: '2rem' }}>
-          <div style={{ width: 64, height: 64, background: 'var(--laranja)', borderRadius: 16, display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 1rem' }}>
-            <GraduationCap size={32} color="white" />
+    <div className="lp-login-screen">
+      <div className="lp-login-grid-bg" aria-hidden="true"></div>
+      <div className="lp-login-box">
+        <div className="lp-login-head">
+          <div className="lp-login-mark">
+            <GraduationCap size={28} color="white" />
           </div>
-          <h2 style={{ color: 'white', fontSize: '1.8rem' }}>Colégio Mara & Lu</h2>
-          <p style={{ color: 'var(--bege)', marginTop: 4 }}>Entre na sua conta</p>
+          <span className="lp-login-eyebrow">Acesso ao portal</span>
+          <h2>Colégio Mara &amp; Lu</h2>
+          <p>Entre na sua conta</p>
         </div>
 
-        <div className="card">
+        <div className="lp-login-card">
           <form onSubmit={handleSubmit}>
             {error && <div className="alert alert-error">{error}</div>}
 
@@ -55,7 +58,7 @@ export default function Login() {
               <label className="form-label">Senha</label>
               <div style={{ position: 'relative' }}>
                 <input name="senha" type={showPass ? 'text' : 'password'} className="form-control" placeholder="••••••••" value={form.senha} onChange={handleChange} required style={{ paddingRight: 44 }} />
-                <button type="button" onClick={() => setShowPass(!showPass)} style={{ position: 'absolute', right: 12, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--cinza)' }}>
+                <button type="button" onClick={() => setShowPass(!showPass)} className="lp-pass-toggle">
                   {showPass ? <EyeOff size={18} /> : <Eye size={18} />}
                 </button>
               </div>
@@ -66,12 +69,14 @@ export default function Login() {
             </button>
           </form>
 
-          <div style={{ textAlign: 'center', marginTop: '1.5rem', paddingTop: '1.5rem', borderTop: '1px solid var(--bege)' }}>
-            <p style={{ color: 'var(--cinza)', fontSize: '0.9rem' }}>
-              Ainda não se inscreveu? <Link to="/inscricao" style={{ color: 'var(--laranja)', fontWeight: 600 }}>Fazer inscrição</Link>
+          <div className="lp-login-footer">
+            <p>
+              Ainda não se inscreveu? <Link to="/inscricao">Fazer inscrição</Link>
             </p>
           </div>
         </div>
+
+        <Link to="/" className="lp-login-back">← voltar ao início</Link>
       </div>
     </div>
   );
