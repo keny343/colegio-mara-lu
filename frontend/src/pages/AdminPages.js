@@ -481,9 +481,9 @@ export function AdminSeries() {
       <div className="page-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
         <div>
           <h2>Classes e Vagas</h2>
-          <p style={{ color: 'var(--cinza)' }}>Gerencie as séries disponíveis para inscrição</p>
+          <p style={{ color: 'var(--cinza)' }}>Gerencie as classes disponíveis para inscrição</p>
         </div>
-        <button className="btn btn-primary" onClick={abrirNovo}><Plus size={18} /> Nova Série</button>
+        <button className="btn btn-primary" onClick={abrirNovo}><Plus size={18} /> Nova Classe</button>
       </div>
 
       {niveis.map(nivel => (
@@ -529,7 +529,7 @@ export function AdminSeries() {
         <div className="modal-overlay" onClick={() => setModal(false)}>
           <div className="modal" style={{ maxWidth: 460 }} onClick={e => e.stopPropagation()}>
             <div className="modal-header">
-              <h3 className="modal-title">{editando ? 'Editar Série' : 'Nova Série'}</h3>
+              <h3 className="modal-title">{editando ? 'Editar Classe' : 'Nova Classe'}</h3>
               <button className="modal-close" onClick={() => setModal(false)}><X size={18} /></button>
             </div>
             <form onSubmit={salvar}>
@@ -560,7 +560,7 @@ export function AdminSeries() {
               <div style={{ display: 'flex', gap: 12 }}>
                 <button type="button" className="btn btn-outline" onClick={() => setModal(false)}>Cancelar</button>
                 <button type="submit" className="btn btn-primary" style={{ flex: 1 }} disabled={saving}>
-                  {saving ? 'Salvando...' : editando ? 'Salvar' : 'Criar Série'}
+                  {saving ? 'Salvando...' : editando ? 'Salvar' : 'Criar Classe'}
                 </button>
               </div>
             </form>
