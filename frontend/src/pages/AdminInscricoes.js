@@ -142,7 +142,7 @@ export default function AdminInscricoes() {
             <table className="table">
               <thead>
                 <tr>
-                  <th>#</th><th>Aluno</th><th>Encarregado</th><th>Série</th>
+                  <th>#</th><th>Aluno</th><th>Encarregado</th><th>classe</th>
                   <th>Ano</th><th>Data</th><th>Status</th><th>Ações</th>
                 </tr>
               </thead>

@@ -92,19 +92,7 @@ export default function AdminAcademico() {
     ...Array.from({ length: 13 }, (_, i) => ({ value: i + 1, label: `${i + 1}ª classe` })),
   ]), []);
 
-  const classesOptions = useMemo(() => {
-    const mapped = (series || [])
-      .map(s => ({ value: classeNumero(s.nome), label: s.nome }))
-      .filter(x => Number.isFinite(x.value));
-    const dedup = new Map();
-    for (const it of mapped) {
-      if (!dedup.has(it.value)) dedup.set(it.value, it.label);
-    }
-    const fromSeries = [...dedup.entries()]
-      .sort((a, b) => a[0] - b[0])
-      .map(([value, label]) => ({ value, label }));
-    return fromSeries.length > 0 ? fromSeries : CLASSES_PADRAO;
-  }, [series, CLASSES_PADRAO]);
+const classesOptions = CLASSES_PADRAO;
 
   const classeSelecionada = Number(turmaForm.serie_classe || 0);
   const cursoObrigatorio = classeSelecionada >= 10;
