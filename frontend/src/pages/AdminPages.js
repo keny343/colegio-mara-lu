@@ -480,7 +480,7 @@ export function AdminSeries() {
     <div className="page-container">
       <div className="page-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
         <div>
-          <h2>Séries e Vagas</h2>
+          <h2>Classes e Vagas</h2>
           <p style={{ color: 'var(--cinza)' }}>Gerencie as séries disponíveis para inscrição</p>
         </div>
         <button className="btn btn-primary" onClick={abrirNovo}><Plus size={18} /> Nova Série</button>
