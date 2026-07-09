@@ -486,6 +486,8 @@ const enviarNotificacao = async (req, res) => {
 
   try {
     let destinatarios = [];
+
+    // ===== PESSOA ESPECÍFICA (qualquer role, respeitando a hierarquia) =====
     if (alvo === 'usuario') {
       const { destinatario_id } = req.body;
       if (!destinatario_id) return res.status(400).json({ message: 'Seleccione o destinatário.' });
@@ -495,74 +497,138 @@ const enviarNotificacao = async (req, res) => {
         return res.status(403).json({ message: 'Não tem permissão para enviar mensagem a este utilizador.' });
       }
       destinatarios = [Number(destinatario_id)];
+
+    // ===== ADMIN: pode mandar para qualquer grupo completo =====
     } else if (req.user.role === 'admin') {
       if (alvo === 'todos') {
-        const [rows] = await db.query('SELECT id FROM usuarios WHERE ativo = 1');
+        const [rows] = await db.query('SELECT id FROM usuarios WHERE ativo = 1 AND id != ?', [req.user.id]);
         destinatarios = rows.map(r => r.id);
-      } else if (alvo === 'alunos') {
-        const [rows] = await db.query('SELECT id FROM usuarios WHERE role = ?', ['aluno']);
+
+      } else if (alvo === 'admins') {
+        const [rows] = await db.query('SELECT id FROM usuarios WHERE role = ? AND ativo = 1 AND id != ?', ['admin', req.user.id]);
         destinatarios = rows.map(r => r.id);
-      } else if (alvo === 'professores') {
-        const [rows] = await db.query('SELECT id FROM usuarios WHERE role = ?', ['professor']);
-        destinatarios = rows.map(r => r.id);
+
       } else if (alvo === 'coordenadores') {
-        const [rows] = await db.query('SELECT id FROM usuarios WHERE role = ?', ['coordenador']);
+        const [rows] = await db.query('SELECT id FROM usuarios WHERE role = ? AND ativo = 1', ['coordenador']);
         destinatarios = rows.map(r => r.id);
+
+      } else if (alvo === 'professores') {
+        if (turma_id) {
+          const [rows] = await db.query(
+            `SELECT DISTINCT u.id FROM turma_professores tp
+             JOIN usuarios u ON tp.professor_id = u.id
+             WHERE tp.turma_id = ?`,
+            [turma_id]
+          );
+          destinatarios = rows.map(r => r.id);
+        } else {
+          const [rows] = await db.query('SELECT id FROM usuarios WHERE role = ? AND ativo = 1', ['professor']);
+          destinatarios = rows.map(r => r.id);
+        }
+
+      } else if (alvo === 'alunos') {
+        if (turma_id) {
+          const [rows] = await db.query(
+            `SELECT DISTINCT a.usuario_id AS id FROM matriculas m
+             JOIN alunos a ON m.aluno_id = a.id
+             WHERE m.turma_id = ? AND m.status = 'ativa' AND a.usuario_id IS NOT NULL`,
+            [turma_id]
+          );
+          destinatarios = rows.map(r => r.id);
+        } else {
+          const [rows] = await db.query('SELECT id FROM usuarios WHERE role = ? AND ativo = 1', ['aluno']);
+          destinatarios = rows.map(r => r.id);
+        }
+
       } else {
         return res.status(400).json({ message: 'Alvo inválido.' });
       }
-    } else if (req.user.role === 'coordenador' || (req.user.role === 'professor' && (req.user.curso_coordenado || req.user.nivel_coordenado))) {
+
+    // ===== COORDENADOR: professores e alunos que coordena (todos de uma vez, ou filtrando por turma) =====
+    } else if (req.user.role === 'coordenador') {
       if (!['alunos', 'professores'].includes(alvo)) {
         return res.status(400).json({ message: 'Alvo inválido para esta função.' });
       }
-      if (!turma_id) return res.status(400).json({ message: 'Seleccione a turma.' });
-      const [turmaRows] = await db.query(
-        'SELECT t.id, t.serie_classe, c.nome as curso_nome FROM turmas t LEFT JOIN cursos c ON t.curso_id = c.id WHERE t.id = ? LIMIT 1',
-        [turma_id]
+
+      const [turmas] = await db.query(
+        `SELECT t.id, t.serie_classe, c.nome AS curso_nome FROM turmas t LEFT JOIN cursos c ON t.curso_id = c.id WHERE t.ativo = 1`
       );
-      if (turmaRows.length === 0) return res.status(404).json({ message: 'Turma não encontrada.' });
-      const turma = turmaRows[0];
-      if (req.user.role === 'coordenador') {
-        if (!coordenadorPodeGerirTurma(req.user, turma)) {
+      const minhasTurmas = turmas.filter(t => coordenadorPodeGerirTurma(req.user, t));
+      let turmaIds = minhasTurmas.map(t => t.id);
+
+      if (turma_id) {
+        if (!turmaIds.includes(Number(turma_id))) {
           return res.status(403).json({ message: 'Não tem permissão para esta turma.' });
         }
-      } else {
-        const [profRows] = await db.query('SELECT id FROM turma_professores WHERE professor_id = ? AND turma_id = ? LIMIT 1', [req.user.id, turma_id]);
-        if (profRows.length === 0) {
-          return res.status(403).json({ message: 'Não está atribuído a esta turma.' });
-        }
+        turmaIds = [Number(turma_id)];
       }
+
+      if (!turmaIds.length) {
+        return res.status(404).json({ message: 'Não tem nenhuma turma sob a sua coordenação.' });
+      }
+
       if (alvo === 'alunos') {
         const [rows] = await db.query(
-          `SELECT DISTINCT a.usuario_id FROM matriculas m
+          `SELECT DISTINCT a.usuario_id AS id FROM matriculas m
            JOIN alunos a ON m.aluno_id = a.id
-           WHERE m.turma_id = ? AND m.status = 'ativa' AND a.usuario_id IS NOT NULL`,
-          [turma_id]
+           WHERE m.turma_id IN (?) AND m.status = 'ativa' AND a.usuario_id IS NOT NULL`,
+          [turmaIds]
         );
-        destinatarios = rows.map(r => r.usuario_id);
+        destinatarios = rows.map(r => r.id);
       } else {
         const [rows] = await db.query(
           `SELECT DISTINCT u.id FROM turma_professores tp
            JOIN usuarios u ON tp.professor_id = u.id
-           WHERE tp.turma_id = ?`,
-          [turma_id]
+           WHERE tp.turma_id IN (?)`,
+          [turmaIds]
         );
         destinatarios = rows.map(r => r.id);
       }
+
+    // ===== PROFESSOR: seus alunos (todos de uma vez, ou filtrando por turma) e/ou o(s) seu(s) coordenador(es) =====
     } else if (req.user.role === 'professor') {
-      if (alvo !== 'alunos') return res.status(400).json({ message: 'Professores só podem enviar mensagens para alunos.' });
-      if (!turma_id) return res.status(400).json({ message: 'Seleccione a turma.' });
-      const [profRows] = await db.query('SELECT id FROM turma_professores WHERE professor_id = ? AND turma_id = ? LIMIT 1', [req.user.id, turma_id]);
-      if (profRows.length === 0) {
-        return res.status(403).json({ message: 'Não está atribuído a esta turma.' });
+      if (!['alunos', 'coordenadores'].includes(alvo)) {
+        return res.status(400).json({ message: 'Professores só podem enviar mensagens para os seus alunos ou coordenador(es).' });
       }
-      const [rows] = await db.query(
-        `SELECT DISTINCT a.usuario_id FROM matriculas m
-         JOIN alunos a ON m.aluno_id = a.id
-         WHERE m.turma_id = ? AND m.status = 'ativa' AND a.usuario_id IS NOT NULL`,
-        [turma_id]
+
+      const [minhasTurmas] = await db.query(
+        `SELECT DISTINCT t.id, t.serie_classe, c.nome AS curso_nome FROM turma_professores tp
+         JOIN turmas t ON tp.turma_id = t.id
+         LEFT JOIN cursos c ON t.curso_id = c.id
+         WHERE tp.professor_id = ?`,
+        [req.user.id]
       );
-      destinatarios = rows.map(r => r.usuario_id);
+      let turmaIds = minhasTurmas.map(t => t.id);
+
+      if (turma_id) {
+        if (!turmaIds.includes(Number(turma_id))) {
+          return res.status(403).json({ message: 'Não está atribuído a esta turma.' });
+        }
+        turmaIds = [Number(turma_id)];
+      }
+
+      if (!turmaIds.length) {
+        return res.status(404).json({ message: 'Não está atribuído a nenhuma turma.' });
+      }
+
+      if (alvo === 'alunos') {
+        const [rows] = await db.query(
+          `SELECT DISTINCT a.usuario_id AS id FROM matriculas m
+           JOIN alunos a ON m.aluno_id = a.id
+           WHERE m.turma_id IN (?) AND m.status = 'ativa' AND a.usuario_id IS NOT NULL`,
+          [turmaIds]
+        );
+        destinatarios = rows.map(r => r.id);
+      } else {
+        const turmasUsadas = minhasTurmas.filter(t => turmaIds.includes(t.id));
+        const [coordenadores] = await db.query(
+          `SELECT id, curso_coordenado, nivel_coordenado FROM usuarios WHERE role = 'coordenador' AND ativo = 1`
+        );
+        destinatarios = coordenadores
+          .filter(c => turmasUsadas.some(t => coordenadorPodeGerirTurma(c, t)))
+          .map(c => c.id);
+      }
+
     } else {
       return res.status(403).json({ message: 'Não tem permissão para enviar mensagens.' });
     }
@@ -576,14 +642,13 @@ const enviarNotificacao = async (req, res) => {
     for (const usuario_id of unique) {
       batch.push([usuario_id, req.user.id, titulo, mensagem, 'mensagem']);
     }
-    await db.query('INSERT INTO notificacoes (usuario_id, remetente_id, titulo, mensagem, tipo) VALUES ?',[batch]);
+    await db.query('INSERT INTO notificacoes (usuario_id, remetente_id, titulo, mensagem, tipo) VALUES ?', [batch]);
     return res.status(201).json({ message: `Mensagem enviada para ${unique.length} destinatários.` });
   } catch (err) {
     console.error('[enviarNotificacao] ERRO:', err.message);
     return res.status(500).json({ message: 'Erro ao enviar notificação.' });
   }
 };
-
 // --- LISTAR DOCUMENTOS DO UTILIZADOR ---
 const listarMeusDocumentos = async (req, res) => {
   try {

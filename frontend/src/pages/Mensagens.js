@@ -103,9 +103,6 @@ export default function Mensagens() {
     if (form.alvo === 'usuario' && !form.destinatario_id) {
       return setErro('Seleccione a pessoa destinatária.');
     }
-    if (form.alvo !== 'usuario' && user && ['professor', 'coordenador'].includes(user.role) && !form.turma_id) {
-      return setErro('Seleccione a turma para enviar a mensagem.');
-    }
     setSending(true);
     try {
       await api.post('/notificacoes', form);
@@ -128,25 +125,33 @@ export default function Mensagens() {
 
   const destinatarioOpts = () => {
     if (user?.role === 'admin') return [
-      { value: 'todos',        label: '🌐 Todos' },
-      { value: 'alunos',       label: '🎒 Alunos' },
-      { value: 'professores',  label: '👩‍🏫 Professores' },
-      { value: 'coordenadores',label: '🏫 Coordenadores' },
-      { value: 'usuario',      label: '👤 Pessoa específica' },
+      { value: 'todos',         label: '🌐 Todos' },
+      { value: 'admins',        label: '🛡️ Administradores' },
+      { value: 'coordenadores', label: '🏫 Coordenadores' },
+      { value: 'professores',   label: '👩‍🏫 Professores' },
+      { value: 'alunos',        label: '🎒 Alunos' },
+      { value: 'usuario',       label: '👤 Pessoa específica' },
     ];
     if (user?.role === 'coordenador') return [
-      { value: 'alunos',      label: '🎒 Alunos da turma' },
-      { value: 'professores', label: '👩‍🏫 Professores da turma' },
+      { value: 'professores', label: '👩‍🏫 Todos os professores que coordeno' },
+      { value: 'alunos',      label: '🎒 Todos os alunos que coordeno' },
       { value: 'usuario',     label: '👤 Pessoa específica' },
     ];
     if (user?.role === 'professor') return [
-      { value: 'alunos',  label: '🎒 Alunos da turma' },
-      { value: 'usuario', label: '👤 Pessoa específica' },
+      { value: 'alunos',        label: '🎒 Todos os meus alunos' },
+      { value: 'coordenadores', label: '🏫 O(s) meu(s) coordenador(es)' },
+      { value: 'usuario',       label: '👤 Pessoa específica' },
     ];
     return [
       { value: 'usuario', label: '👤 Coordenador ou professor específico' },
     ];
   };
+
+  // Mostra o filtro opcional de turma só quando faz sentido para o alvo escolhido
+  const mostrarFiltroTurma =
+    (user?.role === 'admin' && ['alunos', 'professores'].includes(form.alvo)) ||
+    (user?.role === 'coordenador' && ['alunos', 'professores'].includes(form.alvo)) ||
+    (user?.role === 'professor' && form.alvo === 'alunos');
 
   return (
     <div className="page-container">
@@ -183,8 +188,8 @@ export default function Mensagens() {
             <h3 style={{ margin: 0, fontSize: '1rem' }}>Enviar mensagem</h3>
             <span style={{ marginLeft: 'auto', fontSize: '0.78rem', color: 'var(--cinza)', textAlign: 'right' }}>
               {user?.role === 'admin' && 'Admin → todos, grupos ou pessoa específica'}
-              {user?.role === 'coordenador' && 'Coordenador → a sua equipa ou pessoa específica'}
-              {user?.role === 'professor' && 'Professor → seus alunos, ou coordenador/aluno específico'}
+              {user?.role === 'coordenador' && 'Coordenador → a sua equipa (toda ou específica)'}
+              {user?.role === 'professor' && 'Professor → alunos, coordenador ou pessoa específica'}
               {user?.role === 'aluno' && 'Aluno → seu coordenador ou professores'}
             </span>
           </div>
@@ -212,7 +217,7 @@ export default function Mensagens() {
                 <select
                   className="form-control form-select"
                   value={form.alvo}
-                  onChange={e => setForm({ ...form, alvo: e.target.value, destinatario_id: '' })}
+                  onChange={e => setForm({ ...form, alvo: e.target.value, destinatario_id: '', turma_id: '' })}
                 >
                   {destinatarioOpts().map(o => (
                     <option key={o.value} value={o.value}>{o.label}</option>
@@ -248,25 +253,7 @@ export default function Mensagens() {
               </div>
             )}
 
-            {(user?.role === 'coordenador' || user?.role === 'professor') && form.alvo !== 'usuario' && (
-              <div className="form-group">
-                <label className="form-label">Turma *</label>
-                <select
-                  className="form-control form-select"
-                  value={form.turma_id}
-                  onChange={e => setForm({ ...form, turma_id: e.target.value })}
-                >
-                  <option value="">Seleccione a turma...</option>
-                  {turmas.map(t => (
-                    <option key={t.id || t.turma_id} value={t.id || t.turma_id}>
-                      {t.nome || t.turma_nome}
-                    </option>
-                  ))}
-                </select>
-              </div>
-            )}
-
-            {user?.role === 'admin' && ['alunos', 'professores'].includes(form.alvo) && (
+            {mostrarFiltroTurma && (
               <div className="form-group">
                 <label className="form-label">Turma específica (opcional)</label>
                 <select
@@ -274,9 +261,11 @@ export default function Mensagens() {
                   value={form.turma_id}
                   onChange={e => setForm({ ...form, turma_id: e.target.value })}
                 >
-                  <option value="">Todas as turmas</option>
+                  <option value="">Todas as turmas sob a sua gestão</option>
                   {turmas.map(t => (
-                    <option key={t.id} value={t.id}>{t.nome}</option>
+                    <option key={t.id || t.turma_id} value={t.id || t.turma_id}>
+                      {t.nome || t.turma_nome}
+                    </option>
                   ))}
                 </select>
               </div>
