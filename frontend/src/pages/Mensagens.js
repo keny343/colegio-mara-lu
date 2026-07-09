@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useAuth } from '../contexts/AuthContext';
-import { MessageCircle, Send, Bell, CheckCircle, User } from 'lucide-react';
+import { MessageCircle, Send, Bell, CheckCircle, User, Search } from 'lucide-react';
 import api from '../services/api';
 import Toast, { useToast } from '../components/Toast';
 
@@ -29,6 +29,86 @@ const roleLabel = (role) => ({
   professor: 'Professores', aluno: 'Alunos',
 }[role] || role);
 
+// Área de conversa 1-a-1 (chat) com um contacto específico
+function ChatArea({ destinatarioId, destinatarioNome, currentUserId, onSent }) {
+  const [msgs, setMsgs] = useState([]);
+  const [texto, setTexto] = useState('');
+  const [loading, setLoading] = useState(true);
+  const [sending, setSending] = useState(false);
+  const bottomRef = useRef(null);
+
+  const carregar = () => {
+    setLoading(true);
+    api.get(`/mensagens/conversa/${destinatarioId}`)
+      .then(res => setMsgs(res.data))
+      .catch(() => setMsgs([]))
+      .finally(() => setLoading(false));
+  };
+
+  useEffect(() => { carregar(); /* eslint-disable-next-line */ }, [destinatarioId]);
+  useEffect(() => { bottomRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [msgs]);
+
+  const enviar = async (e) => {
+    e.preventDefault();
+    if (!texto.trim()) return;
+    setSending(true);
+    try {
+      await api.post('/notificacoes', { mensagem: texto, alvo: 'usuario', destinatario_id: destinatarioId });
+      setTexto('');
+      carregar();
+      onSent && onSent();
+    } catch (err) {
+      // erro pontual de envio; conversa permanece intacta
+    } finally {
+      setSending(false);
+    }
+  };
+
+  return (
+    <div style={{ marginTop: '1rem', border: '1px solid var(--bege)', borderRadius: 12, overflow: 'hidden' }}>
+      <div style={{ padding: '0.6rem 1rem', background: 'var(--bege-claro)', fontWeight: 700, fontSize: '0.85rem', color: 'var(--castanho)' }}>
+        Conversa com {destinatarioNome}
+      </div>
+      <div style={{ maxHeight: 280, overflowY: 'auto', padding: '0.8rem 1rem', display: 'flex', flexDirection: 'column', gap: 8 }}>
+        {loading ? (
+          <p style={{ fontSize: '0.85rem', color: 'var(--cinza)' }}>A carregar conversa...</p>
+        ) : msgs.length === 0 ? (
+          <p style={{ fontSize: '0.85rem', color: 'var(--cinza)' }}>Ainda não há mensagens. Escreva a primeira.</p>
+        ) : msgs.map(m => {
+          const minha = Number(m.remetente_id) === Number(currentUserId);
+          return (
+            <div key={m.id} style={{ alignSelf: minha ? 'flex-end' : 'flex-start', maxWidth: '75%' }}>
+              <div style={{
+                background: minha ? 'var(--laranja)' : 'var(--bege)',
+                color: minha ? '#fff' : 'var(--castanho)',
+                borderRadius: 12, padding: '0.5rem 0.8rem', fontSize: '0.88rem',
+              }}>
+                {m.mensagem}
+              </div>
+              <div style={{ fontSize: '0.68rem', color: 'var(--cinza)', marginTop: 2, textAlign: minha ? 'right' : 'left' }}>
+                {new Date(m.criado_em).toLocaleString('pt-AO', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })}
+              </div>
+            </div>
+          );
+        })}
+        <div ref={bottomRef} />
+      </div>
+      <form onSubmit={enviar} style={{ display: 'flex', gap: 8, padding: '0.6rem', borderTop: '1px solid var(--bege)' }}>
+        <input
+          className="form-control"
+          placeholder="Escreva uma mensagem..."
+          value={texto}
+          onChange={e => setTexto(e.target.value)}
+          style={{ flex: 1 }}
+        />
+        <button type="submit" className="btn btn-primary btn-sm" disabled={sending || !texto.trim()}>
+          <Send size={14} />
+        </button>
+      </form>
+    </div>
+  );
+}
+
 export default function Mensagens() {
   const { user } = useAuth();
   const [notifs, setNotifs] = useState([]);
@@ -42,6 +122,8 @@ export default function Mensagens() {
     turma_id: '',
     destinatario_id: '',
   });
+  const [buscaContato, setBuscaContato] = useState('');
+  const [chatTurmaFiltro, setChatTurmaFiltro] = useState('');
   const [erro, setErro] = useState('');
   const [sending, setSending] = useState(false);
   const { toast, showToast, clearToast } = useToast();
@@ -100,14 +182,11 @@ export default function Mensagens() {
     e.preventDefault();
     setErro('');
     if (!form.titulo || !form.mensagem) return setErro('Título e mensagem são obrigatórios.');
-    if (form.alvo === 'usuario' && !form.destinatario_id) {
-      return setErro('Seleccione a pessoa destinatária.');
-    }
     setSending(true);
     try {
       await api.post('/notificacoes', form);
       showToast('Mensagem enviada com sucesso! Os destinatários foram notificados.', 'success');
-      setForm({ ...form, titulo: '', mensagem: '', destinatario_id: '' });
+      setForm({ ...form, titulo: '', mensagem: '' });
       await carregarNotifs();
     } catch (err) {
       const msg = err.response?.data?.message || 'Erro ao enviar mensagem.';
@@ -147,11 +226,26 @@ export default function Mensagens() {
     ];
   };
 
-  // Mostra o filtro opcional de turma só quando faz sentido para o alvo escolhido
+  // Mostra o filtro opcional de turma só quando faz sentido para o alvo escolhido (envio em massa)
   const mostrarFiltroTurma =
     (user?.role === 'admin' && ['alunos', 'professores'].includes(form.alvo)) ||
     (user?.role === 'coordenador' && ['alunos', 'professores'].includes(form.alvo)) ||
     (user?.role === 'professor' && form.alvo === 'alunos');
+
+  // Contactos filtrados pela busca (nome/email) e, pro professor, pela turma que leciona
+  const contatosFiltrados = contatos
+    .filter(c => {
+      if (user?.role !== 'professor' || !chatTurmaFiltro) return true;
+      if (c.role !== 'aluno') return true; // coordenador continua sempre visível
+      return Array.isArray(c.turma_ids) && c.turma_ids.includes(Number(chatTurmaFiltro));
+    })
+    .filter(c => {
+      if (!buscaContato.trim()) return true;
+      const q = buscaContato.trim().toLowerCase();
+      return c.nome?.toLowerCase().includes(q) || c.email?.toLowerCase().includes(q);
+    });
+
+  const destinatarioSelecionado = contatos.find(c => Number(c.id) === Number(form.destinatario_id));
 
   return (
     <div className="page-container">
@@ -201,32 +295,57 @@ export default function Mensagens() {
             </div>
           )}
 
-          <form onSubmit={enviarMensagem}>
-            <div className="form-row">
-              <div className="form-group">
-                <label className="form-label">Título *</label>
-                <input
-                  className="form-control"
-                  value={form.titulo}
-                  placeholder="Ex: Aviso importante, Reunião de pais..."
-                  onChange={e => setForm({ ...form, titulo: e.target.value })}
-                />
-              </div>
-              <div className="form-group">
-                <label className="form-label">Destinatário *</label>
-                <select
-                  className="form-control form-select"
-                  value={form.alvo}
-                  onChange={e => setForm({ ...form, alvo: e.target.value, destinatario_id: '', turma_id: '' })}
-                >
-                  {destinatarioOpts().map(o => (
-                    <option key={o.value} value={o.value}>{o.label}</option>
-                  ))}
-                </select>
-              </div>
-            </div>
+          <div className="form-group">
+            <label className="form-label">Destinatário *</label>
+            <select
+              className="form-control form-select"
+              value={form.alvo}
+              onChange={e => {
+                setForm({ ...form, alvo: e.target.value, destinatario_id: '', turma_id: '' });
+                setBuscaContato('');
+                setChatTurmaFiltro('');
+              }}
+            >
+              {destinatarioOpts().map(o => (
+                <option key={o.value} value={o.value}>{o.label}</option>
+              ))}
+            </select>
+          </div>
 
-            {form.alvo === 'usuario' && (
+          {form.alvo === 'usuario' ? (
+            <div>
+              <div className="form-group">
+                <label className="form-label">Buscar pessoa</label>
+                <div style={{ position: 'relative' }}>
+                  <Search size={15} style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', color: 'var(--cinza)' }} />
+                  <input
+                    className="form-control"
+                    style={{ paddingLeft: 32 }}
+                    placeholder="Buscar por nome ou email..."
+                    value={buscaContato}
+                    onChange={e => setBuscaContato(e.target.value)}
+                  />
+                </div>
+              </div>
+
+              {user?.role === 'professor' && turmas.length > 0 && (
+                <div className="form-group">
+                  <label className="form-label">Filtrar alunos por turma (opcional)</label>
+                  <select
+                    className="form-control form-select"
+                    value={chatTurmaFiltro}
+                    onChange={e => setChatTurmaFiltro(e.target.value)}
+                  >
+                    <option value="">Todas as turmas</option>
+                    {turmas.map(t => (
+                      <option key={t.id || t.turma_id} value={t.id || t.turma_id}>
+                        {t.nome || t.turma_nome}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
+
               <div className="form-group">
                 <label className="form-label">Pessoa específica *</label>
                 <select
@@ -236,11 +355,15 @@ export default function Mensagens() {
                 >
                   <option value="">Seleccione a pessoa...</option>
                   {['admin', 'coordenador', 'professor', 'aluno'].map(r => {
-                    const grupo = contatos.filter(c => c.role === r);
+                    const grupo = contatosFiltrados.filter(c => c.role === r);
                     if (!grupo.length) return null;
                     return (
                       <optgroup key={r} label={roleLabel(r)}>
-                        {grupo.map(c => <option key={c.id} value={c.id}>{c.nome}</option>)}
+                        {grupo.map(c => (
+                          <option key={c.id} value={c.id}>
+                            {c.nome}{c.email ? ` · ${c.email}` : ''}
+                          </option>
+                        ))}
                       </optgroup>
                     );
                   })}
@@ -250,41 +373,69 @@ export default function Mensagens() {
                     Ainda não tens contactos disponíveis para mensagem directa.
                   </p>
                 )}
+                {contatos.length > 0 && contatosFiltrados.length === 0 && (
+                  <p style={{ fontSize: '0.8rem', color: 'var(--cinza)', marginTop: 4 }}>
+                    Nenhum contacto corresponde à busca/filtro.
+                  </p>
+                )}
               </div>
-            )}
 
-            {mostrarFiltroTurma && (
-              <div className="form-group">
-                <label className="form-label">Turma específica (opcional)</label>
-                <select
-                  className="form-control form-select"
-                  value={form.turma_id}
-                  onChange={e => setForm({ ...form, turma_id: e.target.value })}
-                >
-                  <option value="">Todas as turmas sob a sua gestão</option>
-                  {turmas.map(t => (
-                    <option key={t.id || t.turma_id} value={t.id || t.turma_id}>
-                      {t.nome || t.turma_nome}
-                    </option>
-                  ))}
-                </select>
-              </div>
-            )}
-
-            <div className="form-group">
-              <label className="form-label">Mensagem *</label>
-              <textarea
-                className="form-control"
-                rows="4"
-                placeholder="Escreva aqui a sua mensagem..."
-                value={form.mensagem}
-                onChange={e => setForm({ ...form, mensagem: e.target.value })}
-              />
+              {form.destinatario_id && destinatarioSelecionado && (
+                <ChatArea
+                  destinatarioId={Number(form.destinatario_id)}
+                  destinatarioNome={destinatarioSelecionado.nome}
+                  currentUserId={user.id}
+                  onSent={carregarNotifs}
+                />
+              )}
             </div>
-            <button type="submit" className="btn btn-primary" disabled={sending}>
-              <Send size={15} /> {sending ? 'A enviar...' : 'Enviar mensagem'}
-            </button>
-          </form>
+          ) : (
+            <form onSubmit={enviarMensagem}>
+              <div className="form-row">
+                <div className="form-group">
+                  <label className="form-label">Título *</label>
+                  <input
+                    className="form-control"
+                    value={form.titulo}
+                    placeholder="Ex: Aviso importante, Reunião de pais..."
+                    onChange={e => setForm({ ...form, titulo: e.target.value })}
+                  />
+                </div>
+              </div>
+
+              {mostrarFiltroTurma && (
+                <div className="form-group">
+                  <label className="form-label">Turma específica (opcional)</label>
+                  <select
+                    className="form-control form-select"
+                    value={form.turma_id}
+                    onChange={e => setForm({ ...form, turma_id: e.target.value })}
+                  >
+                    <option value="">Todas as turmas sob a sua gestão</option>
+                    {turmas.map(t => (
+                      <option key={t.id || t.turma_id} value={t.id || t.turma_id}>
+                        {t.nome || t.turma_nome}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
+
+              <div className="form-group">
+                <label className="form-label">Mensagem *</label>
+                <textarea
+                  className="form-control"
+                  rows="4"
+                  placeholder="Escreva aqui a sua mensagem..."
+                  value={form.mensagem}
+                  onChange={e => setForm({ ...form, mensagem: e.target.value })}
+                />
+              </div>
+              <button type="submit" className="btn btn-primary" disabled={sending}>
+                <Send size={15} /> {sending ? 'A enviar...' : 'Enviar mensagem'}
+              </button>
+            </form>
+          )}
         </div>
       )}
 
