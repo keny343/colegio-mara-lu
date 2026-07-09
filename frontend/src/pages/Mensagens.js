@@ -56,8 +56,11 @@ export default function Mensagens() {
   useEffect(() => { carregarNotifs(); }, []);
 
   useEffect(() => {
-    api.get('/mensagens/contactos').then(res => setContatos(res.data)).catch(() => {});
-  }, []);
+    if (!user) return;
+    api.get('/mensagens/contactos')
+      .then(res => setContatos(res.data))
+      .catch(() => setContatos([]));
+  }, [user]);
 
   useEffect(() => {
     if (!user) return;
