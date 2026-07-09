@@ -1,10 +1,9 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useAuth } from '../contexts/AuthContext';
-import { MessageCircle, Send, Bell, CheckCircle, Users, User } from 'lucide-react';
+import { MessageCircle, Send, Bell, CheckCircle, User } from 'lucide-react';
 import api from '../services/api';
 import Toast, { useToast } from '../components/Toast';
 
-/* ── Badge de tipo de notificação ── */
 const tipoBadge = (tipo) => {
   const map = {
     nota_lancada:       { label: 'Nota',        color: '#2563eb', bg: '#eff6ff' },
@@ -25,16 +24,23 @@ const tipoBadge = (tipo) => {
   );
 };
 
+const roleLabel = (role) => ({
+  admin: 'Administração', coordenador: 'Coordenadores',
+  professor: 'Professores', aluno: 'Alunos',
+}[role] || role);
+
 export default function Mensagens() {
   const { user } = useAuth();
   const [notifs, setNotifs] = useState([]);
   const [loading, setLoading] = useState(true);
   const [turmas, setTurmas] = useState([]);
+  const [contatos, setContatos] = useState([]);
   const [form, setForm] = useState({
     titulo: '',
     mensagem: '',
-    alvo: user?.role === 'admin' ? 'todos' : 'alunos',
+    alvo: user?.role === 'admin' ? 'todos' : user?.role === 'aluno' ? 'usuario' : 'alunos',
     turma_id: '',
+    destinatario_id: '',
   });
   const [erro, setErro] = useState('');
   const [sending, setSending] = useState(false);
@@ -48,6 +54,10 @@ export default function Mensagens() {
       .finally(() => setLoading(false));
 
   useEffect(() => { carregarNotifs(); }, []);
+
+  useEffect(() => {
+    api.get('/mensagens/contactos').then(res => setContatos(res.data)).catch(() => {});
+  }, []);
 
   useEffect(() => {
     if (!user) return;
@@ -87,14 +97,17 @@ export default function Mensagens() {
     e.preventDefault();
     setErro('');
     if (!form.titulo || !form.mensagem) return setErro('Título e mensagem são obrigatórios.');
-    if (user && ['professor', 'coordenador'].includes(user.role) && !form.turma_id) {
+    if (form.alvo === 'usuario' && !form.destinatario_id) {
+      return setErro('Seleccione a pessoa destinatária.');
+    }
+    if (form.alvo !== 'usuario' && user && ['professor', 'coordenador'].includes(user.role) && !form.turma_id) {
       return setErro('Seleccione a turma para enviar a mensagem.');
     }
     setSending(true);
     try {
       await api.post('/notificacoes', form);
       showToast('Mensagem enviada com sucesso! Os destinatários foram notificados.', 'success');
-      setForm({ ...form, titulo: '', mensagem: '' });
+      setForm({ ...form, titulo: '', mensagem: '', destinatario_id: '' });
       await carregarNotifs();
     } catch (err) {
       const msg = err.response?.data?.message || 'Erro ao enviar mensagem.';
@@ -108,22 +121,27 @@ export default function Mensagens() {
   if (loading) return <div className="loading"><div className="spinner" /></div>;
 
   const naoLidas = notifs.filter(n => !n.lida).length;
-  const podeEnviar = ['admin', 'coordenador', 'professor'].includes(user?.role);
+  const podeEnviar = ['admin', 'coordenador', 'professor', 'aluno'].includes(user?.role);
 
-  /* Opções de destinatário por role */
   const destinatarioOpts = () => {
     if (user?.role === 'admin') return [
       { value: 'todos',        label: '🌐 Todos' },
       { value: 'alunos',       label: '🎒 Alunos' },
       { value: 'professores',  label: '👩‍🏫 Professores' },
       { value: 'coordenadores',label: '🏫 Coordenadores' },
+      { value: 'usuario',      label: '👤 Pessoa específica' },
     ];
     if (user?.role === 'coordenador') return [
       { value: 'alunos',      label: '🎒 Alunos da turma' },
       { value: 'professores', label: '👩‍🏫 Professores da turma' },
+      { value: 'usuario',     label: '👤 Pessoa específica' },
+    ];
+    if (user?.role === 'professor') return [
+      { value: 'alunos',  label: '🎒 Alunos da turma' },
+      { value: 'usuario', label: '👤 Pessoa específica' },
     ];
     return [
-      { value: 'alunos', label: '🎒 Alunos da turma' },
+      { value: 'usuario', label: '👤 Coordenador ou professor específico' },
     ];
   };
 
@@ -153,7 +171,6 @@ export default function Mensagens() {
         </div>
       </div>
 
-      {/* Formulário de envio — só staff */}
       {podeEnviar && (
         <div className="card" style={{ marginBottom: '1.5rem' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: '1.25rem' }}>
@@ -161,11 +178,11 @@ export default function Mensagens() {
               <Send size={18} color="var(--castanho)" />
             </div>
             <h3 style={{ margin: 0, fontSize: '1rem' }}>Enviar mensagem</h3>
-            {/* Resumo de quem pode enviar para quem */}
             <span style={{ marginLeft: 'auto', fontSize: '0.78rem', color: 'var(--cinza)', textAlign: 'right' }}>
-              {user?.role === 'admin' && 'Admin → todos, alunos, professores ou coordenadores'}
-              {user?.role === 'coordenador' && 'Coordenador → alunos ou professores das suas turmas'}
-              {user?.role === 'professor' && 'Professor → alunos das suas turmas'}
+              {user?.role === 'admin' && 'Admin → todos, grupos ou pessoa específica'}
+              {user?.role === 'coordenador' && 'Coordenador → a sua equipa ou pessoa específica'}
+              {user?.role === 'professor' && 'Professor → seus alunos, ou coordenador/aluno específico'}
+              {user?.role === 'aluno' && 'Aluno → seu coordenador ou professores'}
             </span>
           </div>
 
@@ -192,7 +209,7 @@ export default function Mensagens() {
                 <select
                   className="form-control form-select"
                   value={form.alvo}
-                  onChange={e => setForm({ ...form, alvo: e.target.value })}
+                  onChange={e => setForm({ ...form, alvo: e.target.value, destinatario_id: '' })}
                 >
                   {destinatarioOpts().map(o => (
                     <option key={o.value} value={o.value}>{o.label}</option>
@@ -201,8 +218,34 @@ export default function Mensagens() {
               </div>
             </div>
 
-            {/* Seleção de turma — obrigatória para coordenador e professor */}
-            {(user?.role === 'coordenador' || user?.role === 'professor') && (
+            {form.alvo === 'usuario' && (
+              <div className="form-group">
+                <label className="form-label">Pessoa específica *</label>
+                <select
+                  className="form-control form-select"
+                  value={form.destinatario_id}
+                  onChange={e => setForm({ ...form, destinatario_id: e.target.value })}
+                >
+                  <option value="">Seleccione a pessoa...</option>
+                  {['admin', 'coordenador', 'professor', 'aluno'].map(r => {
+                    const grupo = contatos.filter(c => c.role === r);
+                    if (!grupo.length) return null;
+                    return (
+                      <optgroup key={r} label={roleLabel(r)}>
+                        {grupo.map(c => <option key={c.id} value={c.id}>{c.nome}</option>)}
+                      </optgroup>
+                    );
+                  })}
+                </select>
+                {contatos.length === 0 && (
+                  <p style={{ fontSize: '0.8rem', color: 'var(--cinza)', marginTop: 4 }}>
+                    Ainda não tens contactos disponíveis para mensagem directa.
+                  </p>
+                )}
+              </div>
+            )}
+
+            {(user?.role === 'coordenador' || user?.role === 'professor') && form.alvo !== 'usuario' && (
               <div className="form-group">
                 <label className="form-label">Turma *</label>
                 <select
@@ -220,7 +263,6 @@ export default function Mensagens() {
               </div>
             )}
 
-            {/* Admin pode opcionalmente filtrar por turma */}
             {user?.role === 'admin' && ['alunos', 'professores'].includes(form.alvo) && (
               <div className="form-group">
                 <label className="form-label">Turma específica (opcional)</label>
@@ -254,7 +296,6 @@ export default function Mensagens() {
         </div>
       )}
 
-      {/* Lista de notificações recebidas */}
       <div className="card">
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: '1rem' }}>
           <Bell size={18} color="var(--castanho)" />
@@ -290,7 +331,6 @@ export default function Mensagens() {
                   cursor: n.lida ? 'default' : 'pointer', transition: 'all 0.2s',
                 }}
               >
-                {/* Avatar */}
                 <div style={{
                   width: 42, height: 42, borderRadius: '50%', flexShrink: 0,
                   background: n.lida ? 'var(--bege)' : 'var(--laranja)',
@@ -299,7 +339,6 @@ export default function Mensagens() {
                   <MessageCircle size={18} color={n.lida ? 'var(--cinza)' : 'white'} />
                 </div>
 
-                {/* Conteúdo */}
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8, flexWrap: 'wrap' }}>
                     <p style={{ fontSize: '0.92rem', fontWeight: n.lida ? 400 : 600, color: 'var(--castanho)', margin: 0 }}>
@@ -311,7 +350,6 @@ export default function Mensagens() {
                     )}
                   </div>
                   <div style={{ display: 'flex', gap: 10, marginTop: 6, alignItems: 'center', flexWrap: 'wrap' }}>
-                    {/* Remetente */}
                     {n.remetente_nome && (
                       <span style={{
                         fontSize: '0.78rem', fontWeight: 600, color: 'var(--castanho)',

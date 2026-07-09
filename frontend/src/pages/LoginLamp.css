@@ -1,0 +1,105 @@
+.lamp-screen {
+  position: relative;
+  min-height: 100vh;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-start;
+  padding: 2.5rem 1.5rem 3rem;
+  background: linear-gradient(180deg, #1c0f06 0%, var(--castanho) 55%, var(--castanho-medio) 100%);
+  overflow: hidden;
+}
+
+.lamp-rig {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  z-index: 2;
+}
+
+.lamp-wire {
+  width: 2px;
+  height: 36px;
+  background: rgba(245, 230, 211, 0.25);
+}
+
+.lamp-fixture {
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 0;
+  position: relative;
+  width: 150px;
+  height: 130px;
+  transition: transform 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.lamp-fixture:active { transform: rotate(3deg); }
+.lamp-fixture:focus-visible { outline: 2px solid var(--laranja-claro); outline-offset: 6px; }
+
+.lamp-svg { width: 100%; height: 100%; overflow: visible; }
+
+.lamp-shade {
+  fill: var(--castanho-medio);
+  stroke: var(--castanho-claro);
+  stroke-width: 1.5;
+  transition: fill 0.5s ease;
+}
+.is-on .lamp-shade { fill: var(--laranja); }
+
+.lamp-neck { stroke: var(--castanho-claro); stroke-width: 3; }
+
+.lamp-bulb {
+  fill: var(--bege);
+  opacity: 0.5;
+  transition: fill 0.4s ease, filter 0.4s ease, opacity 0.4s ease;
+}
+.is-on .lamp-bulb {
+  fill: var(--laranja-claro);
+  opacity: 1;
+  filter: drop-shadow(0 0 18px rgba(232, 100, 26, 0.85)) drop-shadow(0 0 42px rgba(242, 131, 64, 0.5));
+}
+
+.pull-cord {
+  position: absolute; left: 50%; top: 92px; width: 1.5px; height: 32px;
+  background: rgba(245, 230, 211, 0.35); transform: translateX(-50%);
+}
+.pull-knob {
+  position: absolute; bottom: -6px; left: 50%; transform: translateX(-50%);
+  width: 10px; height: 10px; border-radius: 50%; background: var(--bege);
+}
+
+.light-cone {
+  position: absolute; top: 168px; left: 50%;
+  width: 460px; height: 480px;
+  transform: translateX(-50%) scaleY(0.3);
+  transform-origin: top center;
+  clip-path: polygon(44% 0%, 56% 0%, 100% 100%, 0% 100%);
+  background: radial-gradient(ellipse at 50% 0%, rgba(232, 100, 26, 0.32), rgba(232, 100, 26, 0.06) 55%, transparent 75%);
+  opacity: 0;
+  transition: opacity 0.6s ease, transform 0.7s cubic-bezier(0.22, 1, 0.36, 1);
+  pointer-events: none;
+}
+.is-on .light-cone { opacity: 1; transform: translateX(-50%) scaleY(1); }
+
+.lamp-hint {
+  margin-top: 8px; font-size: 0.85rem; color: rgba(245, 230, 211, 0.55);
+  font-family: 'DM Sans', sans-serif; transition: color 0.5s ease;
+}
+.is-on .lamp-hint { color: var(--laranja-claro); }
+
+.login-card-wrap {
+  position: relative; z-index: 3; margin-top: 24px;
+  width: 100%; max-width: 420px;
+  opacity: 0; transform: translateY(24px) scale(0.96); filter: blur(4px);
+  transition: opacity 0.55s ease 0.15s, transform 0.55s cubic-bezier(0.22, 1, 0.36, 1) 0.15s, filter 0.55s ease 0.15s;
+}
+.is-on .login-card-wrap { opacity: 1; transform: translateY(0) scale(1); filter: blur(0); }
+
+.login-card { box-shadow: var(--sombra-lg); }
+
+@media (prefers-reduced-motion: reduce) {
+  .lamp-fixture, .light-cone, .login-card-wrap { transition: none !important; }
+}

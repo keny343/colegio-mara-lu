@@ -6,7 +6,7 @@ const { register, login, perfil, atualizarPerfil, uploadAvatar, atualizarFotoPer
 const { inscreverAluno, uploadPublicInscricao } = require('../controllers/publicController');
 const { listarAlunos, criarAluno, atualizarAluno, removerAluno } = require('../controllers/alunosController');
 const { minhasInscricoes, criarInscricao, cancelarInscricao, listarTodas, detalhesInscricao, atualizarStatus, dashboardStats } = require('../controllers/inscricoesController');
-const { listarSeries, criarSerie, atualizarSerie, deletarSerie, upload, enviarDocumento, atualizarDocumento, listarMeusDocumentos, listarUsuarios, listarEquipaCoordenador, criarUsuario, atualizarUsuario, designarCoordenador, minhasNotificacoes, marcarNotificacaoLida, enviarNotificacao, sincronizarVagasSeries } = require('../controllers/extrasController');
+const { listarSeries, criarSerie, atualizarSerie, deletarSerie, upload, enviarDocumento, atualizarDocumento, listarMeusDocumentos, listarUsuarios, listarEquipaCoordenador, criarUsuario, atualizarUsuario, designarCoordenador, minhasNotificacoes, marcarNotificacaoLida, enviarNotificacao, listarContatosPermitidos, sincronizarVagasSeries } = require('../controllers/extrasController');
 const {
   listarCursos, criarCurso, atualizarCurso, removerCurso,
   listarDisciplinas, criarDisciplina, atualizarDisciplina,
@@ -63,6 +63,7 @@ router.get('/documentos', authMiddleware, listarMeusDocumentos);
 router.get('/notificacoes', authMiddleware, minhasNotificacoes);
 router.patch('/notificacoes/:id/lida', authMiddleware, marcarNotificacaoLida);
 router.post('/notificacoes', authMiddleware, enviarNotificacao);
+router.get('/mensagens/contactos', authMiddleware, listarContatosPermitidos);
 
 // ===== ROTAS ADMIN + COORDENADOR =====
 router.get('/admin/dashboard', staffMiddleware, dashboardStats);
