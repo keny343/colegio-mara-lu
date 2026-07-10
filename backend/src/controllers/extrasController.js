@@ -1,5 +1,5 @@
 const db = require('../config/database');
-const { podeDesignarCoordenador, tipoDesignacaoNoAmbito, coordenadorPodeGerirTurma, filtroSqlSeriesCoordenador } = require('../utils/academicoRules');
+const { podeDesignarCoordenador, tipoDesignacaoNoAmbito, coordenadorPodeGerirTurma, filtroSqlSeriesCoordenador, temEscopoCoordenacao } = require('../utils/academicoRules');
 const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
