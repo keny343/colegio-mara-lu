@@ -123,6 +123,7 @@ export default function Mensagens() {
     destinatario_id: '',
   });
   const [buscaContato, setBuscaContato] = useState('');
+  const [dropdownAberto, setDropdownAberto] = useState(false);
   const [chatTurmaFiltro, setChatTurmaFiltro] = useState('');
   const [erro, setErro] = useState('');
   const [sending, setSending] = useState(false);
@@ -314,20 +315,6 @@ export default function Mensagens() {
 
           {form.alvo === 'usuario' ? (
             <div>
-              <div className="form-group">
-                <label className="form-label">Buscar pessoa</label>
-                <div style={{ position: 'relative' }}>
-                  <Search size={15} style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', color: 'var(--cinza)' }} />
-                  <input
-                    className="form-control"
-                    style={{ paddingLeft: 32 }}
-                    placeholder="Buscar por nome ou email..."
-                    value={buscaContato}
-                    onChange={e => setBuscaContato(e.target.value)}
-                  />
-                </div>
-              </div>
-
               {user?.role === 'professor' && turmas.length > 0 && (
                 <div className="form-group">
                   <label className="form-label">Filtrar alunos por turma (opcional)</label>
@@ -346,37 +333,92 @@ export default function Mensagens() {
                 </div>
               )}
 
-              <div className="form-group">
+              <div className="form-group" style={{ position: 'relative' }}>
                 <label className="form-label">Pessoa específica *</label>
-                <select
-                  className="form-control form-select"
-                  value={form.destinatario_id}
-                  onChange={e => setForm({ ...form, destinatario_id: e.target.value })}
-                >
-                  <option value="">Seleccione a pessoa...</option>
-                  {['admin', 'coordenador', 'professor', 'aluno'].map(r => {
-                    const grupo = contatosFiltrados.filter(c => c.role === r);
-                    if (!grupo.length) return null;
-                    return (
-                      <optgroup key={r} label={roleLabel(r)}>
-                        {grupo.map(c => (
-                          <option key={c.id} value={c.id}>
-                            {c.nome}{c.email ? ` · ${c.email}` : ''}
-                          </option>
-                        ))}
-                      </optgroup>
-                    );
-                  })}
-                </select>
-                {contatos.length === 0 && (
-                  <p style={{ fontSize: '0.8rem', color: 'var(--cinza)', marginTop: 4 }}>
-                    Ainda não tens contactos disponíveis para mensagem directa.
-                  </p>
-                )}
-                {contatos.length > 0 && contatosFiltrados.length === 0 && (
-                  <p style={{ fontSize: '0.8rem', color: 'var(--cinza)', marginTop: 4 }}>
-                    Nenhum contacto corresponde à busca/filtro.
-                  </p>
+
+                {destinatarioSelecionado ? (
+                  <div style={{
+                    display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                    gap: 8, padding: '0.55rem 0.8rem', borderRadius: 8,
+                    background: 'var(--laranja-suave)', border: '1px solid rgba(232,100,26,0.25)',
+                  }}>
+                    <span style={{ fontSize: '0.9rem', fontWeight: 600, color: 'var(--castanho)' }}>
+                      {destinatarioSelecionado.nome}
+                      {destinatarioSelecionado.email && (
+                        <span style={{ fontWeight: 400, color: 'var(--cinza)' }}> · {destinatarioSelecionado.email}</span>
+                      )}
+                    </span>
+                    <button
+                      type="button"
+                      className="btn btn-outline btn-sm"
+                      onClick={() => { setForm({ ...form, destinatario_id: '' }); setBuscaContato(''); }}
+                    >
+                      Trocar
+                    </button>
+                  </div>
+                ) : (
+                  <>
+                    <div style={{ position: 'relative' }}>
+                      <Search size={15} style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', color: 'var(--cinza)' }} />
+                      <input
+                        className="form-control"
+                        style={{ paddingLeft: 32 }}
+                        placeholder="Escreva o nome ou email..."
+                        value={buscaContato}
+                        onChange={e => setBuscaContato(e.target.value)}
+                        onFocus={() => setDropdownAberto(true)}
+                        onBlur={() => setTimeout(() => setDropdownAberto(false), 150)}
+                      />
+                    </div>
+
+                    {dropdownAberto && (
+                      <div style={{
+                        position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 20,
+                        marginTop: 4, maxHeight: 260, overflowY: 'auto',
+                        background: '#fff', border: '1px solid var(--bege)', borderRadius: 10,
+                        boxShadow: '0 8px 24px rgba(0,0,0,0.1)',
+                      }}>
+                        {contatosFiltrados.length === 0 ? (
+                          <p style={{ padding: '0.7rem 0.9rem', fontSize: '0.85rem', color: 'var(--cinza)', margin: 0 }}>
+                            {contatos.length === 0
+                              ? 'Ainda não tens contactos disponíveis para mensagem directa.'
+                              : 'Nenhum contacto corresponde à busca/filtro.'}
+                          </p>
+                        ) : (
+                          ['admin', 'coordenador', 'professor', 'aluno'].map(r => {
+                            const grupo = contatosFiltrados.filter(c => c.role === r);
+                            if (!grupo.length) return null;
+                            return (
+                              <div key={r}>
+                                <div style={{
+                                  padding: '0.4rem 0.9rem', fontSize: '0.7rem', fontWeight: 700,
+                                  textTransform: 'uppercase', letterSpacing: 0.5, color: 'var(--cinza)',
+                                  background: 'var(--bege-claro)',
+                                }}>
+                                  {roleLabel(r)}
+                                </div>
+                                {grupo.map(c => (
+                                  <div
+                                    key={c.id}
+                                    onMouseDown={() => { setForm({ ...form, destinatario_id: String(c.id) }); setDropdownAberto(false); }}
+                                    style={{
+                                      padding: '0.55rem 0.9rem', cursor: 'pointer', fontSize: '0.88rem',
+                                      color: 'var(--castanho)', borderBottom: '1px solid var(--bege-claro)',
+                                    }}
+                                    onMouseEnter={e => e.currentTarget.style.background = 'var(--bege-claro)'}
+                                    onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
+                                  >
+                                    <span style={{ fontWeight: 600 }}>{c.nome}</span>
+                                    {c.email && <span style={{ color: 'var(--cinza)' }}> · {c.email}</span>}
+                                  </div>
+                                ))}
+                              </div>
+                            );
+                          })
+                        )}
+                      </div>
+                    )}
+                  </>
                 )}
               </div>
 
