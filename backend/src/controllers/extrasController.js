@@ -343,7 +343,7 @@ const designarCoordenador = async (req, res) => {
 const minhasNotificacoes = async (req, res) => {
   try {
     const [rows] = await db.query(
-      `SELECT n.id, n.titulo, n.mensagem, n.tipo, n.lida, n.criado_em,
+      `SELECT n.id, n.titulo, n.mensagem, n.tipo, n.lida, n.criado_em, n.remetente_id,
               u.nome AS remetente_nome, u.role AS remetente_role
        FROM notificacoes n
        LEFT JOIN usuarios u ON n.remetente_id = u.id
@@ -425,7 +425,6 @@ const obterContatosPermitidos = async (user) => {
          WHERE m.turma_id IN (?) AND m.status = 'ativa'`,
         [turmaIds]
       );
-      // agrupa por aluno, mantendo lista de turmas em que está (pro filtro por turma no frontend)
       const mapa = new Map();
       rows.forEach(r => {
         if (!mapa.has(r.id)) {
@@ -525,7 +524,6 @@ const enviarNotificacao = async (req, res) => {
   if (!mensagem || !alvo) {
     return res.status(400).json({ message: 'Mensagem e alvo são obrigatórios.' });
   }
-  // Numa conversa com pessoa específica o título é opcional (é um chat, não um aviso).
   const tituloFinal = titulo || (alvo === 'usuario' ? 'Mensagem' : null);
   if (!tituloFinal) {
     return res.status(400).json({ message: 'Título é obrigatório.' });

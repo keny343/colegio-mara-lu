@@ -127,6 +127,7 @@ export default function Mensagens() {
   const [chatTurmaFiltro, setChatTurmaFiltro] = useState('');
   const [erro, setErro] = useState('');
   const [sending, setSending] = useState(false);
+  const [respondendoPara, setRespondendoPara] = useState(null); // { id, nome }
   const { toast, showToast, clearToast } = useToast();
   const bottomRef = useRef(null);
 
@@ -481,6 +482,21 @@ export default function Mensagens() {
         </div>
       )}
 
+      {respondendoPara && (
+        <div className="card" style={{ marginBottom: '1.5rem' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+            <h3 style={{ margin: 0, fontSize: '1rem' }}>Conversa</h3>
+            <button type="button" className="alert-close" onClick={() => setRespondendoPara(null)}>×</button>
+          </div>
+          <ChatArea
+            destinatarioId={respondendoPara.id}
+            destinatarioNome={respondendoPara.nome}
+            currentUserId={user.id}
+            onSent={carregarNotifs}
+          />
+        </div>
+      )}
+
       <div className="card">
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: '1rem' }}>
           <Bell size={18} color="var(--castanho)" />
@@ -559,6 +575,19 @@ export default function Mensagens() {
                       <span style={{ fontSize: '0.75rem', color: 'var(--laranja)', fontWeight: 600 }}>
                         Clica para marcar como lida
                       </span>
+                    )}
+                    {n.remetente_id && Number(n.remetente_id) !== Number(user.id) && (
+                      <button
+                        type="button"
+                        className="btn btn-outline btn-sm"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setRespondendoPara({ id: Number(n.remetente_id), nome: n.remetente_nome || 'Utilizador' });
+                        }}
+                        style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 4 }}
+                      >
+                        <MessageCircle size={12} /> Responder
+                      </button>
                     )}
                   </div>
                 </div>
