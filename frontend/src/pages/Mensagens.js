@@ -35,6 +35,7 @@ function ChatArea({ destinatarioId, destinatarioNome, currentUserId, onSent }) {
   const [texto, setTexto] = useState('');
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
+  const [erroEnvio, setErroEnvio] = useState('');
   const bottomRef = useRef(null);
 
   const carregar = () => {
@@ -52,13 +53,15 @@ function ChatArea({ destinatarioId, destinatarioNome, currentUserId, onSent }) {
     e.preventDefault();
     if (!texto.trim()) return;
     setSending(true);
+    setErroEnvio('');
     try {
       await api.post('/notificacoes', { mensagem: texto, alvo: 'usuario', destinatario_id: destinatarioId });
       setTexto('');
       carregar();
       onSent && onSent();
     } catch (err) {
-      // erro pontual de envio; conversa permanece intacta
+      // erro de envio: texto fica no input para o utilizador tentar de novo
+      setErroEnvio(err.response?.data?.message || 'Não foi possível enviar. Tente novamente.');
     } finally {
       setSending(false);
     }
@@ -93,6 +96,9 @@ function ChatArea({ destinatarioId, destinatarioNome, currentUserId, onSent }) {
         })}
         <div ref={bottomRef} />
       </div>
+      {erroEnvio && (
+        <div style={{ padding: '0.4rem 1rem', fontSize: '0.78rem', color: '#b91c1c' }}>{erroEnvio}</div>
+      )}
       <form onSubmit={enviar} style={{ display: 'flex', gap: 8, padding: '0.6rem', borderTop: '1px solid var(--bege)' }}>
         <input
           className="form-control"
@@ -169,15 +175,27 @@ export default function Mensagens() {
 
   const marcarLida = (id) => {
     setNotifs(prev => prev.map(n => n.id === id ? { ...n, lida: true } : n));
-    api.patch(`/notificacoes/${id}/lida`).catch(() => {});
+    api.patch(`/notificacoes/${id}/lida`).catch(() => {
+      // reverte se o servidor recusou (ex.: 403)
+      setNotifs(prev => prev.map(n => n.id === id ? { ...n, lida: false } : n));
+    });
   };
 
-  const marcarTodasLidas = () => {
-    notifs.filter(n => !n.lida).forEach(n => {
-      api.patch(`/notificacoes/${n.id}/lida`).catch(() => {});
-    });
-    setNotifs(prev => prev.map(n => ({ ...n, lida: true })));
-    showToast('Todas as mensagens marcadas como lidas.', 'info');
+  const marcarTodasLidas = async () => {
+    const pendentes = notifs.filter(n => !n.lida);
+    const resultados = await Promise.allSettled(
+      pendentes.map(n => api.patch(`/notificacoes/${n.id}/lida`))
+    );
+    const idsOk = new Set(
+      pendentes.filter((_, i) => resultados[i].status === 'fulfilled').map(n => n.id)
+    );
+    setNotifs(prev => prev.map(n => idsOk.has(n.id) ? { ...n, lida: true } : n));
+    const falhas = pendentes.length - idsOk.size;
+    if (falhas > 0) {
+      showToast(`${idsOk.size} marcada(s) como lida(s). ${falhas} falharam.`, 'error');
+    } else {
+      showToast('Todas as mensagens marcadas como lidas.', 'info');
+    }
   };
 
   const enviarMensagem = async (e) => {
