@@ -457,7 +457,7 @@ const obterContatosPermitidos = async (user) => {
       alunos = Array.from(mapa.values());
     }
     const [coordenadores] = await db.query(
-      `SELECT id, nome, email, role, curso_coordenado, nivel_coordenado FROM usuarios WHERE role = 'coordenador' AND ativo = 1`
+      `SELECT id, nome, email, role, curso_coordenado, nivel_coordenado FROM usuarios WHERE (role = 'coordenador' OR curso_coordenado IS NOT NULL OR nivel_coordenado IS NOT NULL) AND ativo = 1`
     );
     const meusCoordenadores = coordenadores
       .filter(c => minhasTurmas.some(t => coordenadorPodeGerirTurma(c, t)))
@@ -486,10 +486,14 @@ const obterContatosPermitidos = async (user) => {
       professores = rows;
     }
     const [coordenadores] = await db.query(
-      `SELECT id, nome, email, role, curso_coordenado, nivel_coordenado FROM usuarios WHERE role = 'coordenador' AND ativo = 1`
+      `SELECT id, nome, email, role, curso_coordenado, nivel_coordenado FROM usuarios WHERE (role = 'coordenador' OR curso_coordenado IS NOT NULL OR nivel_coordenado IS NOT NULL) AND ativo = 1`
     );
     const meusCoordenadores = coordenadores
-      .filter(c => minhasTurmas.some(t => coordenadorPodeGerirTurma(c, t)))
+      .filter(c => {
+        const resultado = minhasTurmas.some(t => coordenadorPodeGerirTurma(c, t));
+        console.log('[DEBUG contactos-aluno]', { coordenador: c.nome, role: c.role, curso_coordenado: c.curso_coordenado, nivel_coordenado: c.nivel_coordenado, minhasTurmas, resultado });
+        return resultado;
+      })
       .map(({ id, nome, email, role }) => ({ id, nome, email, role }));
     return [...meusCoordenadores, ...professores].sort((a, b) => a.nome.localeCompare(b.nome));
   }
