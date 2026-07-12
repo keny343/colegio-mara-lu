@@ -2,6 +2,7 @@ import React from 'react';
 import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { NotificationProvider } from './contexts/NotificationContext';
+import { ConfirmProvider } from './contexts/ConfirmContext';
 import './index.css';
 
 import Navbar from './components/Navbar';
@@ -137,7 +138,9 @@ export default function App() {
     <BrowserRouter>
       <AuthProvider>
         <NotificationProvider>
-          <AppRoutes />
+          <ConfirmProvider>
+            <AppRoutes />
+          </ConfirmProvider>
         </NotificationProvider>
       </AuthProvider>
     </BrowserRouter>

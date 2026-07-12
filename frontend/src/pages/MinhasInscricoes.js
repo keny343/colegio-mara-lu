@@ -3,6 +3,8 @@ import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { Plus, FileText, Clock, CheckCircle, XCircle, AlertCircle, Upload, X } from 'lucide-react';
 import api from '../services/api';
 import { normalizeSeriesName } from '../utils/serieName';
+import { useConfirm } from '../contexts/ConfirmContext';
+import { useNotification } from '../contexts/NotificationContext';
 
 function StatusBadge({ status }) {
   const map = {
@@ -26,6 +28,8 @@ export default function MinhasInscricoes() {
   const [uploading, setUploading] = useState(false);
   const location = useLocation();
   const isNova = location.pathname.includes('/nova');
+  const confirm = useConfirm();
+  const { error: notifyError } = useNotification();
 
   const carregar = () => {
     api.get('/inscricoes/minhas').then(r => setInscricoes(r.data)).finally(() => setLoading(false));
@@ -33,13 +37,27 @@ export default function MinhasInscricoes() {
   useEffect(() => { carregar(); }, []);
 
   const cancelar = async (id) => {
-    if (!window.confirm('Cancelar esta inscrição?')) return;
-    await api.patch(`/inscricoes/${id}/cancelar`).catch(() => {});
-    carregar();
+    const ok = await confirm({
+      title: 'Cancelar inscrição',
+      message: 'Tem a certeza que deseja cancelar esta inscrição? Esta acção não pode ser desfeita.',
+      confirmLabel: 'Sim, cancelar',
+      cancelLabel: 'Manter inscrição',
+      variant: 'danger',
+    });
+    if (!ok) return;
+    try {
+      await api.patch(`/inscricoes/${id}/cancelar`);
+      carregar();
+    } catch (err) {
+      notifyError(err.response?.data?.message || 'Erro ao cancelar inscrição.');
+    }
   };
 
   const enviarDoc = async () => {
-    if (!docFile || !docTipo) return alert('Selecione o tipo e o arquivo.');
+    if (!docFile || !docTipo) {
+      notifyError('Seleccione o tipo e o ficheiro.');
+      return;
+    }
     setUploading(true);
     const fd = new FormData();
     fd.append('arquivo', docFile);

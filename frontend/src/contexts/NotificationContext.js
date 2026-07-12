@@ -30,14 +30,14 @@ export const NotificationProvider = ({ children }) => {
   return (
     <NotificationContext.Provider value={{ success, error, info, removeNotice }}>
       {children}
-      <div className="toast-portal">
+      <div className="toast-portal" aria-live="polite" aria-relevant="additions">
         {notices.map((notice) => (
-          <div key={notice.id} className={`toast toast-${notice.type}`}>
+          <div key={notice.id} className={`toast toast-${notice.type}`} role="status">
             <div className="toast-body">
               <strong>{notice.title}</strong>
               <p>{notice.message}</p>
             </div>
-            <button type="button" className="toast-close" onClick={() => removeNotice(notice.id)}>×</button>
+            <button type="button" className="toast-close" aria-label="Fechar notificação" onClick={() => removeNotice(notice.id)}>×</button>
           </div>
         ))}
       </div>

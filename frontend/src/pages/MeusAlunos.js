@@ -1,6 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import { Plus, Edit2, Trash2, User, X } from 'lucide-react';
 import api from '../services/api';
+import { useConfirm } from '../contexts/ConfirmContext';
+import { useNotification } from '../contexts/NotificationContext';
 
 const formVazio = { nome: '', data_nascimento: '', cpf: '', rg: '', sexo: '', nacionalidade: '', nome_mae: '', nome_pai: '', responsavel: '', telefone_emergencia: '', necessidades_especiais: '' };
 
@@ -12,6 +14,8 @@ export default function MeusAlunos() {
   const [form, setForm] = useState(formVazio);
   const [erro, setErro] = useState('');
   const [saving, setSaving] = useState(false);
+  const confirm = useConfirm();
+  const { error: notifyError } = useNotification();
 
   const carregar = () => {
     api.get('/alunos').then(r => setAlunos(r.data)).finally(() => setLoading(false));
@@ -35,9 +39,20 @@ export default function MeusAlunos() {
   };
 
   const excluir = async (id) => {
-    if (!window.confirm('Tem certeza que deseja remover este aluno?')) return;
-    await api.delete(`/alunos/${id}`).catch(() => {});
-    carregar();
+    const ok = await confirm({
+      title: 'Remover aluno',
+      message: 'Tem a certeza que deseja remover este aluno? Os dados associados serão eliminados.',
+      confirmLabel: 'Sim, remover',
+      cancelLabel: 'Cancelar',
+      variant: 'danger',
+    });
+    if (!ok) return;
+    try {
+      await api.delete(`/alunos/${id}`);
+      carregar();
+    } catch (err) {
+      notifyError(err.response?.data?.message || 'Erro ao remover aluno.');
+    }
   };
 
   const handleChange = e => setForm({ ...form, [e.target.name]: e.target.value });

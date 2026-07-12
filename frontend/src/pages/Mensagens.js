@@ -1,678 +1,356 @@
-const db = require('../config/database');
-const { podeDesignarCoordenador, tipoDesignacaoNoAmbito, coordenadorPodeGerirTurma, filtroSqlSeriesCoordenador } = require('../utils/academicoRules');
-const multer = require('multer');
-const path = require('path');
-const fs = require('fs');
-const bcrypt = require('bcryptjs');
+import React, { useCallback, useEffect, useState } from 'react';
+import { MessageCircle, Send, Search, Users, Megaphone } from 'lucide-react';
+import api from '../services/api';
+import { useAuth } from '../contexts/AuthContext';
+import { useNotification } from '../contexts/NotificationContext';
+import { podeAcederInformacaoGeral } from '../utils/roles';
 
-// --- SÉRIES ---
-const listarSeries = async (req, res) => {
-  try {
-    const [rows] = await db.query('SELECT * FROM series WHERE ativo = 1 ORDER BY ordem, nivel, nome');
-    return res.json(rows);
-  } catch (err) {
-    console.error('listarSeries:', err.message);
-    return res.status(500).json({ message: err.message || 'Erro ao buscar séries.' });
-  }
+const ROLE_LABEL = {
+  admin: 'Admin',
+  coordenador: 'Coordenador',
+  professor: 'Professor',
+  aluno: 'Aluno',
 };
 
-const criarSerie = async (req, res) => {
-  const { nome, nivel, vagas_total, ano_letivo } = req.body;
-  try {
-    const [result] = await db.query(
-      'INSERT INTO series (nome, nivel, vagas_total, vagas_disponiveis, ano_letivo) VALUES (?,?,?,?,?)',
-      [nome, nivel, vagas_total, vagas_total, ano_letivo]
-    );
-    return res.status(201).json({ message: 'Série criada!', id: result.insertId });
-  } catch (err) {
-    console.error('[criarSerie] ERRO:', err.message);
-    return res.status(500).json({ message: 'Erro ao criar série.', detail: err.message });
-  }
-};
+export default function Mensagens() {
+  const { user } = useAuth();
+  const { success, error: notifyError } = useNotification();
+  const [contatos, setContatos] = useState([]);
+  const [filtro, setFiltro] = useState('');
+  const [selecionado, setSelecionado] = useState(null);
+  const [conversa, setConversa] = useState([]);
+  const [texto, setTexto] = useState('');
+  const [loading, setLoading] = useState(true);
+  const [loadingConversa, setLoadingConversa] = useState(false);
+  const [enviando, setEnviando] = useState(false);
+  const [erro, setErro] = useState('');
+  const [modo, setModo] = useState('chat');
+  const [broadcast, setBroadcast] = useState({ titulo: '', mensagem: '', alvo: 'alunos', turma_id: '' });
+  const [turmas, setTurmas] = useState([]);
 
-const CAMPOS_SERIE_PERMITIDOS = ['nome', 'nivel', 'vagas_total', 'ano_letivo', 'ordem', 'curso', 'ativo'];
+  const podeBroadcast = podeAcederInformacaoGeral(user) || user?.role === 'professor';
 
-const atualizarSerie = async (req, res) => {
-  const { id } = req.params;
-  const campos = {};
-  for (const k of CAMPOS_SERIE_PERMITIDOS) {
-    if (req.body[k] !== undefined) campos[k] = req.body[k];
-  }
-  const keys = Object.keys(campos);
-  if (keys.length === 0) return res.status(400).json({ message: 'Nada para atualizar.' });
-  try {
-    const sets = keys.map(k => `${k} = ?`).join(', ');
-    await db.query(`UPDATE series SET ${sets} WHERE id = ?`, [...keys.map(k => campos[k]), id]);
-    return res.json({ message: 'Série atualizada!' });
-  } catch (err) {
-    console.error('[atualizarSerie] ERRO:', err.message);
-    return res.status(500).json({ message: 'Erro ao atualizar série.', detail: err.message });
-  }
-};
+  const carregarContatos = useCallback(() => {
+    setLoading(true);
+    api.get('/mensagens/contactos')
+      .then((r) => setContatos(r.data))
+      .catch(() => setErro('Não foi possível carregar os contactos.'))
+      .finally(() => setLoading(false));
+  }, []);
 
-const deletarSerie = async (req, res) => {
-  const { id } = req.params;
-  try {
-    await db.query('UPDATE series SET ativo = 0 WHERE id = ?', [id]);
-    return res.json({ message: 'Série desativada.' });
-  } catch (err) {
-    console.error('[deletarSerie] ERRO:', err.message);
-    return res.status(500).json({ message: 'Erro ao deletar série.', detail: err.message });
-  }
-};
-
-// --- DOCUMENTOS ---
-const supabaseUpload = require('../config/supabaseUpload');
-const upload = supabaseUpload('documentos', 5);
-
-const enviarDocumento = async (req, res) => {
-  const { inscricao_id, tipo } = req.body;
-  if (!req.file) return res.status(400).json({ message: 'Arquivo não enviado.' });
-  if (!inscricao_id) return res.status(400).json({ message: 'Inscrição não indicada.' });
-
-  try {
-    // Só admin ou o dono da inscrição pode anexar documentos a ela
-    if (req.user.role !== 'admin') {
-      const [[insc]] = await db.query('SELECT usuario_id FROM inscricoes WHERE id = ? LIMIT 1', [inscricao_id]);
-      if (!insc || Number(insc.usuario_id) !== Number(req.user.id)) {
-        return res.status(403).json({ message: 'Não tem permissão para esta inscrição.' });
-      }
+  useEffect(() => {
+    carregarContatos();
+    if (podeBroadcast) {
+      const turmasEndpoint = user?.role === 'professor' && !podeAcederInformacaoGeral(user)
+        ? '/professor/minhas-disciplinas'
+        : '/staff/turmas';
+      api.get(turmasEndpoint)
+        .then((r) => {
+          const data = turmasEndpoint.includes('disciplinas')
+            ? [...new Map(r.data.map((d) => [d.turma_id, { id: d.turma_id, nome: d.turma_nome }])).values()]
+            : r.data;
+          setTurmas(data);
+        })
+        .catch(() => {});
     }
-    await db.query(
-      'INSERT INTO documentos (inscricao_id, tipo, nome_arquivo, caminho_arquivo) VALUES (?,?,?,?)',
-[inscricao_id, tipo, req.file.originalname, req.file.secure_url || req.file.path]
-    );
-    return res.status(201).json({ message: 'Documento enviado com sucesso!' });
-  } catch (err) {
-    console.error('[enviarDocumento] ERRO:', err.message);
-    return res.status(500).json({ message: 'Erro ao salvar documento.', detail: err.message });
-  }
-};
+  }, [carregarContatos, podeBroadcast, user?.role]);
 
-const atualizarDocumento = async (req, res) => {
-  const { id } = req.params;
-  const { status, observacao } = req.body;
-  // Ajusta esta lista se coordenador/professor também puderem validar documentos
-  if (!['admin', 'coordenador'].includes(req.user.role)) {
-    return res.status(403).json({ message: 'Sem permissão para actualizar documentos.' });
-  }
-  try {
-    await db.query('UPDATE documentos SET status = ?, observacao = ? WHERE id = ?', [status, observacao || null, id]);
-    return res.json({ message: 'Documento atualizado.' });
-  } catch (err) {
-    console.error('[atualizarDocumento] ERRO:', err.message);
-    return res.status(500).json({ message: 'Erro ao atualizar documento.', detail: err.message });
-  }
-};
-
-// --- UTILIZADORES ---
-
-// Listar todos os utilizadores (admin)
-const listarUsuarios = async (req, res) => {
-  try {
-    const [rows] = await db.query(
-      `SELECT id, nome, email, telefone, cpf, role,
-              curso_coordenado, nivel_coordenado, ativo, criado_em
-       FROM usuarios
-       ORDER BY nome`
-    );
-    return res.json(rows);
-  } catch (err) {
-    console.error('listarUsuarios:', err.message);
-    return res.status(500).json({ message: err.message || 'Erro ao buscar usuários.' });
-  }
-};
-
-// Equipa do coordenador: professores atribuídos às turmas do seu âmbito
-const listarEquipaCoordenador = async (req, res) => {
-  if (req.user.role === 'admin') {
-    return listarUsuarios(req, res);
-  }
-  try {
-    const [rows] = await db.query(
-      `SELECT DISTINCT u.id, u.nome, u.email, u.telefone, u.cpf, u.role, u.ativo,
-              u.curso_coordenado, u.nivel_coordenado, u.criado_em,
-              t.serie_classe, c.nome as curso_nome
-       FROM usuarios u
-       INNER JOIN turma_professores tp ON tp.professor_id = u.id
-       INNER JOIN turmas t ON t.id = tp.turma_id AND t.ativo = 1
-       LEFT JOIN cursos c ON t.curso_id = c.id
-       WHERE u.role IN ('professor', 'coordenador') AND u.ativo = 1
-       ORDER BY u.nome`
-    );
-    const vistos = new Set();
-    const equipa = [];
-    for (const r of rows) {
-      if (!coordenadorPodeGerirTurma(req.user, { serie_classe: r.serie_classe, curso_nome: r.curso_nome })) continue;
-      if (vistos.has(r.id)) continue;
-      vistos.add(r.id);
-      const { serie_classe, curso_nome, ...user } = r;
-      equipa.push(user);
+  const abrirConversa = async (contato) => {
+    setSelecionado(contato);
+    setModo('chat');
+    setLoadingConversa(true);
+    setErro('');
+    try {
+      const r = await api.get(`/mensagens/conversa/${contato.id}`);
+      setConversa(r.data);
+    } catch (err) {
+      setErro(err.response?.data?.message || 'Erro ao carregar conversa.');
+      setConversa([]);
+    } finally {
+      setLoadingConversa(false);
     }
-    return res.json(equipa);
-  } catch (err) {
-    console.error('listarEquipaCoordenador:', err.message);
-    return res.status(500).json({ message: err.message || 'Erro ao buscar equipa.' });
-  }
-};
+  };
 
-// Recalcular vagas_disponiveis com base em matrículas activas
-const sincronizarVagasSeries = async (req, res) => {
-  try {
-    const [series] = await db.query('SELECT id, ordem, ano_letivo, curso, vagas_total FROM series WHERE ativo = 1');
-    let atualizadas = 0;
-    for (const s of series) {
-      let sql = `SELECT COUNT(DISTINCT m.id) as ocupadas
-        FROM matriculas m
-        JOIN turmas t ON m.turma_id = t.id
-        WHERE m.status = 'ativa' AND m.ano_letivo = ? AND t.serie_classe = ?`;
-      const params = [s.ano_letivo, s.ordem];
-      if (s.ordem >= 10 && s.curso) {
-        sql += ' AND EXISTS (SELECT 1 FROM cursos c WHERE c.id = t.curso_id AND c.nome = ?)';
-        params.push(s.curso);
-      }
-      const [[row]] = await db.query(sql, params);
-      const ocupadas = Number(row?.ocupadas || 0);
-      const disp = Math.max(0, Number(s.vagas_total) - ocupadas);
-      await db.query('UPDATE series SET vagas_disponiveis = ? WHERE id = ?', [disp, s.id]);
-      atualizadas++;
-    }
-    return res.json({ message: `Vagas sincronizadas em ${atualizadas} classe(s).`, atualizadas });
-  } catch (err) {
-    console.error('sincronizarVagasSeries:', err.message);
-    return res.status(500).json({ message: err.message || 'Erro ao sincronizar vagas.' });
-  }
-};
-
-// Criar utilizador (professor / coordenador / admin)
-const criarUsuario = async (req, res) => {
-  if (req.user.role !== 'admin') {
-    return res.status(403).json({ message: 'Apenas o administrador pode criar utilizadores.' });
-  }
-  const { nome, bi, email, telefone, role, curso_coordenado, nivel_coordenado } = req.body;
-
-  if (!nome || !bi || !role) {
-    return res.status(400).json({ message: 'Nome, BI e perfil são obrigatórios.' });
-  }
-  if (!['admin', 'professor'].includes(role)) {
-    return res.status(400).json({ message: 'Perfil inválido. Coordenadores são designados pelo administrador.' });
-  }
-
-  const biLimpo    = String(bi).trim();
-  const emailFinal = (email && String(email).trim()) || `${biLimpo}@staff.local`;
-
-  try {
-    const [dupBi] = await db.query('SELECT id FROM usuarios WHERE cpf = ? LIMIT 1', [biLimpo]);
-    if (dupBi.length > 0) return res.status(409).json({ message: 'Já existe um usuário com este BI.' });
-
-    const [dupEmail] = await db.query('SELECT id FROM usuarios WHERE email = ? LIMIT 1', [emailFinal]);
-    if (dupEmail.length > 0) return res.status(409).json({ message: 'E-mail já está em uso.' });
-
-    const hash = await bcrypt.hash(biLimpo, 10);
-    const [r] = await db.query(
-      `INSERT INTO usuarios
-         (nome, email, senha, telefone, cpf, role, curso_coordenado, nivel_coordenado, ativo)
-       VALUES (?,?,?,?,?,?,?,?,?)`,
-      [
-        nome,
-        emailFinal,
-        hash,
-        telefone || null,
-        biLimpo,
-        role,
-        curso_coordenado || null,
-        nivel_coordenado || null,
-        1
-      ]
-    );
-    return res.status(201).json({ id: r.insertId, message: 'Usuário criado.' });
-  } catch (err) {
-    console.error('[criarUsuario] ERRO:', err.message);
-    return res.status(500).json({ message: 'Erro ao criar usuário.' });
-  }
-};
-
-// Actualizar utilizador
-const atualizarUsuario = async (req, res) => {
-  const { id } = req.params;
-  const { nome, email, telefone, role, ativo, curso_coordenado, nivel_coordenado } = req.body;
-
-  const campos = {};
-  if (nome             !== undefined) campos.nome             = nome;
-  if (email            !== undefined) campos.email            = email;
-  if (telefone         !== undefined) campos.telefone         = telefone;
-  if (role             !== undefined) campos.role             = role;
-  if (ativo            !== undefined) campos.ativo            = ativo ? 1 : 0;
-  if (curso_coordenado !== undefined || nivel_coordenado !== undefined) {
-    return res.status(400).json({ message: 'Coordenação só pode ser alterada em "Designar coordenador".' });
-  }
-
-  const keys = Object.keys(campos);
-  if (keys.length === 0) return res.status(400).json({ message: 'Nada para atualizar.' });
-
-  try {
-    if (campos.role) {
-      if (!['admin', 'professor', 'aluno'].includes(campos.role)) {
-        return res.status(400).json({ message: 'Use "Designar coordenador" para atribuir função de coordenação.' });
-      }
-      if (campos.role !== 'coordenador') {
-        campos.curso_coordenado = null;
-        campos.nivel_coordenado = null;
-      }
-    }
-    if (campos.role === 'coordenador') {
-      return res.status(400).json({ message: 'Coordenadores só podem ser designados pelo administrador.' });
-    }
-    const sets = keys.map(k => `${k} = ?`).join(', ');
-    await db.query(`UPDATE usuarios SET ${sets} WHERE id = ?`, [...keys.map(k => campos[k]), id]);
-    return res.json({ message: 'Usuário atualizado.' });
-  } catch (err) {
-    console.error('[atualizarUsuario] ERRO:', err.message);
-    return res.status(500).json({ message: 'Erro ao atualizar usuário.' });
-  }
-};
-
-// Designar / remover coordenador (admin: tudo; coordenador: só no seu ciclo/curso)
-const designarCoordenador = async (req, res) => {
-  const { id } = req.params;
-  const { tipo, curso_id, curso_nome, manter_role_professor } = req.body;
-
-  if (!podeDesignarCoordenador(req.user)) {
-    return res.status(403).json({ message: 'Sem permissão para designar coordenadores.' });
-  }
-
-  const tiposValidos = ['1_ciclo', '2_ciclo', 'curso', 'remover'];
-  if (!tiposValidos.includes(tipo)) {
-    return res.status(400).json({ message: 'Tipo inválido. Use: 1_ciclo, 2_ciclo, curso ou remover.' });
-  }
-
-  if (req.user.role !== 'admin' && tipo === 'remover') {
-    return res.status(403).json({ message: 'Apenas o administrador pode remover coordenação.' });
-  }
-
-  try {
-    const [[user]] = await db.query(
-      'SELECT id, role, nome FROM usuarios WHERE id = ? LIMIT 1',
-      [id]
-    );
-    if (!user) return res.status(404).json({ message: 'Utilizador não encontrado.' });
-    if (!['professor', 'coordenador'].includes(user.role)) {
-      return res.status(400).json({ message: 'Só professores ou coordenadores podem ser designados.' });
-    }
-
-    if (tipo === 'remover') {
-      const novaRole = user.role === 'coordenador' ? 'professor' : user.role;
-      await db.query(
-        'UPDATE usuarios SET role = ?, curso_coordenado = NULL, nivel_coordenado = NULL WHERE id = ?',
-        [novaRole === 'coordenador' ? 'professor' : novaRole, id]
-      );
-      return res.json({ message: 'Coordenação removida.' });
-    }
-
-    let nivel_coordenado = null;
-    let curso_coordenado = null;
-    let role = user.role;
-    let cursoNomeDesignado = null;
-
-    if (tipo === '1_ciclo') {
-      nivel_coordenado = '1º ciclo';
-    } else if (tipo === '2_ciclo') {
-      nivel_coordenado = '2º ciclo';
-    } else if (tipo === 'curso') {
-      if (curso_id) {
-        const [[c]] = await db.query('SELECT nome FROM cursos WHERE id = ? AND ativo = 1', [curso_id]);
-        if (!c) return res.status(400).json({ message: 'Curso não encontrado.' });
-        curso_coordenado = c.nome;
-        cursoNomeDesignado = c.nome;
-      } else if (curso_nome) {
-        curso_coordenado = String(curso_nome).trim();
-        cursoNomeDesignado = curso_coordenado;
-      } else {
-        return res.status(400).json({ message: 'Indique o curso a coordenar.' });
-      }
-    }
-
-    if (!tipoDesignacaoNoAmbito(req.user, tipo, cursoNomeDesignado)) {
-      return res.status(403).json({
-        message: 'Só pode designar coordenadores no mesmo ciclo ou curso que coordena.',
+  const enviarMensagem = async (e) => {
+    e.preventDefault();
+    if (!selecionado || !texto.trim()) return;
+    setEnviando(true);
+    setErro('');
+    try {
+      await api.post('/notificacoes', {
+        alvo: 'usuario',
+        destinatario_id: selecionado.id,
+        titulo: 'Mensagem',
+        mensagem: texto.trim(),
       });
+      setTexto('');
+      success('Mensagem enviada.');
+      const r = await api.get(`/mensagens/conversa/${selecionado.id}`);
+      setConversa(r.data);
+    } catch (err) {
+      const msg = err.response?.data?.message || 'Erro ao enviar mensagem.';
+      setErro(msg);
+      notifyError(msg);
+    } finally {
+      setEnviando(false);
     }
+  };
 
-    if (manter_role_professor && user.role === 'professor') {
-      role = 'professor';
-    } else {
-      role = 'coordenador';
+  const enviarBroadcast = async (e) => {
+    e.preventDefault();
+    if (!broadcast.mensagem.trim()) return setErro('Escreva a mensagem.');
+    if ((user?.role === 'professor' || user?.role === 'coordenador') && !broadcast.turma_id) {
+      return setErro('Seleccione a turma.');
     }
-
-    await db.query(
-      'UPDATE usuarios SET role = ?, curso_coordenado = ?, nivel_coordenado = ? WHERE id = ?',
-      [role, curso_coordenado, nivel_coordenado, id]
-    );
-
-    return res.json({
-      message: 'Coordenador designado com sucesso.',
-      role,
-      curso_coordenado,
-      nivel_coordenado,
-    });
-  } catch (err) {
-    console.error('[designarCoordenador]', err.message);
-    return res.status(500).json({ message: 'Erro ao designar coordenador.' });
-  }
-};
-
-// Notificações do utilizador
-const minhasNotificacoes = async (req, res) => {
-  try {
-    const [rows] = await db.query(
-      `SELECT n.id, n.titulo, n.mensagem, n.tipo, n.lida, n.criado_em, n.remetente_id,
-              u.nome AS remetente_nome, u.role AS remetente_role
-       FROM notificacoes n
-       LEFT JOIN usuarios u ON n.remetente_id = u.id
-       WHERE n.usuario_id = ?
-       ORDER BY n.criado_em DESC
-       LIMIT 50`,
-      [req.user.id]
-    );
-    return res.json(rows);
-  } catch (err) {
-    console.error('[minhasNotificacoes] ERRO:', err.message);
-    return res.status(500).json({ message: 'Erro ao buscar notificações.', detail: err.message });
-  }
-};
-
-const marcarNotificacaoLida = async (req, res) => {
-  try {
-    const { id } = req.params;
-    const [rows] = await db.query('SELECT usuario_id FROM notificacoes WHERE id = ? LIMIT 1', [id]);
-    if (rows.length === 0) return res.status(404).json({ message: 'Notificação não encontrada.' });
-    if (Number(rows[0].usuario_id) !== Number(req.user.id)) return res.status(403).json({ message: 'Não tem permissão para actualizar esta notificação.' });
-    await db.query('UPDATE notificacoes SET lida = 1 WHERE id = ?', [id]);
-    return res.json({ message: 'Notificação marcada como lida.' });
-  } catch (err) {
-    console.error('[marcarNotificacaoLida] ERRO:', err.message);
-    return res.status(500).json({ message: 'Erro ao atualizar notificação.' });
-  }
-};
-
-// Contactos que o utilizador pode mensagear individualmente, respeitando a hierarquia
-const obterContatosPermitidos = async (user) => {
-  if (user.role === 'admin') {
-    // Admin: TODOS os usuários do sistema, ordem alfabética. Busca por nome/email é feita no frontend.
-    const [rows] = await db.query(
-      `SELECT id, nome, email, role FROM usuarios WHERE ativo = 1 AND id != ? ORDER BY nome`,
-      [user.id]
-    );
-    return rows;
-  }
-
-  if (user.role === 'coordenador') {
-    const [turmas] = await db.query(
-      `SELECT t.id, t.serie_classe, c.nome AS curso_nome FROM turmas t LEFT JOIN cursos c ON t.curso_id = c.id WHERE t.ativo = 1`
-    );
-    const minhasTurmas = turmas.filter(t => coordenadorPodeGerirTurma(user, t));
-    const turmaIds = minhasTurmas.map(t => t.id);
-    if (!turmaIds.length) return [];
-    const [profs] = await db.query(
-      `SELECT DISTINCT u.id, u.nome, u.email, u.role FROM turma_professores tp
-       JOIN usuarios u ON tp.professor_id = u.id
-       WHERE tp.turma_id IN (?)`,
-      [turmaIds]
-    );
-    const [alunos] = await db.query(
-      `SELECT DISTINCT u.id, u.nome, u.email, u.role FROM matriculas m
-       JOIN alunos a ON m.aluno_id = a.id
-       JOIN usuarios u ON a.usuario_id = u.id
-       WHERE m.turma_id IN (?) AND m.status = 'ativa'`,
-      [turmaIds]
-    );
-    return [...profs, ...alunos].sort((a, b) => a.nome.localeCompare(b.nome));
-  }
-
-  if (user.role === 'professor') {
-    const [minhasTurmas] = await db.query(
-      `SELECT DISTINCT t.id, t.nome, t.serie_classe, c.nome AS curso_nome FROM turma_professores tp
-       JOIN turmas t ON tp.turma_id = t.id
-       LEFT JOIN cursos c ON t.curso_id = c.id
-       WHERE tp.professor_id = ?`,
-      [user.id]
-    );
-    const turmaIds = minhasTurmas.map(t => t.id);
-    let alunos = [];
-    if (turmaIds.length) {
-      const [rows] = await db.query(
-        `SELECT u.id, u.nome, u.email, u.role, m.turma_id FROM matriculas m
-         JOIN alunos a ON m.aluno_id = a.id
-         JOIN usuarios u ON a.usuario_id = u.id
-         WHERE m.turma_id IN (?) AND m.status = 'ativa'`,
-        [turmaIds]
-      );
-      const mapa = new Map();
-      rows.forEach(r => {
-        if (!mapa.has(r.id)) {
-          mapa.set(r.id, { id: r.id, nome: r.nome, email: r.email, role: r.role, turma_ids: [] });
-        }
-        mapa.get(r.id).turma_ids.push(r.turma_id);
-      });
-      alunos = Array.from(mapa.values());
+    setEnviando(true);
+    setErro('');
+    try {
+      const payload = {
+        titulo: broadcast.titulo.trim() || 'Comunicado',
+        mensagem: broadcast.mensagem.trim(),
+        alvo: broadcast.alvo,
+      };
+      if (broadcast.turma_id) payload.turma_id = Number(broadcast.turma_id);
+      const r = await api.post('/notificacoes', payload);
+      success(r.data.message || 'Mensagem enviada.');
+      setBroadcast({ titulo: '', mensagem: '', alvo: broadcast.alvo, turma_id: broadcast.turma_id });
+    } catch (err) {
+      const msg = err.response?.data?.message || 'Erro ao enviar comunicado.';
+      setErro(msg);
+      notifyError(msg);
+    } finally {
+      setEnviando(false);
     }
-    const [coordenadores] = await db.query(
-      `SELECT id, nome, email, role, curso_coordenado, nivel_coordenado FROM usuarios WHERE (role = 'coordenador' OR curso_coordenado IS NOT NULL OR nivel_coordenado IS NOT NULL) AND ativo = 1`
-    );
-    const meusCoordenadores = coordenadores
-      .filter(c => minhasTurmas.some(t => coordenadorPodeGerirTurma(c, t)))
-      .map(({ id, nome, email, role }) => ({ id, nome, email, role }));
-    return [...meusCoordenadores, ...alunos].sort((a, b) => a.nome.localeCompare(b.nome));
-  }
+  };
 
-  if (user.role === 'aluno') {
-    const [minhasTurmas] = await db.query(
-      `SELECT DISTINCT t.id, t.serie_classe, c.nome AS curso_nome FROM matriculas m
-       JOIN alunos a ON m.aluno_id = a.id
-       JOIN turmas t ON m.turma_id = t.id
-       LEFT JOIN cursos c ON t.curso_id = c.id
-       WHERE a.usuario_id = ? AND m.status = 'ativa'`,
-      [user.id]
-    );
-    const turmaIds = minhasTurmas.map(t => t.id);
-    let professores = [];
-    if (turmaIds.length) {
-      const [rows] = await db.query(
-        `SELECT DISTINCT u.id, u.nome, u.email, u.role FROM turma_professores tp
-         JOIN usuarios u ON tp.professor_id = u.id
-         WHERE tp.turma_id IN (?)`,
-        [turmaIds]
-      );
-      professores = rows;
-    }
-    const [coordenadores] = await db.query(
-      `SELECT id, nome, email, role, curso_coordenado, nivel_coordenado FROM usuarios WHERE (role = 'coordenador' OR curso_coordenado IS NOT NULL OR nivel_coordenado IS NOT NULL) AND ativo = 1`
-    );
-    const meusCoordenadores = coordenadores
-      .filter(c => minhasTurmas.some(t => coordenadorPodeGerirTurma(c, t)))
-      .map(({ id, nome, email, role }) => ({ id, nome, email, role }));
-    return [...meusCoordenadores, ...professores].sort((a, b) => a.nome.localeCompare(b.nome));
-  }
+  const contatosFiltrados = contatos.filter((c) => {
+    const q = filtro.toLowerCase();
+    return !q || c.nome?.toLowerCase().includes(q) || c.email?.toLowerCase().includes(q);
+  });
 
-  return [];
-};
+  const alvosAdmin = [
+    { value: 'todos', label: 'Todos os utilizadores' },
+    { value: 'alunos', label: 'Todos os alunos' },
+    { value: 'professores', label: 'Todos os professores' },
+    { value: 'coordenadores', label: 'Todos os coordenadores' },
+  ];
 
-const listarContatosPermitidos = async (req, res) => {
-  try {
-    const contatos = await obterContatosPermitidos(req.user);
-    const unique = Array.from(new Map(contatos.map(c => [c.id, c])).values());
-    return res.json(unique);
-  } catch (err) {
-    console.error('[listarContatosPermitidos] ERRO:', err.message);
-    return res.status(500).json({ message: 'Erro ao buscar contactos.' });
-  }
-};
+  const alvosStaff = user?.role === 'professor' && !podeAcederInformacaoGeral(user)
+    ? [{ value: 'alunos', label: 'Alunos da turma' }]
+    : [
+        { value: 'alunos', label: 'Alunos da turma' },
+        { value: 'professores', label: 'Professores da turma' },
+      ];
 
-// Histórico de conversa 1-a-1 com um contacto permitido (chat)
-const listarConversa = async (req, res) => {
-  const outroId = Number(req.params.outroId);
-  if (!outroId) return res.status(400).json({ message: 'Utilizador inválido.' });
+  if (loading) return <div className="loading" role="status" aria-label="A carregar mensagens"><div className="spinner" /></div>;
 
-  try {
-    const permitidos = await obterContatosPermitidos(req.user);
-    const podeConversar = permitidos.some(c => Number(c.id) === outroId);
-    if (!podeConversar) {
-      return res.status(403).json({ message: 'Não tem permissão para ver esta conversa.' });
-    }
+  return (
+    <div className="page-container">
+      <div className="page-header">
+        <h2><MessageCircle size={22} style={{ verticalAlign: 'middle', marginRight: 8 }} />Mensagens</h2>
+        <p style={{ color: 'var(--cinza)' }}>
+          Converse com professores, coordenadores ou alunos conforme as suas permissões.
+        </p>
+      </div>
 
-    const [rows] = await db.query(
-      `SELECT n.id, n.titulo, n.mensagem, n.tipo, n.criado_em, n.lida, n.remetente_id, n.usuario_id
-       FROM notificacoes n
-       WHERE (n.usuario_id = ? AND n.remetente_id = ?) OR (n.usuario_id = ? AND n.remetente_id = ?)
-       ORDER BY n.criado_em ASC
-       LIMIT 200`,
-      [req.user.id, outroId, outroId, req.user.id]
-    );
+      {erro && (
+        <div className="alert alert-error" role="alert" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <span>{erro}</span>
+          <button type="button" className="alert-close" onClick={() => setErro('')} aria-label="Fechar alerta">×</button>
+        </div>
+      )}
 
-    await db.query(
-      `UPDATE notificacoes SET lida = 1 WHERE usuario_id = ? AND remetente_id = ? AND lida = 0`,
-      [req.user.id, outroId]
-    );
+      {podeBroadcast && (
+        <div style={{ display: 'flex', gap: 8, marginBottom: '1rem' }}>
+          <button
+            type="button"
+            className={`btn btn-sm ${modo === 'chat' ? 'btn-primary' : 'btn-outline'}`}
+            onClick={() => setModo('chat')}
+            aria-pressed={modo === 'chat'}
+          >
+            <MessageCircle size={14} /> Conversas
+          </button>
+          <button
+            type="button"
+            className={`btn btn-sm ${modo === 'broadcast' ? 'btn-primary' : 'btn-outline'}`}
+            onClick={() => { setModo('broadcast'); setSelecionado(null); }}
+            aria-pressed={modo === 'broadcast'}
+          >
+            <Megaphone size={14} /> Comunicado
+          </button>
+        </div>
+      )}
 
-    return res.json(rows);
-  } catch (err) {
-    console.error('[listarConversa] ERRO:', err.message);
-    return res.status(500).json({ message: 'Erro ao buscar conversa.' });
-  }
-};
+      {modo === 'broadcast' ? (
+        <div className="card">
+          <h3 style={{ marginTop: 0, display: 'flex', alignItems: 'center', gap: 8 }}>
+            <Users size={18} /> Enviar comunicado
+          </h3>
+          <form onSubmit={enviarBroadcast}>
+            {user?.role !== 'admin' && (
+              <div className="form-group">
+                <label className="form-label" htmlFor="broadcast-turma">Turma *</label>
+                <select
+                  id="broadcast-turma"
+                  className="form-control form-select"
+                  value={broadcast.turma_id}
+                  onChange={(e) => setBroadcast({ ...broadcast, turma_id: e.target.value })}
+                  required
+                >
+                  <option value="">— Seleccione —</option>
+                  {turmas.map((t) => (
+                    <option key={t.id} value={t.id}>{t.nome}</option>
+                  ))}
+                </select>
+              </div>
+            )}
+            <div className="form-group">
+              <label className="form-label" htmlFor="broadcast-alvo">Destinatários</label>
+              <select
+                id="broadcast-alvo"
+                className="form-control form-select"
+                value={broadcast.alvo}
+                onChange={(e) => setBroadcast({ ...broadcast, alvo: e.target.value })}
+              >
+                {(user?.role === 'admin' ? alvosAdmin : alvosStaff).map((a) => (
+                  <option key={a.value} value={a.value}>{a.label}</option>
+                ))}
+              </select>
+            </div>
+            <div className="form-group">
+              <label className="form-label" htmlFor="broadcast-titulo">Título</label>
+              <input
+                id="broadcast-titulo"
+                className="form-control"
+                value={broadcast.titulo}
+                onChange={(e) => setBroadcast({ ...broadcast, titulo: e.target.value })}
+                placeholder="Ex: Reunião de pais"
+              />
+            </div>
+            <div className="form-group">
+              <label className="form-label" htmlFor="broadcast-msg">Mensagem *</label>
+              <textarea
+                id="broadcast-msg"
+                className="form-control"
+                rows={4}
+                value={broadcast.mensagem}
+                onChange={(e) => setBroadcast({ ...broadcast, mensagem: e.target.value })}
+                placeholder="Escreva o comunicado..."
+                required
+              />
+            </div>
+            <button type="submit" className="btn btn-primary" disabled={enviando}>
+              <Send size={16} /> {enviando ? 'A enviar...' : 'Enviar comunicado'}
+            </button>
+          </form>
+        </div>
+      ) : (
+        <div style={{ display: 'grid', gridTemplateColumns: 'minmax(240px, 300px) 1fr', gap: '1rem', minHeight: 480 }}>
+          <div className="card" style={{ padding: 0, display: 'flex', flexDirection: 'column' }}>
+            <div style={{ padding: '1rem', borderBottom: '1px solid var(--bege-medio)' }}>
+              <div style={{ position: 'relative' }}>
+                <Search size={16} style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', color: 'var(--cinza)' }} />
+                <input
+                  className="form-control"
+                  style={{ paddingLeft: 34 }}
+                  placeholder="Pesquisar contacto..."
+                  value={filtro}
+                  onChange={(e) => setFiltro(e.target.value)}
+                  aria-label="Pesquisar contacto"
+                />
+              </div>
+            </div>
+            <div style={{ overflowY: 'auto', flex: 1 }}>
+              {contatosFiltrados.length === 0 ? (
+                <div className="empty-state" style={{ padding: '2rem 1rem' }}>
+                  <MessageCircle size={32} style={{ opacity: 0.3 }} />
+                  <p style={{ color: 'var(--cinza)', fontSize: '0.9rem' }}>Nenhum contacto disponível.</p>
+                </div>
+              ) : (
+                contatosFiltrados.map((c) => (
+                  <button
+                    key={c.id}
+                    type="button"
+                    onClick={() => abrirConversa(c)}
+                    style={{
+                      width: '100%', textAlign: 'left', padding: '12px 1rem', border: 'none',
+                      borderBottom: '1px solid var(--bege-claro)', cursor: 'pointer',
+                      background: selecionado?.id === c.id ? 'var(--laranja-suave)' : 'transparent',
+                    }}
+                    aria-current={selecionado?.id === c.id ? 'true' : undefined}
+                  >
+                    <div style={{ fontWeight: 600, color: 'var(--castanho)' }}>{c.nome}</div>
+                    <div style={{ fontSize: '0.8rem', color: 'var(--cinza)' }}>
+                      {ROLE_LABEL[c.role] || c.role}
+                    </div>
+                  </button>
+                ))
+              )}
+            </div>
+          </div>
 
-const enviarNotificacao = async (req, res) => {
-  const { titulo, mensagem, alvo, turma_id } = req.body;
-  if (!mensagem || !alvo) {
-    return res.status(400).json({ message: 'Mensagem e alvo são obrigatórios.' });
-  }
-  const tituloFinal = titulo || (alvo === 'usuario' ? 'Mensagem' : null);
-  if (!tituloFinal) {
-    return res.status(400).json({ message: 'Título é obrigatório.' });
-  }
-
-  try {
-    let destinatarios = [];
-    if (alvo === 'usuario') {
-      const { destinatario_id } = req.body;
-      if (!destinatario_id) return res.status(400).json({ message: 'Seleccione o destinatário.' });
-      const permitidos = await obterContatosPermitidos(req.user);
-      const alvo_valido = permitidos.some(c => Number(c.id) === Number(destinatario_id));
-      if (!alvo_valido) {
-        return res.status(403).json({ message: 'Não tem permissão para enviar mensagem a este utilizador.' });
-      }
-      destinatarios = [Number(destinatario_id)];
-    } else if (req.user.role === 'admin') {
-      if (alvo === 'todos') {
-        const [rows] = await db.query('SELECT id FROM usuarios WHERE ativo = 1');
-        destinatarios = rows.map(r => r.id);
-      } else if (alvo === 'alunos') {
-        const [rows] = await db.query('SELECT id FROM usuarios WHERE role = ?', ['aluno']);
-        destinatarios = rows.map(r => r.id);
-      } else if (alvo === 'professores') {
-        const [rows] = await db.query('SELECT id FROM usuarios WHERE role = ?', ['professor']);
-        destinatarios = rows.map(r => r.id);
-      } else if (alvo === 'coordenadores') {
-        const [rows] = await db.query('SELECT id FROM usuarios WHERE role = ?', ['coordenador']);
-        destinatarios = rows.map(r => r.id);
-      } else {
-        return res.status(400).json({ message: 'Alvo inválido.' });
-      }
-    } else if (req.user.role === 'coordenador' || (req.user.role === 'professor' && (req.user.curso_coordenado || req.user.nivel_coordenado))) {
-      if (!['alunos', 'professores'].includes(alvo)) {
-        return res.status(400).json({ message: 'Alvo inválido para esta função.' });
-      }
-      if (!turma_id) return res.status(400).json({ message: 'Seleccione a turma.' });
-      const [turmaRows] = await db.query(
-        'SELECT t.id, t.serie_classe, c.nome as curso_nome FROM turmas t LEFT JOIN cursos c ON t.curso_id = c.id WHERE t.id = ? LIMIT 1',
-        [turma_id]
-      );
-      if (turmaRows.length === 0) return res.status(404).json({ message: 'Turma não encontrada.' });
-      const turma = turmaRows[0];
-      if (req.user.role === 'coordenador') {
-        if (!coordenadorPodeGerirTurma(req.user, turma)) {
-          return res.status(403).json({ message: 'Não tem permissão para esta turma.' });
-        }
-      } else {
-        const [profRows] = await db.query('SELECT id FROM turma_professores WHERE professor_id = ? AND turma_id = ? LIMIT 1', [req.user.id, turma_id]);
-        if (profRows.length === 0) {
-          return res.status(403).json({ message: 'Não está atribuído a esta turma.' });
-        }
-      }
-      if (alvo === 'alunos') {
-        const [rows] = await db.query(
-          `SELECT DISTINCT a.usuario_id FROM matriculas m
-           JOIN alunos a ON m.aluno_id = a.id
-           WHERE m.turma_id = ? AND m.status = 'ativa' AND a.usuario_id IS NOT NULL`,
-          [turma_id]
-        );
-        destinatarios = rows.map(r => r.usuario_id);
-      } else {
-        const [rows] = await db.query(
-          `SELECT DISTINCT u.id FROM turma_professores tp
-           JOIN usuarios u ON tp.professor_id = u.id
-           WHERE tp.turma_id = ?`,
-          [turma_id]
-        );
-        destinatarios = rows.map(r => r.id);
-      }
-    } else if (req.user.role === 'professor') {
-      if (alvo !== 'alunos') return res.status(400).json({ message: 'Professores só podem enviar mensagens para alunos.' });
-      if (!turma_id) return res.status(400).json({ message: 'Seleccione a turma.' });
-      const [profRows] = await db.query('SELECT id FROM turma_professores WHERE professor_id = ? AND turma_id = ? LIMIT 1', [req.user.id, turma_id]);
-      if (profRows.length === 0) {
-        return res.status(403).json({ message: 'Não está atribuído a esta turma.' });
-      }
-      const [rows] = await db.query(
-        `SELECT DISTINCT a.usuario_id FROM matriculas m
-         JOIN alunos a ON m.aluno_id = a.id
-         WHERE m.turma_id = ? AND m.status = 'ativa' AND a.usuario_id IS NOT NULL`,
-        [turma_id]
-      );
-      destinatarios = rows.map(r => r.usuario_id);
-    } else {
-      return res.status(403).json({ message: 'Não tem permissão para enviar mensagens.' });
-    }
-
-    if (destinatarios.length === 0) {
-      return res.status(404).json({ message: 'Nenhum destinatário encontrado para este envio.' });
-    }
-
-    const batch = [];
-    const unique = Array.from(new Set(destinatarios.filter(Boolean)));
-    for (const usuario_id of unique) {
-      batch.push([usuario_id, req.user.id, tituloFinal, mensagem, 'mensagem']);
-    }
-    await db.query('INSERT INTO notificacoes (usuario_id, remetente_id, titulo, mensagem, tipo) VALUES ?',[batch]);
-    return res.status(201).json({ message: `Mensagem enviada para ${unique.length} destinatários.` });
-  } catch (err) {
-    console.error('[enviarNotificacao] ERRO:', err.message);
-    return res.status(500).json({ message: 'Erro ao enviar notificação.' });
-  }
-};
-
-// --- LISTAR DOCUMENTOS DO UTILIZADOR ---
-const listarMeusDocumentos = async (req, res) => {
-  try {
-    const usuario_id = req.user.id;
-    const [docs] = await db.query(`
-      SELECT d.* FROM documentos d
-      INNER JOIN inscricoes i ON d.inscricao_id = i.id
-      WHERE i.usuario_id = ?
-      ORDER BY d.enviado_em DESC
-    `, [usuario_id]);
-    return res.json(docs);
-  } catch (err) {
-    console.error('[listarMeusDocumentos] ERRO:', err.message);
-    return res.status(500).json({ message: 'Erro ao buscar documentos.' });
-  }
-};
-
-module.exports = {
-  listarSeries, criarSerie, atualizarSerie, deletarSerie,
-  upload, enviarDocumento, atualizarDocumento, listarMeusDocumentos,
-  listarUsuarios, listarEquipaCoordenador, sincronizarVagasSeries,
-  criarUsuario, atualizarUsuario, designarCoordenador, minhasNotificacoes,
-  marcarNotificacaoLida, enviarNotificacao, listarContatosPermitidos,
-  listarConversa
-};
+          <div className="card" style={{ display: 'flex', flexDirection: 'column', padding: 0 }}>
+            {!selecionado ? (
+              <div className="empty-state" style={{ flex: 1, padding: '3rem' }}>
+                <MessageCircle size={48} style={{ opacity: 0.25 }} />
+                <h3>Seleccione um contacto</h3>
+                <p style={{ color: 'var(--cinza)' }}>Escolha alguém da lista para ver a conversa.</p>
+              </div>
+            ) : (
+              <>
+                <div style={{ padding: '1rem', borderBottom: '1px solid var(--bege-medio)', fontWeight: 700, color: 'var(--castanho)' }}>
+                  {selecionado.nome}
+                  <span style={{ fontWeight: 400, color: 'var(--cinza)', marginLeft: 8, fontSize: '0.85rem' }}>
+                    {ROLE_LABEL[selecionado.role]}
+                  </span>
+                </div>
+                <div style={{ flex: 1, overflowY: 'auto', padding: '1rem', display: 'flex', flexDirection: 'column', gap: 10, minHeight: 300 }}>
+                  {loadingConversa ? (
+                    <div className="loading" role="status"><div className="spinner" /></div>
+                  ) : conversa.length === 0 ? (
+                    <p style={{ color: 'var(--cinza)', textAlign: 'center', margin: 'auto 0' }}>Nenhuma mensagem ainda. Envie a primeira!</p>
+                  ) : (
+                    conversa.map((m) => {
+                      const enviada = Number(m.remetente_id) === Number(user.id);
+                      return (
+                        <div
+                          key={m.id}
+                          style={{
+                            alignSelf: enviada ? 'flex-end' : 'flex-start',
+                            maxWidth: '75%',
+                            background: enviada ? 'var(--laranja)' : 'var(--bege-medio)',
+                            color: enviada ? '#fff' : 'var(--castanho)',
+                            borderRadius: 12,
+                            padding: '10px 14px',
+                          }}
+                        >
+                          <div style={{ lineHeight: 1.5 }}>{m.mensagem}</div>
+                          <div style={{ fontSize: '0.72rem', opacity: 0.75, marginTop: 4, textAlign: 'right' }}>
+                            {new Date(m.criado_em).toLocaleString('pt-AO')}
+                          </div>
+                        </div>
+                      );
+                    })
+                  )}
+                </div>
+                <form onSubmit={enviarMensagem} style={{ padding: '1rem', borderTop: '1px solid var(--bege-medio)', display: 'flex', gap: 8 }}>
+                  <input
+                    className="form-control"
+                    value={texto}
+                    onChange={(e) => setTexto(e.target.value)}
+                    placeholder="Escreva a sua mensagem..."
+                    aria-label="Mensagem"
+                    disabled={enviando}
+                  />
+                  <button type="submit" className="btn btn-primary" disabled={enviando || !texto.trim()} aria-label="Enviar mensagem">
+                    <Send size={16} />
+                  </button>
+                </form>
+              </>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}

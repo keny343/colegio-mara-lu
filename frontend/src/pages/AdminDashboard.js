@@ -4,6 +4,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { Users, FileText, CheckCircle, Clock, XCircle, AlertCircle, BookOpen, TrendingUp } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend } from 'recharts';
 import api from '../services/api';
+import { useNotification } from '../contexts/NotificationContext';
 
 const CORES = ['#E8641A', '#3D1F0A', '#22C55E', '#EF4444', '#F59E0B', '#3B82F6'];
 
@@ -14,6 +15,7 @@ export default function AdminDashboard() {
   const [dados, setDados] = useState(null);
   const [loading, setLoading] = useState(true);
   const [savingVaga, setSavingVaga] = useState(null);
+  const { error: notifyError, success: notifySuccess } = useNotification();
 
   const carregar = () => api.get('/admin/dashboard').then(r => setDados(r.data));
 
@@ -29,8 +31,9 @@ export default function AdminDashboard() {
         vagas_disponiveis: Number(serie.vagas_disponiveis),
       });
       await carregar();
+      notifySuccess('Vagas actualizadas.');
     } catch (e) {
-      alert(e.response?.data?.message || 'Erro ao guardar vagas.');
+      notifyError(e.response?.data?.message || 'Erro ao guardar vagas.');
     } finally {
       setSavingVaga(null);
     }
@@ -40,8 +43,9 @@ export default function AdminDashboard() {
     try {
       await api.post('/admin/series/sincronizar-vagas');
       await carregar();
+      notifySuccess('Vagas sincronizadas com sucesso.');
     } catch (e) {
-      alert(e.response?.data?.message || 'Erro ao sincronizar.');
+      notifyError(e.response?.data?.message || 'Erro ao sincronizar.');
     }
   };
 

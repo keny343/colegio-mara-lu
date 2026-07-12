@@ -29,7 +29,11 @@ export default function Toast({ message, type = 'success', onClose, duration = 3
   const c = colors[type] || colors.info;
 
   return (
-    <div style={{
+    <div
+      role="status"
+      aria-live="polite"
+      aria-atomic="true"
+      style={{
       position: 'fixed', bottom: 28, right: 28, zIndex: 9999,
       display: 'flex', alignItems: 'center', gap: 12,
       background: c.bg, border: `1.5px solid ${c.border}`,
@@ -45,6 +49,7 @@ export default function Toast({ message, type = 'success', onClose, duration = 3
       <span style={{ color: '#fff', fontWeight: 600, fontSize: '0.95rem', flex: 1 }}>{message}</span>
       <button
         type="button"
+        aria-label="Fechar notificação"
         onClick={() => { setVisible(false); setTimeout(onClose, 300); }}
         style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 2, color: 'rgba(255,255,255,0.75)', display: 'flex', alignItems: 'center' }}
       >

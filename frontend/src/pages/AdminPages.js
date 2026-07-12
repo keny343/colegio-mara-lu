@@ -2,6 +2,8 @@ import React, { useEffect, useState } from 'react';
 import { Users, BookOpen, Plus, Edit2, Trash2, X, Save, ToggleLeft, ToggleRight } from 'lucide-react';
 import api from '../services/api';
 import { useAuth } from '../contexts/AuthContext';
+import { useConfirm } from '../contexts/ConfirmContext';
+import { useNotification } from '../contexts/NotificationContext';
 
 // ===== USUÁRIOS =====
 export function AdminUsuarios() {
@@ -18,6 +20,8 @@ export function AdminUsuarios() {
   const [cursos, setCursos] = useState([]);
   const [erro, setErro] = useState('');
   const [saving, setSaving] = useState(false);
+  const confirm = useConfirm();
+  const { error: notifyError } = useNotification();
 
   const carregar = () => {
     const url = isAdmin ? '/admin/usuarios' : '/staff/equipa';
@@ -445,6 +449,8 @@ export function AdminSeries() {
   const [form, setForm] = useState(formSerieVazio);
   const [erro, setErro] = useState('');
   const [saving, setSaving] = useState(false);
+  const confirm = useConfirm();
+  const { error: notifyError } = useNotification();
 
   const carregar = () => {
     api.get('/series').then(r => setSeries(r.data)).finally(() => setLoading(false));
@@ -467,9 +473,20 @@ export function AdminSeries() {
   };
 
   const excluir = async (id) => {
-    if (!window.confirm('Desativar esta série?')) return;
-    await api.delete(`/admin/series/${id}`).catch(() => {});
-    carregar();
+    const ok = await confirm({
+      title: 'Desactivar série',
+      message: 'Tem a certeza que deseja desactivar esta série? Novas inscrições deixarão de aceitar esta classe.',
+      confirmLabel: 'Desactivar',
+      cancelLabel: 'Cancelar',
+      variant: 'danger',
+    });
+    if (!ok) return;
+    try {
+      await api.delete(`/admin/series/${id}`);
+      carregar();
+    } catch (err) {
+      notifyError(err.response?.data?.message || 'Erro ao desactivar série.');
+    }
   };
 
   if (loading) return <div className="loading"><div className="spinner" /></div>;

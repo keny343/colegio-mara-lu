@@ -430,22 +430,34 @@ const obterContatosPermitidos = async (user) => {
   }
 
   if (user.role === 'professor') {
-    const [minhasTurmas] = await db.query(
+    const [turmasEnsino] = await db.query(
       `SELECT DISTINCT t.id, t.nome, t.serie_classe, c.nome AS curso_nome FROM turma_professores tp
        JOIN turmas t ON tp.turma_id = t.id
        LEFT JOIN cursos c ON t.curso_id = c.id
        WHERE tp.professor_id = ?`,
       [user.id]
     );
-    const turmaIds = minhasTurmas.map(t => t.id);
+
+    let turmasCoordenadas = [];
+    if (temEscopoCoordenacao(user)) {
+      const [todasTurmas] = await db.query(
+        `SELECT t.id, t.serie_classe, c.nome AS curso_nome FROM turmas t LEFT JOIN cursos c ON t.curso_id = c.id WHERE t.ativo = 1`
+      );
+      turmasCoordenadas = todasTurmas.filter(t => coordenadorPodeGerirTurma(user, t));
+    }
+
+    const turmaIdsEnsino = turmasEnsino.map(t => t.id);
+    const turmaIdsCoord = turmasCoordenadas.map(t => t.id);
+    const turmaIdsTodos = Array.from(new Set([...turmaIdsEnsino, ...turmaIdsCoord]));
+
     let alunos = [];
-    if (turmaIds.length) {
+    if (turmaIdsTodos.length) {
       const [rows] = await db.query(
         `SELECT u.id, u.nome, u.email, u.role, m.turma_id FROM matriculas m
          JOIN alunos a ON m.aluno_id = a.id
          JOIN usuarios u ON a.usuario_id = u.id
          WHERE m.turma_id IN (?) AND m.status = 'ativa'`,
-        [turmaIds]
+        [turmaIdsTodos]
       );
       const mapa = new Map();
       rows.forEach(r => {
@@ -456,13 +468,28 @@ const obterContatosPermitidos = async (user) => {
       });
       alunos = Array.from(mapa.values());
     }
+
+    // outros professores que leccionam nas turmas que ele coordena (não nas que só lecciona)
+    let outrosProfessores = [];
+    if (turmaIdsCoord.length) {
+      const [rows] = await db.query(
+        `SELECT DISTINCT u.id, u.nome, u.email, u.role FROM turma_professores tp
+         JOIN usuarios u ON tp.professor_id = u.id
+         WHERE tp.turma_id IN (?) AND u.id != ?`,
+        [turmaIdsCoord, user.id]
+      );
+      outrosProfessores = rows;
+    }
+
     const [coordenadores] = await db.query(
-      `SELECT id, nome, email, role, curso_coordenado, nivel_coordenado FROM usuarios WHERE (role = 'coordenador' OR curso_coordenado IS NOT NULL OR nivel_coordenado IS NOT NULL) AND ativo = 1`
+      `SELECT id, nome, email, role, curso_coordenado, nivel_coordenado FROM usuarios WHERE (role = 'coordenador' OR curso_coordenado IS NOT NULL OR nivel_coordenado IS NOT NULL) AND ativo = 1 AND id != ?`,
+      [user.id]
     );
     const meusCoordenadores = coordenadores
-      .filter(c => minhasTurmas.some(t => coordenadorPodeGerirTurma(c, t)))
+      .filter(c => turmasEnsino.some(t => coordenadorPodeGerirTurma(c, t)))
       .map(({ id, nome, email, role }) => ({ id, nome, email, role }));
-    return [...meusCoordenadores, ...alunos].sort((a, b) => a.nome.localeCompare(b.nome));
+
+    return [...meusCoordenadores, ...outrosProfessores, ...alunos].sort((a, b) => a.nome.localeCompare(b.nome));
   }
 
   if (user.role === 'aluno') {
@@ -489,11 +516,7 @@ const obterContatosPermitidos = async (user) => {
       `SELECT id, nome, email, role, curso_coordenado, nivel_coordenado FROM usuarios WHERE (role = 'coordenador' OR curso_coordenado IS NOT NULL OR nivel_coordenado IS NOT NULL) AND ativo = 1`
     );
     const meusCoordenadores = coordenadores
-      .filter(c => {
-        const resultado = minhasTurmas.some(t => coordenadorPodeGerirTurma(c, t));
-        console.log('[DEBUG contactos-aluno]', { coordenador: c.nome, role: c.role, curso_coordenado: c.curso_coordenado, nivel_coordenado: c.nivel_coordenado, minhasTurmas, resultado });
-        return resultado;
-      })
+      .filter(c => minhasTurmas.some(t => coordenadorPodeGerirTurma(c, t)))
       .map(({ id, nome, email, role }) => ({ id, nome, email, role }));
     return [...meusCoordenadores, ...professores].sort((a, b) => a.nome.localeCompare(b.nome));
   }

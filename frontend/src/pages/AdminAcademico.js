@@ -4,6 +4,7 @@ import { normalizeSeriesName } from '../utils/serieName';
 import { useAuth } from '../contexts/AuthContext';
 import { Plus, X, Save, Pencil, Trash2, User } from 'lucide-react';
 import Toast, { useToast } from '../components/Toast';
+import { useConfirm } from '../contexts/ConfirmContext';
 
 function TabButton({ active, onClick, children }) {
   return (
@@ -35,6 +36,7 @@ export default function AdminAcademico() {
   const [modal, setModal] = useState(null); // {type: 'curso'|'disciplina'|'turma'}
   const [erro, setErro] = useState('');
   const { toast, showToast, clearToast } = useToast();
+  const confirm = useConfirm();
   const [saving, setSaving] = useState(false);
   const [cursoEditId, setCursoEditId] = useState(null);
 
@@ -219,7 +221,13 @@ const classesOptions = CLASSES_PADRAO;
   };
 
   const apagarCurso = async (curso) => {
-    const ok = window.confirm(`Deseja apagar o curso "${curso.nome}"?`);
+    const ok = await confirm({
+      title: 'Apagar curso',
+      message: `Deseja apagar o curso "${curso.nome}"? Esta acção é irreversível.`,
+      confirmLabel: 'Apagar',
+      cancelLabel: 'Cancelar',
+      variant: 'danger',
+    });
     if (!ok) return;
     setErro('');
     setSaving(true);
@@ -284,7 +292,13 @@ const classesOptions = CLASSES_PADRAO;
   };
 
   const apagarHorario = async (horario) => {
-    const ok = window.confirm(`Remover horário de ${horario.disciplina_nome} para ${horario.turma_nome}?`);
+    const ok = await confirm({
+      title: 'Remover horário',
+      message: `Remover horário de ${horario.disciplina_nome} para ${horario.turma_nome}?`,
+      confirmLabel: 'Remover',
+      cancelLabel: 'Cancelar',
+      variant: 'danger',
+    });
     if (!ok) return;
     setErro('');
     setSaving(true);
