@@ -24,6 +24,22 @@ const tipoBadge = (tipo) => {
   );
 };
 
+// Distingue mensagem direta (tem remetente) de comunicado geral do sistema/escola (sem remetente)
+const origemBadge = (temRemetente) => {
+  const c = temRemetente
+    ? { label: '💬 Conversa', color: '#166534', bg: '#f0fdf4' }
+    : { label: '📢 Comunicado', color: '#9a3412', bg: '#fff7ed' };
+  return (
+    <span style={{
+      background: c.bg, color: c.color, borderRadius: 6,
+      padding: '2px 8px', fontSize: '0.72rem', fontWeight: 700,
+      letterSpacing: 0.3, border: `1px solid ${c.color}22`,
+    }}>
+      {c.label}
+    </span>
+  );
+};
+
 const roleLabel = (role) => ({
   admin: 'Administração', coordenador: 'Coordenadores',
   professor: 'Professores', aluno: 'Alunos',
@@ -683,6 +699,7 @@ export default function Mensagens() {
                         {new Date(n.criado_em).toLocaleDateString('pt-AO', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
                       </span>
                     )}
+                    {origemBadge(!!n.remetente_id)}
                     {n.tipo && tipoBadge(n.tipo)}
                     {!n.lida && (
                       <span style={{ fontSize: '0.75rem', color: 'var(--laranja)', fontWeight: 600 }}>
