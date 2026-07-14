@@ -24,29 +24,13 @@ const tipoBadge = (tipo) => {
   );
 };
 
-// Distingue mensagem direta (tem remetente) de comunicado geral do sistema/escola (sem remetente)
-const origemBadge = (temRemetente) => {
-  const c = temRemetente
-    ? { label: '💬 Conversa', color: '#166534', bg: '#f0fdf4' }
-    : { label: '📢 Comunicado', color: '#9a3412', bg: '#fff7ed' };
-  return (
-    <span style={{
-      background: c.bg, color: c.color, borderRadius: 6,
-      padding: '2px 8px', fontSize: '0.72rem', fontWeight: 700,
-      letterSpacing: 0.3, border: `1px solid ${c.color}22`,
-    }}>
-      {c.label}
-    </span>
-  );
-};
-
 const roleLabel = (role) => ({
   admin: 'Administração', coordenador: 'Coordenadores',
   professor: 'Professores', aluno: 'Alunos',
 }[role] || role);
 
 // Área de conversa 1-a-1 (chat) com um contacto específico
-function ChatArea({ destinatarioId, destinatarioNome, currentUserId, onSent }) {
+function ChatArea({ destinatarioId, destinatarioNome, currentUserId, onSent, onOpened }) {
   const [msgs, setMsgs] = useState([]);
   const [texto, setTexto] = useState('');
   const [loading, setLoading] = useState(true);
@@ -57,7 +41,11 @@ function ChatArea({ destinatarioId, destinatarioNome, currentUserId, onSent }) {
   const carregar = () => {
     setLoading(true);
     api.get(`/mensagens/conversa/${destinatarioId}`)
-      .then(res => setMsgs(res.data))
+      .then(res => {
+        setMsgs(res.data);
+        // O backend já marcou as mensagens deste contacto como lidas ao abrir a conversa
+        onOpened && onOpened(destinatarioId);
+      })
       .catch(() => setMsgs([]))
       .finally(() => setLoading(false));
   };
@@ -162,11 +150,6 @@ export default function Mensagens() {
   useEffect(() => { carregarNotifs(); }, []);
 
   useEffect(() => {
-    const id = setInterval(carregarNotifs, 20000);
-    return () => clearInterval(id);
-  }, []);
-
-  useEffect(() => {
     if (!user) return;
     api.get('/mensagens/contactos')
       .then(res => setContatos(res.data))
@@ -193,6 +176,17 @@ export default function Mensagens() {
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [notifs]);
+
+  // Chamado pelo ChatArea quando uma conversa com um contacto é aberta/carregada.
+  // Zera o badge desse contacto na lista e marca as suas notificações como lidas localmente
+  // (o número total de não lidas, calculado a partir de `notifs`, desce automaticamente).
+  const handleContactOpened = (contactId) => {
+    const idNum = Number(contactId);
+    setContatos(prev => prev.map(c => Number(c.id) === idNum ? { ...c, nao_lidas: 0 } : c));
+    setNotifs(prev => prev.map(n =>
+      Number(n.remetente_id) === idNum && !n.lida ? { ...n, lida: true } : n
+    ));
+  };
 
   const marcarLida = (id) => {
     setNotifs(prev => prev.map(n => n.id === id ? { ...n, lida: true } : n));
@@ -238,49 +232,9 @@ export default function Mensagens() {
     }
   };
 
-  const conversas = React.useMemo(() => {
-    const mapa = new Map();
-    notifs.forEach(n => {
-      if (!n.remetente_id) return; // avisos do sistema sem remetente não viram "conversa"
-      const id = Number(n.remetente_id);
-      if (!mapa.has(id)) {
-        mapa.set(id, {
-          id,
-          nome: n.remetente_nome || 'Utilizador',
-          role: n.remetente_role,
-          naoLidas: 0,
-          ultimaMensagem: n.mensagem,
-          ultimaData: n.criado_em,
-        });
-      }
-      const c = mapa.get(id);
-      if (!n.lida) c.naoLidas += 1;
-      if (!c.ultimaData || new Date(n.criado_em) > new Date(c.ultimaData)) {
-        c.ultimaMensagem = n.mensagem;
-        c.ultimaData = n.criado_em;
-      }
-    });
-    return Array.from(mapa.values()).sort((a, b) => new Date(b.ultimaData) - new Date(a.ultimaData));
-  }, [notifs]);
-
   if (loading) return <div className="loading"><div className="spinner" /></div>;
 
   const naoLidas = notifs.filter(n => !n.lida).length;
-
-  const abrirConversa = (conversa) => {
-    setRespondendoPara({ id: conversa.id, nome: conversa.nome });
-    const idsNaoLidos = notifs.filter(n => Number(n.remetente_id) === conversa.id && !n.lida).map(n => n.id);
-    if (idsNaoLidos.length === 0) return;
-    setNotifs(prev => prev.map(n => idsNaoLidos.includes(n.id) ? { ...n, lida: true } : n));
-    Promise.allSettled(idsNaoLidos.map(id => api.patch(`/notificacoes/${id}/lida`)))
-      .then(resultados => {
-        const falharam = idsNaoLidos.filter((_, i) => resultados[i].status === 'rejected');
-        if (falharam.length) {
-          setNotifs(prev => prev.map(n => falharam.includes(n.id) ? { ...n, lida: false } : n));
-        }
-      });
-  };
-
   const podeEnviar = ['admin', 'coordenador', 'professor', 'aluno'].includes(user?.role);
 
   const destinatarioOpts = () => {
@@ -484,12 +438,23 @@ export default function Mensagens() {
                                     style={{
                                       padding: '0.55rem 0.9rem', cursor: 'pointer', fontSize: '0.88rem',
                                       color: 'var(--castanho)', borderBottom: '1px solid var(--bege-claro)',
+                                      display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8,
                                     }}
                                     onMouseEnter={e => e.currentTarget.style.background = 'var(--bege-claro)'}
                                     onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
                                   >
-                                    <span style={{ fontWeight: 600 }}>{c.nome}</span>
-                                    {c.email && <span style={{ color: 'var(--cinza)' }}> · {c.email}</span>}
+                                    <span style={{ minWidth: 0 }}>
+                                      <span style={{ fontWeight: 600 }}>{c.nome}</span>
+                                      {c.email && <span style={{ color: 'var(--cinza)' }}> · {c.email}</span>}
+                                    </span>
+                                    {c.nao_lidas > 0 && (
+                                      <span style={{
+                                        background: 'var(--laranja)', color: '#fff', borderRadius: 20,
+                                        padding: '1px 8px', fontSize: '0.72rem', fontWeight: 700, flexShrink: 0,
+                                      }}>
+                                        {c.nao_lidas}
+                                      </span>
+                                    )}
                                   </div>
                                 ))}
                               </div>
@@ -508,6 +473,7 @@ export default function Mensagens() {
                   destinatarioNome={destinatarioSelecionado.nome}
                   currentUserId={user.id}
                   onSent={carregarNotifs}
+                  onOpened={handleContactOpened}
                 />
               )}
             </div>
@@ -561,56 +527,6 @@ export default function Mensagens() {
         </div>
       )}
 
-      {conversas.length > 0 && (
-        <div className="card" style={{ marginBottom: '1.5rem' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: '1rem' }}>
-            <MessageCircle size={18} color="var(--castanho)" />
-            <h3 style={{ margin: 0, fontSize: '1rem' }}>Conversas</h3>
-          </div>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-            {conversas.map(c => (
-              <div
-                key={c.id}
-                onClick={() => abrirConversa(c)}
-                style={{
-                  display: 'flex', alignItems: 'center', gap: 10,
-                  padding: '0.6rem 0.8rem', borderRadius: 10, cursor: 'pointer',
-                  background: respondendoPara?.id === c.id ? 'var(--laranja-suave)' : 'var(--bege-claro)',
-                  border: '1px solid var(--bege)',
-                }}
-              >
-                <div style={{
-                  width: 36, height: 36, borderRadius: '50%', flexShrink: 0,
-                  background: 'var(--bege)', display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  fontWeight: 700, color: 'var(--castanho)', fontSize: '0.85rem',
-                }}>
-                  {c.nome.charAt(0).toUpperCase()}
-                </div>
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ fontWeight: c.naoLidas > 0 ? 700 : 500, fontSize: '0.88rem', color: 'var(--castanho)' }}>
-                    {c.nome}
-                  </div>
-                  <div style={{
-                    fontSize: '0.78rem', color: 'var(--cinza)', whiteSpace: 'nowrap',
-                    overflow: 'hidden', textOverflow: 'ellipsis',
-                  }}>
-                    {c.ultimaMensagem}
-                  </div>
-                </div>
-                {c.naoLidas > 0 && (
-                  <span style={{
-                    background: 'var(--laranja)', color: '#fff', borderRadius: 20,
-                    padding: '1px 8px', fontSize: '0.75rem', fontWeight: 700, flexShrink: 0,
-                  }}>
-                    {c.naoLidas}
-                  </span>
-                )}
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
       {respondendoPara && (
         <div className="card" style={{ marginBottom: '1.5rem' }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
@@ -622,6 +538,7 @@ export default function Mensagens() {
             destinatarioNome={respondendoPara.nome}
             currentUserId={user.id}
             onSent={carregarNotifs}
+            onOpened={handleContactOpened}
           />
         </div>
       )}
@@ -699,7 +616,6 @@ export default function Mensagens() {
                         {new Date(n.criado_em).toLocaleDateString('pt-AO', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
                       </span>
                     )}
-                    {origemBadge(!!n.remetente_id)}
                     {n.tipo && tipoBadge(n.tipo)}
                     {!n.lida && (
                       <span style={{ fontSize: '0.75rem', color: 'var(--laranja)', fontWeight: 600 }}>
@@ -712,7 +628,7 @@ export default function Mensagens() {
                         className="btn btn-outline btn-sm"
                         onClick={(e) => {
                           e.stopPropagation();
-                          abrirConversa({ id: Number(n.remetente_id), nome: n.remetente_nome || 'Utilizador' });
+                          setRespondendoPara({ id: Number(n.remetente_id), nome: n.remetente_nome || 'Utilizador' });
                         }}
                         style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 4 }}
                       >
