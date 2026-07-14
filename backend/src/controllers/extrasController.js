@@ -529,19 +529,7 @@ const listarContatosPermitidos = async (req, res) => {
   try {
     const contatos = await obterContatosPermitidos(req.user);
     const unique = Array.from(new Map(contatos.map(c => [c.id, c])).values());
-
-    // Quantidade de mensagens não lidas por remetente, para mostrar o "badge" junto de cada contacto
-    const [naoLidasRows] = await db.query(
-      `SELECT remetente_id, COUNT(*) AS total
-       FROM notificacoes
-       WHERE usuario_id = ? AND lida = 0 AND remetente_id IS NOT NULL
-       GROUP BY remetente_id`,
-      [req.user.id]
-    );
-    const mapaNaoLidas = new Map(naoLidasRows.map(r => [Number(r.remetente_id), Number(r.total)]));
-    const comContagem = unique.map(c => ({ ...c, nao_lidas: mapaNaoLidas.get(Number(c.id)) || 0 }));
-
-    return res.json(comContagem);
+    return res.json(unique);
   } catch (err) {
     console.error('[listarContatosPermitidos] ERRO:', err.message);
     return res.status(500).json({ message: 'Erro ao buscar contactos.' });
