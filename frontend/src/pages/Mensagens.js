@@ -146,6 +146,11 @@ export default function Mensagens() {
   useEffect(() => { carregarNotifs(); }, []);
 
   useEffect(() => {
+    const id = setInterval(carregarNotifs, 20000);
+    return () => clearInterval(id);
+  }, []);
+
+  useEffect(() => {
     if (!user) return;
     api.get('/mensagens/contactos')
       .then(res => setContatos(res.data))
@@ -220,6 +225,46 @@ export default function Mensagens() {
   if (loading) return <div className="loading"><div className="spinner" /></div>;
 
   const naoLidas = notifs.filter(n => !n.lida).length;
+
+  const conversas = React.useMemo(() => {
+    const mapa = new Map();
+    notifs.forEach(n => {
+      if (!n.remetente_id) return; // avisos do sistema sem remetente não viram "conversa"
+      const id = Number(n.remetente_id);
+      if (!mapa.has(id)) {
+        mapa.set(id, {
+          id,
+          nome: n.remetente_nome || 'Utilizador',
+          role: n.remetente_role,
+          naoLidas: 0,
+          ultimaMensagem: n.mensagem,
+          ultimaData: n.criado_em,
+        });
+      }
+      const c = mapa.get(id);
+      if (!n.lida) c.naoLidas += 1;
+      if (!c.ultimaData || new Date(n.criado_em) > new Date(c.ultimaData)) {
+        c.ultimaMensagem = n.mensagem;
+        c.ultimaData = n.criado_em;
+      }
+    });
+    return Array.from(mapa.values()).sort((a, b) => new Date(b.ultimaData) - new Date(a.ultimaData));
+  }, [notifs]);
+
+  const abrirConversa = (conversa) => {
+    setRespondendoPara({ id: conversa.id, nome: conversa.nome });
+    const idsNaoLidos = notifs.filter(n => Number(n.remetente_id) === conversa.id && !n.lida).map(n => n.id);
+    if (idsNaoLidos.length === 0) return;
+    setNotifs(prev => prev.map(n => idsNaoLidos.includes(n.id) ? { ...n, lida: true } : n));
+    Promise.allSettled(idsNaoLidos.map(id => api.patch(`/notificacoes/${id}/lida`)))
+      .then(resultados => {
+        const falharam = idsNaoLidos.filter((_, i) => resultados[i].status === 'rejected');
+        if (falharam.length) {
+          setNotifs(prev => prev.map(n => falharam.includes(n.id) ? { ...n, lida: false } : n));
+        }
+      });
+  };
+
   const podeEnviar = ['admin', 'coordenador', 'professor', 'aluno'].includes(user?.role);
 
   const destinatarioOpts = () => {
@@ -500,6 +545,56 @@ export default function Mensagens() {
         </div>
       )}
 
+      {conversas.length > 0 && (
+        <div className="card" style={{ marginBottom: '1.5rem' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: '1rem' }}>
+            <MessageCircle size={18} color="var(--castanho)" />
+            <h3 style={{ margin: 0, fontSize: '1rem' }}>Conversas</h3>
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+            {conversas.map(c => (
+              <div
+                key={c.id}
+                onClick={() => abrirConversa(c)}
+                style={{
+                  display: 'flex', alignItems: 'center', gap: 10,
+                  padding: '0.6rem 0.8rem', borderRadius: 10, cursor: 'pointer',
+                  background: respondendoPara?.id === c.id ? 'var(--laranja-suave)' : 'var(--bege-claro)',
+                  border: '1px solid var(--bege)',
+                }}
+              >
+                <div style={{
+                  width: 36, height: 36, borderRadius: '50%', flexShrink: 0,
+                  background: 'var(--bege)', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  fontWeight: 700, color: 'var(--castanho)', fontSize: '0.85rem',
+                }}>
+                  {c.nome.charAt(0).toUpperCase()}
+                </div>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontWeight: c.naoLidas > 0 ? 700 : 500, fontSize: '0.88rem', color: 'var(--castanho)' }}>
+                    {c.nome}
+                  </div>
+                  <div style={{
+                    fontSize: '0.78rem', color: 'var(--cinza)', whiteSpace: 'nowrap',
+                    overflow: 'hidden', textOverflow: 'ellipsis',
+                  }}>
+                    {c.ultimaMensagem}
+                  </div>
+                </div>
+                {c.naoLidas > 0 && (
+                  <span style={{
+                    background: 'var(--laranja)', color: '#fff', borderRadius: 20,
+                    padding: '1px 8px', fontSize: '0.75rem', fontWeight: 700, flexShrink: 0,
+                  }}>
+                    {c.naoLidas}
+                  </span>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
       {respondendoPara && (
         <div className="card" style={{ marginBottom: '1.5rem' }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
@@ -600,7 +695,7 @@ export default function Mensagens() {
                         className="btn btn-outline btn-sm"
                         onClick={(e) => {
                           e.stopPropagation();
-                          setRespondendoPara({ id: Number(n.remetente_id), nome: n.remetente_nome || 'Utilizador' });
+                          abrirConversa({ id: Number(n.remetente_id), nome: n.remetente_nome || 'Utilizador' });
                         }}
                         style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 4 }}
                       >
