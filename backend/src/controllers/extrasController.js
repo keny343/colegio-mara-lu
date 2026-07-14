@@ -430,7 +430,6 @@ const obterContatosPermitidos = async (user) => {
   }
 
   if (user.role === 'professor') {
-    console.log('[DEBUG contactos-professor] user recebido:', { id: user.id, role: user.role, curso_coordenado: user.curso_coordenado, nivel_coordenado: user.nivel_coordenado });
     const [turmasEnsino] = await db.query(
       `SELECT DISTINCT t.id, t.nome, t.serie_classe, c.nome AS curso_nome FROM turma_professores tp
        JOIN turmas t ON tp.turma_id = t.id
