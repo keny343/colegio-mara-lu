@@ -1,5 +1,5 @@
 const db = require('../config/database');
-const { podeDesignarCoordenador, tipoDesignacaoNoAmbito, coordenadorPodeGerirTurma, filtroSqlSeriesCoordenador } = require('../utils/academicoRules');
+const { podeDesignarCoordenador, tipoDesignacaoNoAmbito, coordenadorPodeGerirTurma, filtroSqlSeriesCoordenador, temEscopoCoordenacao } = require('../utils/academicoRules');
 const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
@@ -30,12 +30,19 @@ const criarSerie = async (req, res) => {
   }
 };
 
+const CAMPOS_SERIE_PERMITIDOS = ['nome', 'nivel', 'vagas_total', 'ano_letivo', 'ordem', 'curso', 'ativo'];
+
 const atualizarSerie = async (req, res) => {
   const { id } = req.params;
-  const campos = req.body;
+  const campos = {};
+  for (const k of CAMPOS_SERIE_PERMITIDOS) {
+    if (req.body[k] !== undefined) campos[k] = req.body[k];
+  }
+  const keys = Object.keys(campos);
+  if (keys.length === 0) return res.status(400).json({ message: 'Nada para atualizar.' });
   try {
-    const sets = Object.keys(campos).map(k => `${k} = ?`).join(', ');
-    await db.query(`UPDATE series SET ${sets} WHERE id = ?`, [...Object.values(campos), id]);
+    const sets = keys.map(k => `${k} = ?`).join(', ');
+    await db.query(`UPDATE series SET ${sets} WHERE id = ?`, [...keys.map(k => campos[k]), id]);
     return res.json({ message: 'Série atualizada!' });
   } catch (err) {
     console.error('[atualizarSerie] ERRO:', err.message);
@@ -61,8 +68,16 @@ const upload = supabaseUpload('documentos', 5);
 const enviarDocumento = async (req, res) => {
   const { inscricao_id, tipo } = req.body;
   if (!req.file) return res.status(400).json({ message: 'Arquivo não enviado.' });
+  if (!inscricao_id) return res.status(400).json({ message: 'Inscrição não indicada.' });
 
   try {
+    // Só admin ou o dono da inscrição pode anexar documentos a ela
+    if (req.user.role !== 'admin') {
+      const [[insc]] = await db.query('SELECT usuario_id FROM inscricoes WHERE id = ? LIMIT 1', [inscricao_id]);
+      if (!insc || Number(insc.usuario_id) !== Number(req.user.id)) {
+        return res.status(403).json({ message: 'Não tem permissão para esta inscrição.' });
+      }
+    }
     await db.query(
       'INSERT INTO documentos (inscricao_id, tipo, nome_arquivo, caminho_arquivo) VALUES (?,?,?,?)',
 [inscricao_id, tipo, req.file.originalname, req.file.secure_url || req.file.path]
@@ -77,6 +92,10 @@ const enviarDocumento = async (req, res) => {
 const atualizarDocumento = async (req, res) => {
   const { id } = req.params;
   const { status, observacao } = req.body;
+  // Ajusta esta lista se coordenador/professor também puderem validar documentos
+  if (!['admin', 'coordenador'].includes(req.user.role)) {
+    return res.status(403).json({ message: 'Sem permissão para actualizar documentos.' });
+  }
   try {
     await db.query('UPDATE documentos SET status = ?, observacao = ? WHERE id = ?', [status, observacao || null, id]);
     return res.json({ message: 'Documento atualizado.' });
@@ -167,6 +186,9 @@ const sincronizarVagasSeries = async (req, res) => {
 
 // Criar utilizador (professor / coordenador / admin)
 const criarUsuario = async (req, res) => {
+  if (req.user.role !== 'admin') {
+    return res.status(403).json({ message: 'Apenas o administrador pode criar utilizadores.' });
+  }
   const { nome, bi, email, telefone, role, curso_coordenado, nivel_coordenado } = req.body;
 
   if (!nome || !bi || !role) {
@@ -364,7 +386,7 @@ const marcarNotificacaoLida = async (req, res) => {
     const { id } = req.params;
     const [rows] = await db.query('SELECT usuario_id FROM notificacoes WHERE id = ? LIMIT 1', [id]);
     if (rows.length === 0) return res.status(404).json({ message: 'Notificação não encontrada.' });
-    if (rows[0].usuario_id !== req.user.id) return res.status(403).json({ message: 'Não tem permissão para actualizar esta notificação.' });
+    if (Number(rows[0].usuario_id) !== Number(req.user.id)) return res.status(403).json({ message: 'Não tem permissão para actualizar esta notificação.' });
     await db.query('UPDATE notificacoes SET lida = 1 WHERE id = ?', [id]);
     return res.json({ message: 'Notificação marcada como lida.' });
   } catch (err) {
@@ -408,22 +430,35 @@ const obterContatosPermitidos = async (user) => {
   }
 
   if (user.role === 'professor') {
-    const [minhasTurmas] = await db.query(
+    console.log('[DEBUG contactos-professor] user recebido:', { id: user.id, role: user.role, curso_coordenado: user.curso_coordenado, nivel_coordenado: user.nivel_coordenado });
+    const [turmasEnsino] = await db.query(
       `SELECT DISTINCT t.id, t.nome, t.serie_classe, c.nome AS curso_nome FROM turma_professores tp
        JOIN turmas t ON tp.turma_id = t.id
        LEFT JOIN cursos c ON t.curso_id = c.id
        WHERE tp.professor_id = ?`,
       [user.id]
     );
-    const turmaIds = minhasTurmas.map(t => t.id);
+
+    let turmasCoordenadas = [];
+    if (temEscopoCoordenacao(user)) {
+      const [todasTurmas] = await db.query(
+        `SELECT t.id, t.serie_classe, c.nome AS curso_nome FROM turmas t LEFT JOIN cursos c ON t.curso_id = c.id WHERE t.ativo = 1`
+      );
+      turmasCoordenadas = todasTurmas.filter(t => coordenadorPodeGerirTurma(user, t));
+    }
+
+    const turmaIdsEnsino = turmasEnsino.map(t => t.id);
+    const turmaIdsCoord = turmasCoordenadas.map(t => t.id);
+    const turmaIdsTodos = Array.from(new Set([...turmaIdsEnsino, ...turmaIdsCoord]));
+
     let alunos = [];
-    if (turmaIds.length) {
+    if (turmaIdsTodos.length) {
       const [rows] = await db.query(
         `SELECT u.id, u.nome, u.email, u.role, m.turma_id FROM matriculas m
          JOIN alunos a ON m.aluno_id = a.id
          JOIN usuarios u ON a.usuario_id = u.id
          WHERE m.turma_id IN (?) AND m.status = 'ativa'`,
-        [turmaIds]
+        [turmaIdsTodos]
       );
       const mapa = new Map();
       rows.forEach(r => {
@@ -434,13 +469,28 @@ const obterContatosPermitidos = async (user) => {
       });
       alunos = Array.from(mapa.values());
     }
+
+    // outros professores que leccionam nas turmas que ele coordena (não nas que só lecciona)
+    let outrosProfessores = [];
+    if (turmaIdsCoord.length) {
+      const [rows] = await db.query(
+        `SELECT DISTINCT u.id, u.nome, u.email, u.role FROM turma_professores tp
+         JOIN usuarios u ON tp.professor_id = u.id
+         WHERE tp.turma_id IN (?) AND u.id != ?`,
+        [turmaIdsCoord, user.id]
+      );
+      outrosProfessores = rows;
+    }
+
     const [coordenadores] = await db.query(
-      `SELECT id, nome, email, role, curso_coordenado, nivel_coordenado FROM usuarios WHERE role = 'coordenador' AND ativo = 1`
+      `SELECT id, nome, email, role, curso_coordenado, nivel_coordenado FROM usuarios WHERE (role = 'coordenador' OR curso_coordenado IS NOT NULL OR nivel_coordenado IS NOT NULL) AND ativo = 1 AND id != ?`,
+      [user.id]
     );
     const meusCoordenadores = coordenadores
-      .filter(c => minhasTurmas.some(t => coordenadorPodeGerirTurma(c, t)))
+      .filter(c => turmasEnsino.some(t => coordenadorPodeGerirTurma(c, t)))
       .map(({ id, nome, email, role }) => ({ id, nome, email, role }));
-    return [...meusCoordenadores, ...alunos].sort((a, b) => a.nome.localeCompare(b.nome));
+
+    return [...meusCoordenadores, ...outrosProfessores, ...alunos].sort((a, b) => a.nome.localeCompare(b.nome));
   }
 
   if (user.role === 'aluno') {
@@ -464,7 +514,7 @@ const obterContatosPermitidos = async (user) => {
       professores = rows;
     }
     const [coordenadores] = await db.query(
-      `SELECT id, nome, email, role, curso_coordenado, nivel_coordenado FROM usuarios WHERE role = 'coordenador' AND ativo = 1`
+      `SELECT id, nome, email, role, curso_coordenado, nivel_coordenado FROM usuarios WHERE (role = 'coordenador' OR curso_coordenado IS NOT NULL OR nivel_coordenado IS NOT NULL) AND ativo = 1`
     );
     const meusCoordenadores = coordenadores
       .filter(c => minhasTurmas.some(t => coordenadorPodeGerirTurma(c, t)))
