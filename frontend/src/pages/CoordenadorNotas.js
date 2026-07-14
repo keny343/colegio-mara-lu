@@ -231,7 +231,7 @@ export default function CoordenadorNotas({ modoProfessor = false }) {
       {erro && (
         <div className="alert alert-error" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <span>{erro}</span>
-          <button type="button" className="alert-close" onClick={() => setErro('')}>×</button>
+          <button type="button" className="alert-close" aria-label="Fechar mensagem de erro" onClick={() => setErro('')}>×</button>
         </div>
       )}
 

@@ -68,7 +68,7 @@ export default function ProfessorMateriais() {
       {erro && (
         <div className="alert alert-error" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <span>{erro}</span>
-          <button type="button" className="alert-close" onClick={() => setErro('')}>×</button>
+          <button type="button" className="alert-close" aria-label="Fechar mensagem de erro" onClick={() => setErro('')}>×</button>
         </div>
       )}
 
@@ -167,7 +167,7 @@ export default function ProfessorMateriais() {
                   <td>{m.turma_nome || '—'}</td>
                   <td>{m.disciplina_nome || '—'}</td>
                   <td>
-                    <a
+                    
                       className="btn btn-outline btn-sm"
                       href={`/uploads/materiais/${m.caminho}`}
                       target="_blank"

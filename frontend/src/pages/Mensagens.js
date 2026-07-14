@@ -326,7 +326,7 @@ export default function Mensagens() {
           {erro && (
             <div className="alert alert-error" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
               <span>{erro}</span>
-              <button type="button" className="alert-close" onClick={() => setErro('')}>×</button>
+              <button type="button" className="alert-close" aria-label="Fechar mensagem de erro" onClick={() => setErro('')}>×</button>
             </div>
           )}
 
@@ -531,7 +531,7 @@ export default function Mensagens() {
         <div className="card" style={{ marginBottom: '1.5rem' }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
             <h3 style={{ margin: 0, fontSize: '1rem' }}>Conversa</h3>
-            <button type="button" className="alert-close" onClick={() => setRespondendoPara(null)}>×</button>
+            <button type="button" className="alert-close" aria-label="Fechar conversa" onClick={() => setRespondendoPara(null)}>×</button>
           </div>
           <ChatArea
             destinatarioId={respondendoPara.id}

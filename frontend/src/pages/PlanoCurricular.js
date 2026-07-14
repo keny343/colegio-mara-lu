@@ -65,7 +65,7 @@ export default function PlanoCurricular() {
       {erro && (
         <div className="alert alert-error" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <span>{erro}</span>
-          <button type="button" className="alert-close" onClick={() => setErro('')}>×</button>
+          <button type="button" className="alert-close" aria-label="Fechar mensagem de erro" onClick={() => setErro('')}>×</button>
         </div>
       )}
 
@@ -156,7 +156,7 @@ export default function PlanoCurricular() {
                   <td>{p.coordenador_nome}</td>
                   <td>{new Date(p.criado_em).toLocaleDateString('pt-AO')}</td>
                   <td>
-                    <a
+                    
                       className="btn btn-outline btn-sm"
                       href={`/uploads/planos/${p.caminho}`}
                       target="_blank"
