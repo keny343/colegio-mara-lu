@@ -222,10 +222,6 @@ export default function Mensagens() {
     }
   };
 
-  if (loading) return <div className="loading"><div className="spinner" /></div>;
-
-  const naoLidas = notifs.filter(n => !n.lida).length;
-
   const conversas = React.useMemo(() => {
     const mapa = new Map();
     notifs.forEach(n => {
@@ -250,6 +246,10 @@ export default function Mensagens() {
     });
     return Array.from(mapa.values()).sort((a, b) => new Date(b.ultimaData) - new Date(a.ultimaData));
   }, [notifs]);
+
+  if (loading) return <div className="loading"><div className="spinner" /></div>;
+
+  const naoLidas = notifs.filter(n => !n.lida).length;
 
   const abrirConversa = (conversa) => {
     setRespondendoPara({ id: conversa.id, nome: conversa.nome });
