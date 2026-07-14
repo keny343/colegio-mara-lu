@@ -30,7 +30,7 @@ const roleLabel = (role) => ({
 }[role] || role);
 
 // Área de conversa 1-a-1 (chat) com um contacto específico
-function ChatArea({ destinatarioId, destinatarioNome, currentUserId, onSent }) {
+function ChatArea({ destinatarioId, destinatarioNome, currentUserId, onSent, onOpened }) {
   const [msgs, setMsgs] = useState([]);
   const [texto, setTexto] = useState('');
   const [loading, setLoading] = useState(true);
@@ -41,7 +41,11 @@ function ChatArea({ destinatarioId, destinatarioNome, currentUserId, onSent }) {
   const carregar = () => {
     setLoading(true);
     api.get(`/mensagens/conversa/${destinatarioId}`)
-      .then(res => setMsgs(res.data))
+      .then(res => {
+        setMsgs(res.data);
+        // O backend já marcou as mensagens deste contacto como lidas ao abrir a conversa
+        onOpened && onOpened(destinatarioId);
+      })
       .catch(() => setMsgs([]))
       .finally(() => setLoading(false));
   };
@@ -172,6 +176,17 @@ export default function Mensagens() {
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [notifs]);
+
+  // Chamado pelo ChatArea quando uma conversa com um contacto é aberta/carregada.
+  // Zera o badge desse contacto na lista e marca as suas notificações como lidas localmente
+  // (o número total de não lidas, calculado a partir de `notifs`, desce automaticamente).
+  const handleContactOpened = (contactId) => {
+    const idNum = Number(contactId);
+    setContatos(prev => prev.map(c => Number(c.id) === idNum ? { ...c, nao_lidas: 0 } : c));
+    setNotifs(prev => prev.map(n =>
+      Number(n.remetente_id) === idNum && !n.lida ? { ...n, lida: true } : n
+    ));
+  };
 
   const marcarLida = (id) => {
     setNotifs(prev => prev.map(n => n.id === id ? { ...n, lida: true } : n));
@@ -423,12 +438,23 @@ export default function Mensagens() {
                                     style={{
                                       padding: '0.55rem 0.9rem', cursor: 'pointer', fontSize: '0.88rem',
                                       color: 'var(--castanho)', borderBottom: '1px solid var(--bege-claro)',
+                                      display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8,
                                     }}
                                     onMouseEnter={e => e.currentTarget.style.background = 'var(--bege-claro)'}
                                     onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
                                   >
-                                    <span style={{ fontWeight: 600 }}>{c.nome}</span>
-                                    {c.email && <span style={{ color: 'var(--cinza)' }}> · {c.email}</span>}
+                                    <span style={{ minWidth: 0 }}>
+                                      <span style={{ fontWeight: 600 }}>{c.nome}</span>
+                                      {c.email && <span style={{ color: 'var(--cinza)' }}> · {c.email}</span>}
+                                    </span>
+                                    {c.nao_lidas > 0 && (
+                                      <span style={{
+                                        background: 'var(--laranja)', color: '#fff', borderRadius: 20,
+                                        padding: '1px 8px', fontSize: '0.72rem', fontWeight: 700, flexShrink: 0,
+                                      }}>
+                                        {c.nao_lidas}
+                                      </span>
+                                    )}
                                   </div>
                                 ))}
                               </div>
@@ -447,6 +473,7 @@ export default function Mensagens() {
                   destinatarioNome={destinatarioSelecionado.nome}
                   currentUserId={user.id}
                   onSent={carregarNotifs}
+                  onOpened={handleContactOpened}
                 />
               )}
             </div>
@@ -511,6 +538,7 @@ export default function Mensagens() {
             destinatarioNome={respondendoPara.nome}
             currentUserId={user.id}
             onSent={carregarNotifs}
+            onOpened={handleContactOpened}
           />
         </div>
       )}
