@@ -156,7 +156,7 @@ export default function PlanoCurricular() {
                   <td>{p.coordenador_nome}</td>
                   <td>{new Date(p.criado_em).toLocaleDateString('pt-AO')}</td>
                   <td>
-                    
+                    <a
                       className="btn btn-outline btn-sm"
                       href={`/uploads/planos/${p.caminho}`}
                       target="_blank"

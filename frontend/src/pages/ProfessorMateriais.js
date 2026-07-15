@@ -168,6 +168,7 @@ export default function ProfessorMateriais() {
                   <td>{m.disciplina_nome || '—'}</td>
                   <td>
                     
+                      <a
                       className="btn btn-outline btn-sm"
                       href={`/uploads/materiais/${m.caminho}`}
                       target="_blank"
