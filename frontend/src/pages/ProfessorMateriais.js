@@ -168,12 +168,11 @@ export default function ProfessorMateriais() {
                   <td>{m.disciplina_nome || '—'}</td>
                   <td>
                     
-                      <a
                       className="btn btn-outline btn-sm"
                       href={`/uploads/materiais/${m.caminho}`}
                       target="_blank"
                       rel="noreferrer"
-                    >
+                    <a>
                       <Download size={13} /> Abrir
                     </a>
                   </td>
