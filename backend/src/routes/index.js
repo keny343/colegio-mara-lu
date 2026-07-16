@@ -15,7 +15,8 @@ const {
   minhasDisciplinas, alunosDaTurma,
   lancarFalta,   listarTodosHorarios, listarHorariosTurma, criarHorario, removerHorario,
   alunosDaTurmaStaff, lancarNota, notasDaTurma,
-  criarMatricula, listarAlunosParaMatricula
+  criarMatricula, listarAlunosParaMatricula,
+  pautaFinalTurma, lancarNotaRecurso
 } = require('../controllers/academicoController');
 const {
   uploadMaterial, uploadPlano,
@@ -122,8 +123,11 @@ router.post('/professor/faltas', professorMiddleware, lancarFalta);
 
 router.post('/staff/notas', notasAccessMiddleware, lancarNota);
 router.get('/staff/turmas/:turma_id/notas/:disciplina_id', notasAccessMiddleware, notasDaTurma);
+router.get('/staff/turmas/:turma_id/pauta', notasAccessMiddleware, pautaFinalTurma);
+router.post('/staff/notas-recurso', staffMiddleware, lancarNotaRecurso);
 router.post('/professor/notas', notasAccessMiddleware, lancarNota);
 router.get('/professor/turmas/:turma_id/notas/:disciplina_id', notasAccessMiddleware, notasDaTurma);
+router.get('/professor/turmas/:turma_id/pauta', notasAccessMiddleware, pautaFinalTurma);
 
 // ===== HORÁRIOS ACADÉMICOS (admin/coordenador) =====
 router.get('/staff/horarios', staffMiddleware, listarTodosHorarios);

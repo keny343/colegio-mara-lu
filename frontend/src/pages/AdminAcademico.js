@@ -41,7 +41,7 @@ export default function AdminAcademico() {
   const [cursoEditId, setCursoEditId] = useState(null);
 
   const [cursoForm, setCursoForm] = useState({ nome: '', descricao: '' });
-  const [discForm, setDiscForm] = useState({ nome: '', curso_id: '', serie_min: '', serie_max: '' });
+  const [discForm, setDiscForm] = useState({ nome: '', curso_id: '', serie_min: '', serie_max: '', disciplina_chave: false });
   const [turmaForm, setTurmaForm] = useState({ nome: '', ano_letivo: new Date().getFullYear() + 1, serie_classe: '', curso_id: '', turno: 'manhã' });
   const [turmaEditId, setTurmaEditId] = useState(null);
   const [turmaEditForm, setTurmaEditForm] = useState({ nome: '', turno: 'manhã' });
@@ -163,7 +163,7 @@ const classesOptions = CLASSES_PADRAO;
       setCursoEditId(data?.id || null);
       setCursoForm({ nome: data?.nome || '', descricao: data?.descricao || '' });
     }
-    if (type === 'disciplina') setDiscForm({ nome: '', curso_id: '', serie_min: '', serie_max: '' });
+    if (type === 'disciplina') setDiscForm({ nome: '', curso_id: '', serie_min: '', serie_max: '', disciplina_chave: false });
     if (type === 'turma') setTurmaForm({ nome: '', ano_letivo: new Date().getFullYear() + 1, serie_classe: '', curso_id: '', turno: 'manhã' });
   };
 
@@ -192,6 +192,7 @@ const classesOptions = CLASSES_PADRAO;
           curso_id: discForm.curso_id || null,
           serie_min: discForm.serie_min ? Number(discForm.serie_min) : null,
           serie_max: discForm.serie_max ? Number(discForm.serie_max) : null,
+          disciplina_chave: !!discForm.disciplina_chave,
         });
       }
       if (modal?.type === 'turma') {
@@ -448,6 +449,7 @@ const classesOptions = CLASSES_PADRAO;
                   <th>Disciplina</th>
                   <th>Curso</th>
                   <th>Classe</th>
+                  <th style={{ textAlign: 'center' }}>Chave</th>
                 </tr>
               </thead>
               <tbody>
@@ -457,6 +459,30 @@ const classesOptions = CLASSES_PADRAO;
                     <td>{d.curso_nome || 'Geral'}</td>
                     <td style={{ color: 'var(--cinza)' }}>
                       {d.serie_min || '—'} até {d.serie_max || '—'}
+                    </td>
+                    <td style={{ textAlign: 'center' }}>
+                      <button
+                        type="button"
+                        className="btn btn-sm"
+                        onClick={async () => {
+                          try {
+                            await api.put(`/staff/disciplinas/${d.id}`, { disciplina_chave: !d.disciplina_chave });
+                            showToast(!d.disciplina_chave ? 'Marcada como disciplina chave.' : 'Deixou de ser disciplina chave.', 'success');
+                            await loadAll();
+                          } catch (err) {
+                            showToast(err.response?.data?.message || 'Erro ao actualizar.', 'error');
+                          }
+                        }}
+                        style={{
+                          background: d.disciplina_chave ? '#fef3c7' : 'var(--bege-claro)',
+                          color: d.disciplina_chave ? '#92400e' : 'var(--cinza)',
+                          border: 'none', borderRadius: 20, padding: '3px 12px',
+                          fontSize: '0.75rem', fontWeight: 700, cursor: 'pointer',
+                        }}
+                        title="Clica para alternar"
+                      >
+                        {d.disciplina_chave ? '★ Chave' : 'Não'}
+                      </button>
                     </td>
                   </tr>
                 ))}
@@ -807,6 +833,16 @@ const classesOptions = CLASSES_PADRAO;
                       <label className="form-label">Classe máxima</label>
                       <input className="form-control" type="number" min={1} max={13} value={discForm.serie_max} onChange={e => setDiscForm({ ...discForm, serie_max: e.target.value })} />
                     </div>
+                  </div>
+                  <div className="form-group">
+                    <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', fontSize: '0.9rem', color: 'var(--castanho)' }}>
+                      <input
+                        type="checkbox"
+                        checked={!!discForm.disciplina_chave}
+                        onChange={e => setDiscForm({ ...discForm, disciplina_chave: e.target.checked })}
+                      />
+                      Disciplina nuclear/chave (conta nas regras de recurso)
+                    </label>
                   </div>
                 </>
               )}

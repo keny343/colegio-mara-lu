@@ -11,8 +11,11 @@ const {
   PERIODOS_VALIDOS,
   limitesNota,
   normalizarPeriodoKey,
+  situacaoAprovacao,
+  situacaoFinalAluno,
 } = require('../utils/academicoRules');
 const { ensureNotasPeriodosSchema } = require('../utils/ensureNotasSchema');
+const { ensureDisciplinaChaveSchema } = require('../utils/ensureDisciplinaSchema');
 
 const professorLecionaDisciplina = async (professorId, turmaId, disciplinaId) => {
   const [rows] = await db.query(
@@ -89,6 +92,7 @@ const removerCurso = async (req, res) => {
 // ===== DISCIPLINAS =====
 const listarDisciplinas = async (req, res) => {
   try {
+    await ensureDisciplinaChaveSchema();
     const [rows] = await db.query(
       `SELECT d.*, c.nome as curso_nome
        FROM disciplinas d
@@ -102,7 +106,8 @@ const listarDisciplinas = async (req, res) => {
 
 const criarDisciplina = async (req, res) => {
   try {
-    const { nome, curso_id, serie_min, serie_max } = req.body;
+    await ensureDisciplinaChaveSchema();
+    const { nome, curso_id, serie_min, serie_max, disciplina_chave } = req.body;
     if (!nome || !String(nome).trim()) {
       return res.status(400).json({ message: 'Nome da disciplina é obrigatório.' });
     }
@@ -133,8 +138,8 @@ const criarDisciplina = async (req, res) => {
       });
     }
     const [r] = await db.query(
-      'INSERT INTO disciplinas (nome, curso_id, serie_min, serie_max) VALUES (?,?,?,?)',
-      [String(nome).trim(), curso_id || null, serie_min || null, serie_max || null]
+      'INSERT INTO disciplinas (nome, curso_id, serie_min, serie_max, disciplina_chave) VALUES (?,?,?,?,?)',
+      [String(nome).trim(), curso_id || null, serie_min || null, serie_max || null, disciplina_chave ? 1 : 0]
     );
     return res.status(201).json({ id: r.insertId, message: 'Disciplina criada.' });
   } catch (err) {
@@ -144,8 +149,9 @@ const criarDisciplina = async (req, res) => {
 
 const atualizarDisciplina = async (req, res) => {
   try {
+  await ensureDisciplinaChaveSchema();
   const { id } = req.params;
-  const { nome, curso_id, serie_min, serie_max, ativo } = req.body;
+  const { nome, curso_id, serie_min, serie_max, ativo, disciplina_chave } = req.body;
   const campos = {};
   if (nome !== undefined) {
     const [dup] = await db.query(
@@ -161,6 +167,7 @@ const atualizarDisciplina = async (req, res) => {
   if (serie_min !== undefined) campos.serie_min = serie_min || null;
   if (serie_max !== undefined) campos.serie_max = serie_max || null;
   if (ativo !== undefined) campos.ativo = ativo ? 1 : 0;
+  if (disciplina_chave !== undefined) campos.disciplina_chave = disciplina_chave ? 1 : 0;
   const keys = Object.keys(campos);
   if (keys.length === 0) return res.status(400).json({ message: 'Nada para atualizar.' });
   const sets = keys.map(k => `${k} = ?`).join(', ');
@@ -738,33 +745,203 @@ const notasDaTurma = async (req, res) => {
       [disciplina_id, turma_id]
     );
 
-    const alunosMap = {};
+    const alunosMap = new Map();
     for (const r of rows) {
-      if (!alunosMap[r.matricula_id]) {
-        alunosMap[r.matricula_id] = {
+      if (!alunosMap.has(r.matricula_id)) {
+        alunosMap.set(r.matricula_id, {
           aluno_id: r.aluno_id,
           aluno_nome: r.aluno_nome,
           matricula_id: r.matricula_id,
           periodos: {},
-        };
+        });
       }
       if (r.periodo) {
-        alunosMap[r.matricula_id].periodos[normalizarPeriodoKey(r.periodo)] = r.nota;
+        alunosMap.get(r.matricula_id).periodos[normalizarPeriodoKey(r.periodo)] = r.nota;
       }
     }
 
     const podeAlterar = req.user.role === 'admin'
       || (podeAlterarNotasComoCoordenador(req.user) && coordenadorPodeGerirTurma(req.user, turma));
 
+    const alunosLista = Array.from(alunosMap.values()).map((a) => ({
+      ...a,
+      situacao: situacaoAprovacao(a.periodos, turma.serie_classe),
+    }));
+
     return res.json({
       turma: { id: turma.id, nome: turma.nome, serie_classe: turma.serie_classe },
       limites: limitesNota(turma.serie_classe),
       periodos: PERIODOS_VALIDOS,
-      alunos: Object.values(alunosMap),
+      alunos: alunosLista,
       pode_alterar_como_coordenador: podeAlterar,
     });
   } catch (err) {
     if (err.code === 'ER_NO_SUCH_TABLE') return res.json({ alunos: [], periodos: PERIODOS_VALIDOS });
+    return res.status(500).json({ message: err.message });
+  }
+};
+
+// ===== PAUTA FINAL: aprovado / recurso / reprovado, cruzando todas as disciplinas =====
+const pautaFinalTurma = async (req, res) => {
+  try {
+    await ensureNotasPeriodosSchema();
+    await ensureDisciplinaChaveSchema();
+    if (!podeAcederNotas(req.user)) {
+      return res.status(403).json({ message: 'Sem permissão para consultar a pauta.' });
+    }
+    const turma_id = req.params.turma_id;
+    const [[turma]] = await db.query(
+      `SELECT t.*, c.nome as curso_nome FROM turmas t LEFT JOIN cursos c ON t.curso_id = c.id WHERE t.id = ?`,
+      [turma_id]
+    );
+    if (!turma) return res.status(404).json({ message: 'Turma não encontrada.' });
+
+    const lecionadas = await idsTurmasLecionadas(req.user.id);
+    if (!turmaVisivelParaNotas(req.user, turma, lecionadas)) {
+      return res.status(403).json({ message: 'Não tem acesso à pauta desta turma.' });
+    }
+
+    const [disciplinas] = await db.query(
+      `SELECT DISTINCT d.id, d.nome, d.disciplina_chave
+       FROM turma_professores tp
+       JOIN disciplinas d ON tp.disciplina_id = d.id
+       WHERE tp.turma_id = ?
+       ORDER BY d.nome`,
+      [turma_id]
+    );
+    if (disciplinas.length === 0) {
+      return res.json({ turma: { id: turma.id, nome: turma.nome, serie_classe: turma.serie_classe }, disciplinas: [], alunos: [] });
+    }
+    const disciplinaIds = disciplinas.map((d) => d.id);
+
+    const [alunos] = await db.query(
+      `SELECT m.id as matricula_id, a.id as aluno_id, u.nome as aluno_nome
+       FROM matriculas m
+       JOIN alunos a ON m.aluno_id = a.id
+       JOIN usuarios u ON a.usuario_id = u.id
+       WHERE m.turma_id = ? AND m.status = 'ativa'
+       ORDER BY u.nome`,
+      [turma_id]
+    );
+    if (alunos.length === 0) {
+      return res.json({ turma: { id: turma.id, nome: turma.nome, serie_classe: turma.serie_classe }, disciplinas, alunos: [] });
+    }
+    const matriculaIds = alunos.map((a) => a.matricula_id);
+
+    const [notasTrim] = await db.query(
+      `SELECT matricula_id, disciplina_id, periodo, nota FROM notas
+       WHERE matricula_id IN (?) AND disciplina_id IN (?) AND periodo IN (?)`,
+      [matriculaIds, disciplinaIds, PERIODOS_VALIDOS]
+    );
+    const [notasRec] = await db.query(
+      `SELECT matricula_id, disciplina_id, nota FROM notas
+       WHERE matricula_id IN (?) AND disciplina_id IN (?) AND periodo = 'REC'`,
+      [matriculaIds, disciplinaIds]
+    );
+
+    const periodosPorAlunoDisc = new Map(); // `${matricula_id}-${disciplina_id}` -> { periodo: nota }
+    for (const r of notasTrim) {
+      const k = `${r.matricula_id}-${r.disciplina_id}`;
+      if (!periodosPorAlunoDisc.has(k)) periodosPorAlunoDisc.set(k, {});
+      periodosPorAlunoDisc.get(k)[normalizarPeriodoKey(r.periodo)] = r.nota;
+    }
+    const recursoPorAlunoDisc = new Map(); // `${matricula_id}-${disciplina_id}` -> nota
+    for (const r of notasRec) {
+      recursoPorAlunoDisc.set(`${r.matricula_id}-${r.disciplina_id}`, r.nota);
+    }
+
+    const alunosLista = alunos.map((a) => {
+      const disciplinasAluno = disciplinas.map((d) => {
+        const k = `${a.matricula_id}-${d.id}`;
+        const periodos = periodosPorAlunoDisc.get(k) || {};
+        const situacao = situacaoAprovacao(periodos, turma.serie_classe);
+        const recursoNota = recursoPorAlunoDisc.get(k) ?? null;
+        return {
+          disciplina_id: d.id,
+          nome: d.nome,
+          disciplina_chave: !!d.disciplina_chave,
+          situacao,
+          recurso_nota: recursoNota,
+        };
+      });
+
+      const final = situacaoFinalAluno(disciplinasAluno, turma.serie_classe);
+
+      let resultadoFinal = final.resultado;
+      if (final.resultado === 'recurso') {
+        const negativasComRecurso = final.negativas.map((n) => ({
+          ...n,
+          recurso_nota: disciplinasAluno.find((d) => d.disciplina_id === n.disciplina_id)?.recurso_nota ?? null,
+        }));
+        const faltaRecurso = negativasComRecurso.some((n) => n.recurso_nota == null);
+        if (!faltaRecurso) {
+          const algumaReprovada = negativasComRecurso.some((n) => parseFloat(n.recurso_nota) < 10);
+          resultadoFinal = algumaReprovada ? 'reprovado_apos_recurso' : 'aprovado_apos_recurso';
+        }
+      }
+
+      return {
+        matricula_id: a.matricula_id,
+        aluno_nome: a.aluno_nome,
+        disciplinas: disciplinasAluno,
+        resultado: resultadoFinal,
+        negativas: final.negativas.map((n) => ({ disciplina_id: n.disciplina_id, nome: n.nome })),
+        motivo: final.motivo,
+      };
+    });
+
+    return res.json({
+      turma: { id: turma.id, nome: turma.nome, serie_classe: turma.serie_classe },
+      disciplinas,
+      alunos: alunosLista,
+    });
+  } catch (err) {
+    if (err.code === 'ER_NO_SUCH_TABLE') return res.json({ turma: null, disciplinas: [], alunos: [] });
+    return res.status(500).json({ message: err.message });
+  }
+};
+
+// Lançar/atualizar nota de exame de recurso (nota única; >=10 aprova a disciplina)
+const lancarNotaRecurso = async (req, res) => {
+  try {
+    await ensureNotasPeriodosSchema();
+    if (req.user.role !== 'admin' && !podeAlterarNotasComoCoordenador(req.user)) {
+      return res.status(403).json({ message: 'Só o administrador ou o coordenador podem lançar notas de recurso.' });
+    }
+    const { matricula_id, disciplina_id, nota } = req.body;
+    if (!matricula_id || !disciplina_id || nota === undefined || nota === null || nota === '') {
+      return res.status(400).json({ message: 'Aluno, disciplina e nota são obrigatórios.' });
+    }
+    const [[m]] = await db.query(
+      `SELECT m.id, t.serie_classe, t.id as turma_id FROM matriculas m JOIN turmas t ON m.turma_id = t.id WHERE m.id = ? LIMIT 1`,
+      [matricula_id]
+    );
+    if (!m) return res.status(404).json({ message: 'Matrícula não encontrada.' });
+
+    if (req.user.role !== 'admin') {
+      const [[turma]] = await db.query('SELECT * FROM turmas WHERE id = ? LIMIT 1', [m.turma_id]);
+      if (!coordenadorPodeGerirTurma(req.user, turma)) {
+        return res.status(403).json({ message: 'Não tem permissão para esta turma.' });
+      }
+    }
+
+    const validacao = validarNota(nota, m.serie_classe);
+    if (!validacao.ok) return res.status(400).json({ message: validacao.message });
+
+    const [existente] = await db.query(
+      `SELECT id FROM notas WHERE matricula_id = ? AND disciplina_id = ? AND periodo = 'REC' LIMIT 1`,
+      [matricula_id, disciplina_id]
+    );
+    if (existente.length > 0) {
+      await db.query(`UPDATE notas SET nota = ?, data_lancamento = NOW() WHERE id = ?`, [nota, existente[0].id]);
+    } else {
+      await db.query(
+        `INSERT INTO notas (matricula_id, disciplina_id, periodo, nota, data_lancamento) VALUES (?,?,'REC',?, NOW())`,
+        [matricula_id, disciplina_id, nota]
+      );
+    }
+    return res.json({ message: 'Nota de recurso lançada.' });
+  } catch (err) {
     return res.status(500).json({ message: err.message });
   }
 };
@@ -779,4 +956,5 @@ module.exports = {
   listarTodosHorarios, listarHorariosTurma, criarHorario, removerHorario,
   alunosDaTurmaStaff, notasDaTurma,
   criarMatricula, listarAlunosParaMatricula,
+  pautaFinalTurma, lancarNotaRecurso,
 };
