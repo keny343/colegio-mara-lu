@@ -66,10 +66,49 @@ export default function CoordenadorNotas({ modoProfessor = false }) {
   const [saving, setSaving] = useState({});
   const [erro, setErro] = useState('');
   const [notaModal, setNotaModal] = useState(null); // { aluno, periodo }
+  const [pauta, setPauta] = useState(null);
+  const [loadingPauta, setLoadingPauta] = useState(false);
+  const [recursoForm, setRecursoForm] = useState({});
+  const [savingRecurso, setSavingRecurso] = useState({});
   const { toast, showToast, clearToast } = useToast();
 
+  const podeLancarRecurso = user?.role === 'admin' || podeAlterarCoord;
   const baseNotas = professor && !podeEditarNotas(user) ? '/professor' : '/staff';
   const postNotas = `${baseNotas}/notas`;
+
+  const carregarPauta = useCallback(async () => {
+    if (!turmaId) { setPauta(null); return; }
+    setLoadingPauta(true);
+    try {
+      const res = await api.get(`${baseNotas}/turmas/${turmaId}/pauta`);
+      setPauta(res.data);
+    } catch (e) {
+      setPauta(null);
+    } finally {
+      setLoadingPauta(false);
+    }
+  }, [turmaId, baseNotas]);
+
+  useEffect(() => { carregarPauta(); }, [carregarPauta]);
+
+  const salvarRecurso = async (matricula_id, disciplina_id) => {
+    const key = `${matricula_id}-${disciplina_id}`;
+    const valor = recursoForm[key];
+    if (valor === undefined || valor === null || valor === '') {
+      showToast('Introduza a nota de recurso.', 'error');
+      return;
+    }
+    setSavingRecurso(s => ({ ...s, [key]: true }));
+    try {
+      await api.post('/staff/notas-recurso', { matricula_id, disciplina_id, nota: parseFloat(valor) });
+      showToast('Nota de recurso lançada.', 'success');
+      await carregarPauta();
+    } catch (e) {
+      showToast(e.response?.data?.message || 'Erro ao lançar nota de recurso.', 'error');
+    } finally {
+      setSavingRecurso(s => ({ ...s, [key]: false }));
+    }
+  };
 
   useEffect(() => {
     if (!podeAcederNotas(user)) return;
@@ -268,6 +307,88 @@ export default function CoordenadorNotas({ modoProfessor = false }) {
         )}
       </div>
 
+      {turmaId && (
+        <div className="card" style={{ marginBottom: '1.5rem', padding: 0, overflow: 'auto' }}>
+          <h3 style={{ padding: '1rem 1rem 0.5rem', margin: 0, fontSize: '1.05rem', color: 'var(--castanho)' }}>
+            Pauta final — situação do aluno (todas as disciplinas)
+          </h3>
+          {loadingPauta ? (
+            <p style={{ padding: '0 1rem 1rem', color: 'var(--cinza)' }}>A carregar pauta...</p>
+          ) : !pauta || pauta.alunos.length === 0 ? (
+            <p style={{ padding: '0 1rem 1rem', color: 'var(--cinza)' }}>
+              Sem disciplinas/alunos suficientes para calcular a pauta desta turma.
+            </p>
+          ) : (
+            <table className="table">
+              <thead>
+                <tr>
+                  <th>Aluno</th>
+                  <th>Resultado</th>
+                  <th>Disciplinas em negativa</th>
+                  {podeLancarRecurso && <th>Recurso</th>}
+                </tr>
+              </thead>
+              <tbody>
+                {pauta.alunos.map((a) => {
+                  const badges = {
+                    aprovado:               { label: 'Aprovado',            bg: '#dcfce7', color: '#15803d' },
+                    aprovado_apos_recurso:  { label: 'Aprovado (recurso)',  bg: '#dcfce7', color: '#15803d' },
+                    recurso:                { label: 'Vai a recurso',       bg: '#fef3c7', color: '#92400e' },
+                    reprovado:              { label: 'Reprovado',           bg: '#fee2e2', color: '#b91c1c' },
+                    reprovado_apos_recurso: { label: 'Reprovado (recurso)', bg: '#fee2e2', color: '#b91c1c' },
+                    incompleto:             { label: 'Notas incompletas',   bg: '#f3f4f6', color: '#6b7280' },
+                  };
+                  const b = badges[a.resultado] || badges.incompleto;
+                  return (
+                    <tr key={a.matricula_id}>
+                      <td><strong>{a.aluno_nome}</strong></td>
+                      <td>
+                        <span style={{ background: b.bg, color: b.color, borderRadius: 6, padding: '2px 10px', fontSize: '0.78rem', fontWeight: 700 }}>
+                          {b.label}
+                        </span>
+                      </td>
+                      <td style={{ fontSize: '0.85rem' }}>
+                        {a.negativas.length === 0 ? '—' : a.negativas.map(n => n.nome).join(', ')}
+                      </td>
+                      {podeLancarRecurso && (
+                        <td>
+                          {a.resultado === 'recurso' && a.negativas.map((n) => {
+                            const key = `${a.matricula_id}-${n.disciplina_id}`;
+                            return (
+                              <div key={key} style={{ display: 'flex', gap: 4, alignItems: 'center', marginBottom: 4 }}>
+                                <span style={{ fontSize: '0.75rem', color: 'var(--cinza)', minWidth: 90 }}>{n.nome}</span>
+                                <input
+                                  type="number"
+                                  className="form-control"
+                                  style={{ width: 60, fontSize: '0.8rem' }}
+                                  min={0}
+                                  max={20}
+                                  step="0.1"
+                                  value={recursoForm[key] ?? ''}
+                                  onChange={(e) => setRecursoForm(f => ({ ...f, [key]: e.target.value }))}
+                                />
+                                <button
+                                  type="button"
+                                  className="btn btn-primary btn-sm"
+                                  disabled={savingRecurso[key]}
+                                  onClick={() => salvarRecurso(a.matricula_id, n.disciplina_id)}
+                                >
+                                  <Save size={12} />
+                                </button>
+                              </div>
+                            );
+                          })}
+                        </td>
+                      )}
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          )}
+        </div>
+      )}
+
       {!turmaId || !disciplinaId ? (
         <div className="card empty-state">
           <ClipboardList size={48} style={{ opacity: 0.3 }} />
@@ -357,6 +478,7 @@ export default function CoordenadorNotas({ modoProfessor = false }) {
                 <tr>
                   <th>Aluno</th>
                   <th style={{ textAlign: 'center' }}>Média anual</th>
+                  <th style={{ textAlign: 'center' }}>Situação</th>
                 </tr>
               </thead>
               <tbody>
@@ -364,6 +486,21 @@ export default function CoordenadorNotas({ modoProfessor = false }) {
                   <tr key={a.matricula_id}>
                     <td>{a.aluno_nome}</td>
                     <td style={{ textAlign: 'center', fontWeight: 700 }}>{mediaAluno(a.matricula_id) ?? '—'}</td>
+                    <td style={{ textAlign: 'center' }}>
+                      {a.situacao === 'aprovado' && (
+                        <span style={{ background: '#dcfce7', color: '#15803d', borderRadius: 6, padding: '2px 10px', fontSize: '0.78rem', fontWeight: 700 }}>
+                          Aprovado
+                        </span>
+                      )}
+                      {a.situacao === 'reprovado' && (
+                        <span style={{ background: '#fee2e2', color: '#b91c1c', borderRadius: 6, padding: '2px 10px', fontSize: '0.78rem', fontWeight: 700 }}>
+                          Reprovado
+                        </span>
+                      )}
+                      {!a.situacao && (
+                        <span style={{ color: 'var(--cinza)', fontSize: '0.78rem' }}>Notas incompletas</span>
+                      )}
+                    </td>
                   </tr>
                 ))}
               </tbody>
