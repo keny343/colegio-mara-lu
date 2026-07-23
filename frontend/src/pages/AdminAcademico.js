@@ -54,6 +54,9 @@ export default function AdminAcademico() {
   const [matriculaModal, setMatriculaModal] = useState(null);
   const [alunosParaMatricula, setAlunosParaMatricula] = useState([]);
   const [matriculaAlunoId, setMatriculaAlunoId] = useState('');
+  const [configAvaliacao, setConfigAvaliacao] = useState([]);
+  const [configForm, setConfigForm] = useState({});
+  const [savingConfig, setSavingConfig] = useState({});
   const [horarioForm, setHorarioForm] = useState({ turma_id: '', disciplina_id: '', dia_semana: 'segunda', hora_inicio: '07:30', hora_fim: '08:30', sala: '' });
   const normalizarNome = (nome) =>
     String(nome || '')
@@ -138,16 +141,18 @@ const classesOptions = CLASSES_PADRAO;
       api.get('/series'),
       api.get('/staff/usuarios'),
       api.get('/staff/horarios'),
+      api.get('/staff/config-avaliacao'),
     ]);
-    const labels = ['cursos', 'disciplinas', 'turmas', 'séries', 'utilizadores', 'horários'];
+    const labels = ['cursos', 'disciplinas', 'turmas', 'séries', 'utilizadores', 'horários', 'configuração de avaliação'];
     const errors = [];
-    const [c, d, t, s, u, h] = results;
+    const [c, d, t, s, u, h, ca] = results;
     if (c.status === 'fulfilled') setCursos(c.value.data); else errors.push(labels[0]);
     if (d.status === 'fulfilled') setDisciplinas(d.value.data); else errors.push(labels[1]);
     if (t.status === 'fulfilled') setTurmas(t.value.data); else errors.push(labels[2]);
     if (s.status === 'fulfilled') setSeries(s.value.data); else errors.push(labels[3]);
     if (u.status === 'fulfilled') setUsuarios(u.value.data); else errors.push(labels[4]);
     if (h.status === 'fulfilled') setHorarios(h.value.data); else errors.push(labels[5]);
+    if (ca.status === 'fulfilled') setConfigAvaliacao(ca.value.data); else errors.push(labels[6]);
     setErro(errors.length > 0
       ? `Erro ao carregar: ${errors.join(', ')}. ${results.find(r => r.status === 'rejected')?.reason?.response?.data?.message || ''}`.trim()
       : '');
@@ -389,6 +394,7 @@ const classesOptions = CLASSES_PADRAO;
           <TabButton active={tab === 'turmas'} onClick={() => setTab('turmas')}>Turmas</TabButton>
           <TabButton active={tab === 'horarios'} onClick={() => setTab('horarios')}>Horários</TabButton>
           <TabButton active={tab === 'atribuir'} onClick={() => setTab('atribuir')}>Atribuir Professor</TabButton>
+          {isAdmin && <TabButton active={tab === 'classes'} onClick={() => setTab('classes')}>Classes</TabButton>}
         </div>
       </div>
 
@@ -670,6 +676,117 @@ const classesOptions = CLASSES_PADRAO;
           <button className="btn btn-primary" onClick={salvarAtribuicao} disabled={saving}>
             {saving ? 'Salvando...' : <><Save size={16} /> Atribuir</>}
           </button>
+        </div>
+      )}
+
+      {tab === 'classes' && (
+        <div className="card">
+          <h3 style={{ marginBottom: '0.25rem', fontSize: '1.1rem' }}>Exame Nacional / Defesa Final por classe</h3>
+          <p style={{ color: 'var(--cinza)', fontSize: '0.85rem', marginBottom: '1.25rem' }}>
+            A configuração aplica-se a todas as turmas da classe (+curso, se aplicável) automaticamente — não é por turma individual.
+            Uma classe nunca pode ter as duas opções activas ao mesmo tempo.
+          </p>
+
+          <div className="form-row" style={{ alignItems: 'flex-end' }}>
+            <div className="form-group">
+              <label className="form-label">Classe *</label>
+              <select
+                className="form-control form-select"
+                value={configForm.serie_classe || ''}
+                onChange={e => setConfigForm({ ...configForm, serie_classe: e.target.value, curso_id: '' })}
+              >
+                <option value="">Selecionar...</option>
+                {Array.from({ length: 13 }, (_, i) => i + 1).map(n => (
+                  <option key={n} value={n}>{n}ª classe</option>
+                ))}
+              </select>
+            </div>
+            <div className="form-group">
+              <label className="form-label">Curso (opcional — vazio = toda a classe)</label>
+              <select
+                className="form-control form-select"
+                value={configForm.curso_id || ''}
+                onChange={e => setConfigForm({ ...configForm, curso_id: e.target.value })}
+              >
+                <option value="">Toda a classe (sem curso específico)</option>
+                {cursosUnicos.map(c => <option key={c.id} value={c.id}>{c.nome}</option>)}
+              </select>
+            </div>
+          </div>
+          <div className="form-row">
+            <div className="form-group">
+              <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}>
+                <input
+                  type="checkbox"
+                  checked={!!configForm.exame_nacional}
+                  onChange={e => setConfigForm({ ...configForm, exame_nacional: e.target.checked, defesa_final: e.target.checked ? false : configForm.defesa_final })}
+                />
+                Realiza Exame Nacional (7ª prova)
+              </label>
+            </div>
+            <div className="form-group">
+              <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}>
+                <input
+                  type="checkbox"
+                  checked={!!configForm.defesa_final}
+                  onChange={e => setConfigForm({ ...configForm, defesa_final: e.target.checked, exame_nacional: e.target.checked ? false : configForm.exame_nacional })}
+                />
+                Realiza Defesa Final
+              </label>
+            </div>
+          </div>
+          <button
+            className="btn btn-primary"
+            disabled={!configForm.serie_classe || saving}
+            onClick={async () => {
+              setErro('');
+              setSaving(true);
+              try {
+                await api.put('/staff/config-avaliacao', {
+                  serie_classe: Number(configForm.serie_classe),
+                  curso_id: configForm.curso_id ? Number(configForm.curso_id) : null,
+                  exame_nacional: !!configForm.exame_nacional,
+                  defesa_final: !!configForm.defesa_final,
+                });
+                showToast('Configuração guardada. Aplicada a todas as turmas desta classe/curso.', 'success');
+                setConfigForm({});
+                await loadAll();
+              } catch (err) {
+                const msg = err.response?.data?.message || 'Erro ao guardar configuração.';
+                setErro(msg);
+                showToast(msg, 'error');
+              } finally {
+                setSaving(false);
+              }
+            }}
+          >
+            <Save size={16} /> Guardar configuração
+          </button>
+
+          <div className="table-container" style={{ marginTop: '1.5rem' }}>
+            <table className="table">
+              <thead>
+                <tr>
+                  <th>Classe</th>
+                  <th>Curso</th>
+                  <th style={{ textAlign: 'center' }}>Exame Nacional</th>
+                  <th style={{ textAlign: 'center' }}>Defesa Final</th>
+                </tr>
+              </thead>
+              <tbody>
+                {configAvaliacao.length === 0 ? (
+                  <tr><td colSpan={4} style={{ color: 'var(--cinza)' }}>Nenhuma classe configurada ainda — por omissão, nenhuma classe usa exame nacional nem defesa final.</td></tr>
+                ) : configAvaliacao.map(cfg => (
+                  <tr key={cfg.id}>
+                    <td><strong>{cfg.serie_classe}ª classe</strong></td>
+                    <td>{cfg.curso_nome || 'Toda a classe'}</td>
+                    <td style={{ textAlign: 'center' }}>{cfg.exame_nacional ? '✓' : '—'}</td>
+                    <td style={{ textAlign: 'center' }}>{cfg.defesa_final ? '✓' : '—'}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </div>
       )}
 

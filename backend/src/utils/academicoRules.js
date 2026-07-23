@@ -260,6 +260,70 @@ const situacaoFinalAluno = (disciplinasAluno, serieClasse) => {
   return { resultado: 'recurso', negativas, motivo: `Recurso em ${negativas.length} disciplina(s).` };
 };
 
+/** Média final ponderada: 70% média da escola + 30% nota do exame/defesa (ou 2ª chamada) */
+const mediaFinalPonderada = (mediaEscola, notaFinal) => {
+  const me = parseFloat(mediaEscola);
+  const nf = parseFloat(notaFinal);
+  if (Number.isNaN(me) || Number.isNaN(nf)) return null;
+  return parseFloat((me * 0.7 + nf * 0.3).toFixed(1));
+};
+
+/**
+ * Situação de uma disciplina considerando a configuração de Exame Nacional / Defesa Final
+ * da classe+curso da turma. Se a classe não tiver exame nem defesa activos, cai no
+ * comportamento simples de sempre (situacaoAprovacao).
+ *
+ * @param {object} periodos períodos trimestrais (1PP..3PT) — dão a "média da escola"
+ * @param {number} serieClasse
+ * @param {{exame_nacional:boolean, defesa_final:boolean}} config
+ * @param {number|null} notaFinal nota do Exame Nacional OU da Defesa Final (conforme config)
+ * @param {number|null} notaChamada2 nota da 2ª chamada, se já lançada
+ */
+const situacaoComConfig = (periodos, serieClasse, config, notaFinal, notaChamada2) => {
+  const usaExame = !!config?.exame_nacional;
+  const usaDefesa = !!config?.defesa_final;
+
+  if (!usaExame && !usaDefesa) {
+    return {
+      status: situacaoAprovacao(periodos, serieClasse),
+      tipo: null,
+      media_escola: mediaPeriodos(periodos),
+      media_final: mediaPeriodos(periodos),
+    };
+  }
+
+  const tipo = usaExame ? 'exame_nacional' : 'defesa_final';
+  const s = Number(serieClasse);
+  const minimo = (s >= 1 && s <= 6) ? 5 : 10;
+  const mediaEscola = mediaPeriodos(periodos);
+  if (mediaEscola == null) {
+    return { status: 'incompleto', tipo, media_escola: null, media_final: null };
+  }
+
+  if (notaFinal == null) {
+    return { status: 'aguarda_nota_final', tipo, media_escola: mediaEscola, media_final: null };
+  }
+
+  if (notaChamada2 != null) {
+    const mediaFinalCh2 = mediaFinalPonderada(mediaEscola, notaChamada2);
+    return {
+      status: mediaFinalCh2 >= minimo ? 'aprovado_2a_chamada' : 'reprovado',
+      tipo,
+      media_escola: mediaEscola,
+      media_final_inicial: mediaFinalPonderada(mediaEscola, notaFinal),
+      media_final: mediaFinalCh2,
+    };
+  }
+
+  const mediaFinal = mediaFinalPonderada(mediaEscola, notaFinal);
+  return {
+    status: mediaFinal >= minimo ? 'aprovado' : 'pendente_2a_chamada',
+    tipo,
+    media_escola: mediaEscola,
+    media_final: mediaFinal,
+  };
+};
+
 /** Disciplina (faixa de classes) dentro do âmbito do coordenador */
 const disciplinaNoAmbitoCoordenador = (user, disciplina, cursoNomeDisciplina) => {
   if (!user || user.role === 'admin') return true;
@@ -333,6 +397,8 @@ module.exports = {
   mediaPeriodos,
   situacaoAprovacao,
   situacaoFinalAluno,
+  mediaFinalPonderada,
+  situacaoComConfig,
   periodosCompletos,
   TIPOS_COORDENACAO,
   filtroSqlSeriesCoordenador,
