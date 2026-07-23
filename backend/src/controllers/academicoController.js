@@ -13,9 +13,12 @@ const {
   normalizarPeriodoKey,
   situacaoAprovacao,
   situacaoFinalAluno,
+  mediaFinalPonderada,
+  situacaoComConfig,
 } = require('../utils/academicoRules');
 const { ensureNotasPeriodosSchema } = require('../utils/ensureNotasSchema');
 const { ensureDisciplinaChaveSchema } = require('../utils/ensureDisciplinaSchema');
+const { ensureConfigAvaliacaoSchema } = require('../utils/ensureConfigAvaliacaoSchema');
 
 const professorLecionaDisciplina = async (professorId, turmaId, disciplinaId) => {
   const [rows] = await db.query(
@@ -760,18 +763,29 @@ const notasDaTurma = async (req, res) => {
       }
     }
 
+    const config = await obterConfigTurma(turma);
+
     const podeAlterar = req.user.role === 'admin'
       || (podeAlterarNotasComoCoordenador(req.user) && coordenadorPodeGerirTurma(req.user, turma));
 
-    const alunosLista = Array.from(alunosMap.values()).map((a) => ({
-      ...a,
-      situacao: situacaoAprovacao(a.periodos, turma.serie_classe),
-    }));
+    const alunosLista = Array.from(alunosMap.values()).map((a) => {
+      const notaFinal = config.exame_nacional ? (a.periodos.EXN ?? null) : config.defesa_final ? (a.periodos.DEF ?? null) : null;
+      const notaCh2 = a.periodos.CH2 ?? null;
+      const avaliacao = situacaoComConfig(a.periodos, turma.serie_classe, config, notaFinal, notaCh2);
+      // situacao simples, para compatibilidade com a pauta/recurso cruzado entre disciplinas
+      const situacaoSimples = ['aprovado', 'aprovado_2a_chamada'].includes(avaliacao.status)
+        ? 'aprovado'
+        : ['reprovado'].includes(avaliacao.status)
+          ? 'reprovado'
+          : null;
+      return { ...a, situacao: situacaoSimples, avaliacao };
+    });
 
     return res.json({
       turma: { id: turma.id, nome: turma.nome, serie_classe: turma.serie_classe },
       limites: limitesNota(turma.serie_classe),
       periodos: PERIODOS_VALIDOS,
+      config_avaliacao: config,
       alunos: alunosLista,
       pode_alterar_como_coordenador: podeAlterar,
     });
@@ -827,6 +841,7 @@ const pautaFinalTurma = async (req, res) => {
       return res.json({ turma: { id: turma.id, nome: turma.nome, serie_classe: turma.serie_classe }, disciplinas, alunos: [] });
     }
     const matriculaIds = alunos.map((a) => a.matricula_id);
+    const config = await obterConfigTurma(turma);
 
     const [notasTrim] = await db.query(
       `SELECT matricula_id, disciplina_id, periodo, nota FROM notas
@@ -836,6 +851,11 @@ const pautaFinalTurma = async (req, res) => {
     const [notasRec] = await db.query(
       `SELECT matricula_id, disciplina_id, nota FROM notas
        WHERE matricula_id IN (?) AND disciplina_id IN (?) AND periodo = 'REC'`,
+      [matriculaIds, disciplinaIds]
+    );
+    const [notasFinais] = await db.query(
+      `SELECT matricula_id, disciplina_id, periodo, nota FROM notas
+       WHERE matricula_id IN (?) AND disciplina_id IN (?) AND periodo IN ('EXN','DEF','CH2')`,
       [matriculaIds, disciplinaIds]
     );
 
@@ -849,12 +869,28 @@ const pautaFinalTurma = async (req, res) => {
     for (const r of notasRec) {
       recursoPorAlunoDisc.set(`${r.matricula_id}-${r.disciplina_id}`, r.nota);
     }
+    const finaisPorAlunoDisc = new Map(); // `${matricula_id}-${disciplina_id}` -> { EXN/DEF, CH2 }
+    for (const r of notasFinais) {
+      const k = `${r.matricula_id}-${r.disciplina_id}`;
+      if (!finaisPorAlunoDisc.has(k)) finaisPorAlunoDisc.set(k, {});
+      finaisPorAlunoDisc.get(k)[r.periodo] = r.nota;
+    }
 
     const alunosLista = alunos.map((a) => {
       const disciplinasAluno = disciplinas.map((d) => {
         const k = `${a.matricula_id}-${d.id}`;
         const periodos = periodosPorAlunoDisc.get(k) || {};
-        const situacao = situacaoAprovacao(periodos, turma.serie_classe);
+        const finais = finaisPorAlunoDisc.get(k) || {};
+        let situacao;
+        if (config.exame_nacional || config.defesa_final) {
+          const notaFinal = config.exame_nacional ? (finais.EXN ?? null) : (finais.DEF ?? null);
+          const avaliacao = situacaoComConfig(periodos, turma.serie_classe, config, notaFinal, finais.CH2 ?? null);
+          situacao = ['aprovado', 'aprovado_2a_chamada'].includes(avaliacao.status)
+            ? 'aprovado'
+            : avaliacao.status === 'reprovado' ? 'reprovado' : null;
+        } else {
+          situacao = situacaoAprovacao(periodos, turma.serie_classe);
+        }
         const recursoNota = recursoPorAlunoDisc.get(k) ?? null;
         return {
           disciplina_id: d.id,
@@ -892,6 +928,7 @@ const pautaFinalTurma = async (req, res) => {
 
     return res.json({
       turma: { id: turma.id, nome: turma.nome, serie_classe: turma.serie_classe },
+      config_avaliacao: config,
       disciplinas,
       alunos: alunosLista,
     });
@@ -946,6 +983,188 @@ const lancarNotaRecurso = async (req, res) => {
   }
 };
 
+// ===== CONFIGURAÇÃO: Exame Nacional / Defesa Final por classe (+curso) =====
+const listarConfigAvaliacao = async (req, res) => {
+  try {
+    await ensureConfigAvaliacaoSchema();
+    const [rows] = await db.query(
+      `SELECT ca.*, c.nome as curso_nome
+       FROM config_avaliacao ca
+       LEFT JOIN cursos c ON ca.curso_id = c.id
+       ORDER BY ca.serie_classe, c.nome`
+    );
+    return res.json(rows);
+  } catch (err) {
+    return res.status(500).json({ message: err.message });
+  }
+};
+
+const salvarConfigAvaliacao = async (req, res) => {
+  try {
+    await ensureConfigAvaliacaoSchema();
+    const { serie_classe, curso_id, exame_nacional, defesa_final } = req.body;
+    if (serie_classe === undefined || serie_classe === null) {
+      return res.status(400).json({ message: 'Classe é obrigatória.' });
+    }
+    if (exame_nacional && defesa_final) {
+      return res.status(400).json({ message: 'Uma classe não pode ter Exame Nacional e Defesa Final activos ao mesmo tempo.' });
+    }
+    const cursoIdVal = curso_id || null;
+    const [existente] = await db.query(
+      cursoIdVal
+        ? `SELECT id FROM config_avaliacao WHERE serie_classe = ? AND curso_id = ? LIMIT 1`
+        : `SELECT id FROM config_avaliacao WHERE serie_classe = ? AND curso_id IS NULL LIMIT 1`,
+      cursoIdVal ? [serie_classe, cursoIdVal] : [serie_classe]
+    );
+    if (existente.length > 0) {
+      await db.query(
+        `UPDATE config_avaliacao SET exame_nacional = ?, defesa_final = ? WHERE id = ?`,
+        [exame_nacional ? 1 : 0, defesa_final ? 1 : 0, existente[0].id]
+      );
+    } else {
+      await db.query(
+        `INSERT INTO config_avaliacao (serie_classe, curso_id, exame_nacional, defesa_final) VALUES (?,?,?,?)`,
+        [serie_classe, cursoIdVal, exame_nacional ? 1 : 0, defesa_final ? 1 : 0]
+      );
+    }
+    return res.json({ message: 'Configuração guardada. Aplicada automaticamente a todas as turmas desta classe/curso.' });
+  } catch (err) {
+    return res.status(500).json({ message: err.message });
+  }
+};
+
+/** Resolve a config activa pra uma turma: primeiro por classe+curso específico, senão por classe genérica (curso_id NULL) */
+const obterConfigTurma = async (turma) => {
+  await ensureConfigAvaliacaoSchema();
+  if (turma.curso_id) {
+    const [rows] = await db.query(
+      `SELECT exame_nacional, defesa_final FROM config_avaliacao WHERE serie_classe = ? AND curso_id = ? LIMIT 1`,
+      [turma.serie_classe, turma.curso_id]
+    );
+    if (rows.length > 0) return rows[0];
+  }
+  const [rows2] = await db.query(
+    `SELECT exame_nacional, defesa_final FROM config_avaliacao WHERE serie_classe = ? AND curso_id IS NULL LIMIT 1`,
+    [turma.serie_classe]
+  );
+  return rows2[0] || { exame_nacional: 0, defesa_final: 0 };
+};
+
+// Lançar/atualizar nota do Exame Nacional (7ª prova) ou da Defesa Final
+const lancarNotaExameDefesa = async (req, res) => {
+  try {
+    await ensureNotasPeriodosSchema();
+    if (req.user.role !== 'admin' && !podeAlterarNotasComoCoordenador(req.user)) {
+      return res.status(403).json({ message: 'Só o administrador ou o coordenador podem lançar esta nota.' });
+    }
+    const { matricula_id, disciplina_id, nota } = req.body;
+    if (!matricula_id || !disciplina_id || nota === undefined || nota === null || nota === '') {
+      return res.status(400).json({ message: 'Aluno, disciplina e nota são obrigatórios.' });
+    }
+    const [[m]] = await db.query(
+      `SELECT m.id, t.serie_classe, t.curso_id, t.id as turma_id FROM matriculas m JOIN turmas t ON m.turma_id = t.id WHERE m.id = ? LIMIT 1`,
+      [matricula_id]
+    );
+    if (!m) return res.status(404).json({ message: 'Matrícula não encontrada.' });
+    if (req.user.role !== 'admin') {
+      const [[turma]] = await db.query('SELECT * FROM turmas WHERE id = ? LIMIT 1', [m.turma_id]);
+      if (!coordenadorPodeGerirTurma(req.user, turma)) {
+        return res.status(403).json({ message: 'Não tem permissão para esta turma.' });
+      }
+    }
+    const config = await obterConfigTurma(m);
+    if (!config.exame_nacional && !config.defesa_final) {
+      return res.status(400).json({ message: 'Esta classe/curso não está configurada para Exame Nacional nem Defesa Final.' });
+    }
+    const periodo = config.exame_nacional ? 'EXN' : 'DEF';
+
+    const validacao = validarNota(nota, m.serie_classe);
+    if (!validacao.ok) return res.status(400).json({ message: validacao.message });
+
+    const [existente] = await db.query(
+      `SELECT id FROM notas WHERE matricula_id = ? AND disciplina_id = ? AND periodo = ? LIMIT 1`,
+      [matricula_id, disciplina_id, periodo]
+    );
+    if (existente.length > 0) {
+      await db.query(`UPDATE notas SET nota = ?, data_lancamento = NOW() WHERE id = ?`, [nota, existente[0].id]);
+    } else {
+      await db.query(
+        `INSERT INTO notas (matricula_id, disciplina_id, periodo, nota, data_lancamento) VALUES (?,?,?,?, NOW())`,
+        [matricula_id, disciplina_id, periodo, nota]
+      );
+    }
+    return res.json({ message: config.exame_nacional ? 'Nota do Exame Nacional lançada.' : 'Nota da Defesa Final lançada.' });
+  } catch (err) {
+    return res.status(500).json({ message: err.message });
+  }
+};
+
+// Lançar/atualizar nota da 2ª chamada (só permitido se a média final ponderada estiver pendente, <10)
+const lancarNotaChamada2 = async (req, res) => {
+  try {
+    await ensureNotasPeriodosSchema();
+    if (req.user.role !== 'admin' && !podeAlterarNotasComoCoordenador(req.user)) {
+      return res.status(403).json({ message: 'Só o administrador ou o coordenador podem lançar a 2ª chamada.' });
+    }
+    const { matricula_id, disciplina_id, nota } = req.body;
+    if (!matricula_id || !disciplina_id || nota === undefined || nota === null || nota === '') {
+      return res.status(400).json({ message: 'Aluno, disciplina e nota são obrigatórios.' });
+    }
+    const [[m]] = await db.query(
+      `SELECT m.id, t.serie_classe, t.curso_id, t.id as turma_id FROM matriculas m JOIN turmas t ON m.turma_id = t.id WHERE m.id = ? LIMIT 1`,
+      [matricula_id]
+    );
+    if (!m) return res.status(404).json({ message: 'Matrícula não encontrada.' });
+    if (req.user.role !== 'admin') {
+      const [[turma]] = await db.query('SELECT * FROM turmas WHERE id = ? LIMIT 1', [m.turma_id]);
+      if (!coordenadorPodeGerirTurma(req.user, turma)) {
+        return res.status(403).json({ message: 'Não tem permissão para esta turma.' });
+      }
+    }
+    const config = await obterConfigTurma(m);
+    if (!config.exame_nacional && !config.defesa_final) {
+      return res.status(400).json({ message: 'Esta classe/curso não está configurada para Exame Nacional nem Defesa Final.' });
+    }
+    const periodoFinal = config.exame_nacional ? 'EXN' : 'DEF';
+
+    const [periodosRows] = await db.query(
+      `SELECT periodo, nota FROM notas WHERE matricula_id = ? AND disciplina_id = ? AND periodo IN (?)`,
+      [matricula_id, disciplina_id, PERIODOS_VALIDOS]
+    );
+    const periodos = {};
+    periodosRows.forEach((r) => { periodos[normalizarPeriodoKey(r.periodo)] = r.nota; });
+
+    const [[notaFinalRow]] = await db.query(
+      `SELECT nota FROM notas WHERE matricula_id = ? AND disciplina_id = ? AND periodo = ? LIMIT 1`,
+      [matricula_id, disciplina_id, periodoFinal]
+    );
+    const notaFinal = notaFinalRow ? notaFinalRow.nota : null;
+    const situacaoAtual = situacaoComConfig(periodos, m.serie_classe, config, notaFinal, null);
+    if (situacaoAtual.status !== 'pendente_2a_chamada') {
+      return res.status(400).json({ message: 'Esta disciplina não está pendente de 2ª chamada.' });
+    }
+
+    const validacao = validarNota(nota, m.serie_classe);
+    if (!validacao.ok) return res.status(400).json({ message: validacao.message });
+
+    const [existente] = await db.query(
+      `SELECT id FROM notas WHERE matricula_id = ? AND disciplina_id = ? AND periodo = 'CH2' LIMIT 1`,
+      [matricula_id, disciplina_id]
+    );
+    if (existente.length > 0) {
+      await db.query(`UPDATE notas SET nota = ?, data_lancamento = NOW() WHERE id = ?`, [nota, existente[0].id]);
+    } else {
+      await db.query(
+        `INSERT INTO notas (matricula_id, disciplina_id, periodo, nota, data_lancamento) VALUES (?,?,'CH2',?, NOW())`,
+        [matricula_id, disciplina_id, nota]
+      );
+    }
+    return res.json({ message: 'Nota da 2ª chamada lançada.' });
+  } catch (err) {
+    return res.status(500).json({ message: err.message });
+  }
+};
+
 module.exports = {
   listarCursos, criarCurso, atualizarCurso, removerCurso,
   listarDisciplinas, criarDisciplina, atualizarDisciplina,
@@ -957,4 +1176,6 @@ module.exports = {
   alunosDaTurmaStaff, notasDaTurma,
   criarMatricula, listarAlunosParaMatricula,
   pautaFinalTurma, lancarNotaRecurso,
+  listarConfigAvaliacao, salvarConfigAvaliacao,
+  lancarNotaExameDefesa, lancarNotaChamada2,
 };
