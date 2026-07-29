@@ -60,6 +60,11 @@ export default function CoordenadorNotas({ modoProfessor = false }) {
   const [limites, setLimites] = useState({ min: 0, max: 20 });
   const [serieClasse, setSerieClasse] = useState(null);
   const [podeAlterarCoord, setPodeAlterarCoord] = useState(false);
+  const [configDisciplina, setConfigDisciplina] = useState({ exame_nacional: false, defesa_final: false });
+  const [notaFinalForm, setNotaFinalForm] = useState({});
+  const [savingNotaFinal, setSavingNotaFinal] = useState({});
+  const [chamada2Form, setChamada2Form] = useState({});
+  const [savingChamada2, setSavingChamada2] = useState({});
   const [form, setForm] = useState({});
   const [loading, setLoading] = useState(true);
   const [loadingNotas, setLoadingNotas] = useState(false);
@@ -70,6 +75,10 @@ export default function CoordenadorNotas({ modoProfessor = false }) {
   const [loadingPauta, setLoadingPauta] = useState(false);
   const [recursoForm, setRecursoForm] = useState({});
   const [savingRecurso, setSavingRecurso] = useState({});
+  const [pautaNotaFinalForm, setPautaNotaFinalForm] = useState({});
+  const [savingPautaNotaFinal, setSavingPautaNotaFinal] = useState({});
+  const [pautaChamada2Form, setPautaChamada2Form] = useState({});
+  const [savingPautaChamada2, setSavingPautaChamada2] = useState({});
   const { toast, showToast, clearToast } = useToast();
 
   const podeLancarRecurso = user?.role === 'admin' || podeAlterarCoord;
@@ -110,6 +119,44 @@ export default function CoordenadorNotas({ modoProfessor = false }) {
     }
   };
 
+  const salvarNotaFinalPauta = async (matricula_id, disciplina_id) => {
+    const key = `${matricula_id}-${disciplina_id}`;
+    const valor = pautaNotaFinalForm[key];
+    if (valor === undefined || valor === null || valor === '') {
+      showToast('Introduza a nota.', 'error');
+      return;
+    }
+    setSavingPautaNotaFinal(s => ({ ...s, [key]: true }));
+    try {
+      await api.post('/staff/notas-exame-defesa', { matricula_id, disciplina_id, nota: parseFloat(valor) });
+      showToast('Nota lançada com sucesso.', 'success');
+      await carregarPauta();
+    } catch (e) {
+      showToast(e.response?.data?.message || 'Erro ao lançar nota.', 'error');
+    } finally {
+      setSavingPautaNotaFinal(s => ({ ...s, [key]: false }));
+    }
+  };
+
+  const salvarChamada2Pauta = async (matricula_id, disciplina_id) => {
+    const key = `${matricula_id}-${disciplina_id}`;
+    const valor = pautaChamada2Form[key];
+    if (valor === undefined || valor === null || valor === '') {
+      showToast('Introduza a nota da 2ª chamada.', 'error');
+      return;
+    }
+    setSavingPautaChamada2(s => ({ ...s, [key]: true }));
+    try {
+      await api.post('/staff/notas-chamada2', { matricula_id, disciplina_id, nota: parseFloat(valor) });
+      showToast('Nota da 2ª chamada lançada.', 'success');
+      await carregarPauta();
+    } catch (e) {
+      showToast(e.response?.data?.message || 'Erro ao lançar 2ª chamada.', 'error');
+    } finally {
+      setSavingPautaChamada2(s => ({ ...s, [key]: false }));
+    }
+  };
+
   useEffect(() => {
     if (!podeAcederNotas(user)) return;
     if (professor && !podeEditarNotas(user)) {
@@ -124,6 +171,7 @@ export default function CoordenadorNotas({ modoProfessor = false }) {
                 nome: a.turma_nome,
                 serie_classe: a.serie_classe,
                 ano_letivo: a.ano_letivo,
+                curso_nome: a.curso_nome,
               };
             }
           }
@@ -161,6 +209,7 @@ export default function CoordenadorNotas({ modoProfessor = false }) {
       setLimites(res.data.limites || { min: 0, max: 20 });
       setSerieClasse(res.data.turma?.serie_classe);
       setPodeAlterarCoord(!!res.data.pode_alterar_como_coordenador);
+      setConfigDisciplina(res.data.config_avaliacao || { exame_nacional: false, defesa_final: false });
       const inicial = {};
       for (const a of res.data.alunos || []) {
         inicial[a.matricula_id] = { ...a.periodos };
@@ -223,6 +272,42 @@ export default function CoordenadorNotas({ modoProfessor = false }) {
 
   const mediaAluno = (matricula_id) => mediaAnual(form[matricula_id] || {});
 
+  const salvarNotaFinal = async (matricula_id) => {
+    const valor = notaFinalForm[matricula_id];
+    if (valor === undefined || valor === null || valor === '') {
+      showToast(configDisciplina.exame_nacional ? 'Introduza a nota do Exame Nacional.' : 'Introduza a nota da Defesa Final.', 'error');
+      return;
+    }
+    setSavingNotaFinal(s => ({ ...s, [matricula_id]: true }));
+    try {
+      await api.post('/staff/notas-exame-defesa', { matricula_id, disciplina_id: Number(disciplinaId), nota: parseFloat(valor) });
+      showToast('Nota lançada com sucesso.', 'success');
+      await carregarNotas();
+    } catch (e) {
+      showToast(e.response?.data?.message || 'Erro ao lançar nota.', 'error');
+    } finally {
+      setSavingNotaFinal(s => ({ ...s, [matricula_id]: false }));
+    }
+  };
+
+  const salvarChamada2 = async (matricula_id) => {
+    const valor = chamada2Form[matricula_id];
+    if (valor === undefined || valor === null || valor === '') {
+      showToast('Introduza a nota da 2ª chamada.', 'error');
+      return;
+    }
+    setSavingChamada2(s => ({ ...s, [matricula_id]: true }));
+    try {
+      await api.post('/staff/notas-chamada2', { matricula_id, disciplina_id: Number(disciplinaId), nota: parseFloat(valor) });
+      showToast('Nota da 2ª chamada lançada.', 'success');
+      await carregarNotas();
+    } catch (e) {
+      showToast(e.response?.data?.message || 'Erro ao lançar 2ª chamada.', 'error');
+    } finally {
+      setSavingChamada2(s => ({ ...s, [matricula_id]: false }));
+    }
+  };
+
   if (!podeAcederNotas(user)) {
     return (
       <div className="page-container">
@@ -281,7 +366,7 @@ export default function CoordenadorNotas({ modoProfessor = false }) {
             <select className="form-control form-select" value={turmaId} onChange={e => { setTurmaId(e.target.value); setDisciplinaId(''); }}>
               <option value="">Selecionar turma...</option>
               {turmas.map(t => (
-                <option key={t.id} value={t.id}>{t.nome} — {t.serie_classe}ª ({t.ano_letivo})</option>
+                <option key={t.id} value={t.id}>{t.nome} — {t.serie_classe}ª{t.curso_nome ? ` · ${t.curso_nome}` : ''} ({t.ano_letivo})</option>
               ))}
             </select>
           </div>
@@ -325,7 +410,7 @@ export default function CoordenadorNotas({ modoProfessor = false }) {
                   <th>Aluno</th>
                   <th>Resultado</th>
                   <th>Disciplinas em negativa</th>
-                  {podeLancarRecurso && <th>Recurso</th>}
+                  {podeLancarRecurso && <th>Pendências / Acção</th>}
                 </tr>
               </thead>
               <tbody>
@@ -339,6 +424,8 @@ export default function CoordenadorNotas({ modoProfessor = false }) {
                     incompleto:             { label: 'Notas incompletas',   bg: '#f3f4f6', color: '#6b7280' },
                   };
                   const b = badges[a.resultado] || badges.incompleto;
+                  const aguardaExameDefesa = (a.disciplinas || []).filter(d => d.avaliacao_status === 'aguarda_nota_final');
+                  const aguardaChamada2 = (a.disciplinas || []).filter(d => d.avaliacao_status === 'pendente_2a_chamada');
                   return (
                     <tr key={a.matricula_id}>
                       <td><strong>{a.aluno_nome}</strong></td>
@@ -346,6 +433,14 @@ export default function CoordenadorNotas({ modoProfessor = false }) {
                         <span style={{ background: b.bg, color: b.color, borderRadius: 6, padding: '2px 10px', fontSize: '0.78rem', fontWeight: 700 }}>
                           {b.label}
                         </span>
+                        {aguardaExameDefesa.length > 0 && (
+                          <div style={{ fontSize: '0.72rem', color: '#92400e', marginTop: 2 }}>
+                            Aguarda {pauta.config_avaliacao?.exame_nacional ? 'Exame Nacional' : 'Defesa Final'}
+                          </div>
+                        )}
+                        {aguardaChamada2.length > 0 && (
+                          <div style={{ fontSize: '0.72rem', color: '#92400e', marginTop: 2 }}>Aguarda 2ª chamada</div>
+                        )}
                       </td>
                       <td style={{ fontSize: '0.85rem' }}>
                         {a.negativas.length === 0 ? '—' : a.negativas.map(n => n.nome).join(', ')}
@@ -356,7 +451,7 @@ export default function CoordenadorNotas({ modoProfessor = false }) {
                             const key = `${a.matricula_id}-${n.disciplina_id}`;
                             return (
                               <div key={key} style={{ display: 'flex', gap: 4, alignItems: 'center', marginBottom: 4 }}>
-                                <span style={{ fontSize: '0.75rem', color: 'var(--cinza)', minWidth: 90 }}>{n.nome}</span>
+                                <span style={{ fontSize: '0.75rem', color: 'var(--cinza)', minWidth: 90 }}>{n.nome} (recurso)</span>
                                 <input
                                   type="number"
                                   className="form-control"
@@ -372,6 +467,60 @@ export default function CoordenadorNotas({ modoProfessor = false }) {
                                   className="btn btn-primary btn-sm"
                                   disabled={savingRecurso[key]}
                                   onClick={() => salvarRecurso(a.matricula_id, n.disciplina_id)}
+                                >
+                                  <Save size={12} />
+                                </button>
+                              </div>
+                            );
+                          })}
+                          {aguardaExameDefesa.map((d) => {
+                            const key = `${a.matricula_id}-${d.disciplina_id}`;
+                            return (
+                              <div key={key} style={{ display: 'flex', gap: 4, alignItems: 'center', marginBottom: 4 }}>
+                                <span style={{ fontSize: '0.75rem', color: 'var(--cinza)', minWidth: 90 }}>
+                                  {d.nome} ({pauta.config_avaliacao?.exame_nacional ? 'Exame' : 'Defesa'})
+                                </span>
+                                <input
+                                  type="number"
+                                  className="form-control"
+                                  style={{ width: 60, fontSize: '0.8rem' }}
+                                  min={0}
+                                  max={20}
+                                  step="0.1"
+                                  value={pautaNotaFinalForm[key] ?? ''}
+                                  onChange={(e) => setPautaNotaFinalForm(f => ({ ...f, [key]: e.target.value }))}
+                                />
+                                <button
+                                  type="button"
+                                  className="btn btn-primary btn-sm"
+                                  disabled={savingPautaNotaFinal[key]}
+                                  onClick={() => salvarNotaFinalPauta(a.matricula_id, d.disciplina_id)}
+                                >
+                                  <Save size={12} />
+                                </button>
+                              </div>
+                            );
+                          })}
+                          {aguardaChamada2.map((d) => {
+                            const key = `${a.matricula_id}-${d.disciplina_id}`;
+                            return (
+                              <div key={key} style={{ display: 'flex', gap: 4, alignItems: 'center', marginBottom: 4 }}>
+                                <span style={{ fontSize: '0.75rem', color: 'var(--cinza)', minWidth: 90 }}>{d.nome} (2ª chamada)</span>
+                                <input
+                                  type="number"
+                                  className="form-control"
+                                  style={{ width: 60, fontSize: '0.8rem' }}
+                                  min={0}
+                                  max={20}
+                                  step="0.1"
+                                  value={pautaChamada2Form[key] ?? ''}
+                                  onChange={(e) => setPautaChamada2Form(f => ({ ...f, [key]: e.target.value }))}
+                                />
+                                <button
+                                  type="button"
+                                  className="btn btn-primary btn-sm"
+                                  disabled={savingPautaChamada2[key]}
+                                  onClick={() => salvarChamada2Pauta(a.matricula_id, d.disciplina_id)}
                                 >
                                   <Save size={12} />
                                 </button>
@@ -473,38 +622,120 @@ export default function CoordenadorNotas({ modoProfessor = false }) {
           ))}
           <div className="card" style={{ padding: '1rem' }}>
             <h3 style={{ margin: '0 0 0.75rem', fontSize: '1rem' }}>Resumo — média anual por aluno</h3>
-            <table className="table">
-              <thead>
-                <tr>
-                  <th>Aluno</th>
-                  <th style={{ textAlign: 'center' }}>Média anual</th>
-                  <th style={{ textAlign: 'center' }}>Situação</th>
-                </tr>
-              </thead>
-              <tbody>
-                {alunos.map((a) => (
-                  <tr key={a.matricula_id}>
-                    <td>{a.aluno_nome}</td>
-                    <td style={{ textAlign: 'center', fontWeight: 700 }}>{mediaAluno(a.matricula_id) ?? '—'}</td>
-                    <td style={{ textAlign: 'center' }}>
-                      {a.situacao === 'aprovado' && (
-                        <span style={{ background: '#dcfce7', color: '#15803d', borderRadius: 6, padding: '2px 10px', fontSize: '0.78rem', fontWeight: 700 }}>
-                          Aprovado
-                        </span>
-                      )}
-                      {a.situacao === 'reprovado' && (
-                        <span style={{ background: '#fee2e2', color: '#b91c1c', borderRadius: 6, padding: '2px 10px', fontSize: '0.78rem', fontWeight: 700 }}>
-                          Reprovado
-                        </span>
-                      )}
-                      {!a.situacao && (
-                        <span style={{ color: 'var(--cinza)', fontSize: '0.78rem' }}>Notas incompletas</span>
-                      )}
-                    </td>
+            {!configDisciplina.exame_nacional && !configDisciplina.defesa_final ? (
+              <table className="table">
+                <thead>
+                  <tr>
+                    <th>Aluno</th>
+                    <th style={{ textAlign: 'center' }}>Média anual</th>
+                    <th style={{ textAlign: 'center' }}>Situação</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  {alunos.map((a) => (
+                    <tr key={a.matricula_id}>
+                      <td>{a.aluno_nome}</td>
+                      <td style={{ textAlign: 'center', fontWeight: 700 }}>{mediaAluno(a.matricula_id) ?? '—'}</td>
+                      <td style={{ textAlign: 'center' }}>
+                        {a.situacao === 'aprovado' && (
+                          <span style={{ background: '#dcfce7', color: '#15803d', borderRadius: 6, padding: '2px 10px', fontSize: '0.78rem', fontWeight: 700 }}>
+                            Aprovado
+                          </span>
+                        )}
+                        {a.situacao === 'reprovado' && (
+                          <span style={{ background: '#fee2e2', color: '#b91c1c', borderRadius: 6, padding: '2px 10px', fontSize: '0.78rem', fontWeight: 700 }}>
+                            Reprovado
+                          </span>
+                        )}
+                        {!a.situacao && (
+                          <span style={{ color: 'var(--cinza)', fontSize: '0.78rem' }}>Notas incompletas</span>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            ) : (
+              <>
+                <p style={{ fontSize: '0.82rem', color: 'var(--cinza)', marginTop: 0 }}>
+                  Esta classe/curso está configurada para <strong>{configDisciplina.exame_nacional ? 'Exame Nacional (7ª prova)' : 'Defesa Final'}</strong>.
+                  Média final = Média da Escola × 70% + {configDisciplina.exame_nacional ? 'Exame Nacional' : 'Defesa Final'} × 30%.
+                </p>
+                <table className="table">
+                  <thead>
+                    <tr>
+                      <th>Aluno</th>
+                      <th style={{ textAlign: 'center' }}>Média da Escola</th>
+                      <th style={{ textAlign: 'center' }}>{configDisciplina.exame_nacional ? 'Exame Nacional' : 'Defesa Final'}</th>
+                      <th style={{ textAlign: 'center' }}>Média Final</th>
+                      <th style={{ textAlign: 'center' }}>Situação</th>
+                      {podeAlterarCoord && <th style={{ textAlign: 'center' }}>2ª Chamada</th>}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {alunos.map((a) => {
+                      const av = a.avaliacao || {};
+                      const statusBadges = {
+                        aprovado:              { label: 'Aprovado',              bg: '#dcfce7', color: '#15803d' },
+                        aprovado_2a_chamada:   { label: 'Aprovado (2ª chamada)',  bg: '#dcfce7', color: '#15803d' },
+                        pendente_2a_chamada:   { label: 'Pendente 2ª chamada',    bg: '#fef3c7', color: '#92400e' },
+                        reprovado:             { label: 'Reprovado',              bg: '#fee2e2', color: '#b91c1c' },
+                        aguarda_nota_final:    { label: `Aguarda ${configDisciplina.exame_nacional ? 'Exame Nacional' : 'Defesa Final'}`, bg: '#f3f4f6', color: '#6b7280' },
+                        incompleto:            { label: 'Notas incompletas',      bg: '#f3f4f6', color: '#6b7280' },
+                      };
+                      const b = statusBadges[av.status] || statusBadges.incompleto;
+                      const jaTemNotaFinal = configDisciplina.exame_nacional ? a.periodos?.EXN != null : a.periodos?.DEF != null;
+                      return (
+                        <tr key={a.matricula_id}>
+                          <td><strong>{a.aluno_nome}</strong></td>
+                          <td style={{ textAlign: 'center' }}>{av.media_escola ?? '—'}</td>
+                          <td style={{ textAlign: 'center' }}>
+                            {jaTemNotaFinal || !podeAlterarCoord ? (
+                              (configDisciplina.exame_nacional ? a.periodos?.EXN : a.periodos?.DEF) ?? '—'
+                            ) : (
+                              <div style={{ display: 'flex', gap: 4, justifyContent: 'center' }}>
+                                <input
+                                  type="number" className="form-control" style={{ width: 60, fontSize: '0.8rem' }}
+                                  min={0} max={20} step="0.1"
+                                  value={notaFinalForm[a.matricula_id] ?? ''}
+                                  onChange={(e) => setNotaFinalForm(f => ({ ...f, [a.matricula_id]: e.target.value }))}
+                                />
+                                <button type="button" className="btn btn-primary btn-sm" disabled={savingNotaFinal[a.matricula_id]} onClick={() => salvarNotaFinal(a.matricula_id)}>
+                                  <Save size={12} />
+                                </button>
+                              </div>
+                            )}
+                          </td>
+                          <td style={{ textAlign: 'center', fontWeight: 700 }}>{av.media_final ?? '—'}</td>
+                          <td style={{ textAlign: 'center' }}>
+                            <span style={{ background: b.bg, color: b.color, borderRadius: 6, padding: '2px 10px', fontSize: '0.78rem', fontWeight: 700 }}>
+                              {b.label}
+                            </span>
+                          </td>
+                          {podeAlterarCoord && (
+                            <td style={{ textAlign: 'center' }}>
+                              {av.status === 'pendente_2a_chamada' && (
+                                <div style={{ display: 'flex', gap: 4, justifyContent: 'center' }}>
+                                  <input
+                                    type="number" className="form-control" style={{ width: 60, fontSize: '0.8rem' }}
+                                    min={0} max={20} step="0.1"
+                                    value={chamada2Form[a.matricula_id] ?? ''}
+                                    onChange={(e) => setChamada2Form(f => ({ ...f, [a.matricula_id]: e.target.value }))}
+                                  />
+                                  <button type="button" className="btn btn-primary btn-sm" disabled={savingChamada2[a.matricula_id]} onClick={() => salvarChamada2(a.matricula_id)}>
+                                    <Save size={12} />
+                                  </button>
+                                </div>
+                              )}
+                            </td>
+                          )}
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </>
+            )}
           </div>
         </>
       )}

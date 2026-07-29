@@ -566,8 +566,7 @@ const classesOptions = CLASSES_PADRAO;
                 <label className="form-label">Turma</label>
                 <select className="form-control form-select" value={horarioForm.turma_id} onChange={e => setHorarioForm({ ...horarioForm, turma_id: e.target.value })}>
                   <option value="">Selecionar...</option>
-                  {turmas.map(t => <option key={t.id} value={t.id}>{t.nome} — {t.serie_classe}ª</option>)}
-                </select>
+{turmas.map(t => <option key={t.id} value={t.id}>{t.nome} — {t.serie_classe}ª{t.curso_nome ? ` · ${t.curso_nome}` : ''} ({t.ano_letivo})</option>)}                </select>
               </div>
               <div className="form-group">
                 <label className="form-label">Disciplina</label>

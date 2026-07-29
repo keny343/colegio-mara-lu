@@ -304,9 +304,11 @@ const minhasDisciplinas = async (req, res) => {
   try {
     const [rows] = await db.query(
       `SELECT tp.id as atribuicao_id, t.id as turma_id, t.nome as turma_nome, t.ano_letivo, t.serie_classe,
+              c.nome as curso_nome,
               d.id as disciplina_id, d.nome as disciplina_nome
        FROM turma_professores tp
        JOIN turmas t ON tp.turma_id = t.id
+       LEFT JOIN cursos c ON t.curso_id = c.id
        JOIN disciplinas d ON tp.disciplina_id = d.id
        WHERE tp.professor_id = ?
        ORDER BY t.ano_letivo DESC, t.serie_classe, t.nome, d.nome`,
@@ -882,9 +884,11 @@ const pautaFinalTurma = async (req, res) => {
         const periodos = periodosPorAlunoDisc.get(k) || {};
         const finais = finaisPorAlunoDisc.get(k) || {};
         let situacao;
+        let avaliacaoStatus = null;
         if (config.exame_nacional || config.defesa_final) {
           const notaFinal = config.exame_nacional ? (finais.EXN ?? null) : (finais.DEF ?? null);
           const avaliacao = situacaoComConfig(periodos, turma.serie_classe, config, notaFinal, finais.CH2 ?? null);
+          avaliacaoStatus = avaliacao.status;
           situacao = ['aprovado', 'aprovado_2a_chamada'].includes(avaliacao.status)
             ? 'aprovado'
             : avaliacao.status === 'reprovado' ? 'reprovado' : null;
@@ -897,6 +901,7 @@ const pautaFinalTurma = async (req, res) => {
           nome: d.nome,
           disciplina_chave: !!d.disciplina_chave,
           situacao,
+          avaliacao_status: avaliacaoStatus,
           recurso_nota: recursoNota,
         };
       });
