@@ -105,12 +105,19 @@ const listarTodas = async (req, res) => {
 
   try {
     // CORRIGIDO: inclui encarregado_nome e telefone_emergencia da tabela alunos
+    // + matrícula ACTUAL do aluno (turma/classe/curso reais), não só a série pedida na inscrição —
+    // essencial para reflectir transferências entre cursos/turmas depois da aprovação.
     const [rows] = await db.query(`
       SELECT i.*, a.nome as aluno_nome, a.data_nascimento, a.cpf as aluno_cpf,
              a.responsavel as encarregado_nome, a.telefone_emergencia,
              s.nome as serie_nome, s.nivel, s.curso, s.ordem,
-             u.nome as responsavel_nome, u.email as responsavel_email, u.telefone as responsavel_telefone
+             u.nome as responsavel_nome, u.email as responsavel_email, u.telefone as responsavel_telefone,
+             m.id as matricula_id, t.nome as matricula_turma_nome,
+             t.serie_classe as matricula_serie_classe, mc.nome as matricula_curso_nome
       ${baseFrom}
+      LEFT JOIN matriculas m ON m.aluno_id = a.id AND m.ano_letivo = i.ano_letivo AND m.status = 'ativa'
+      LEFT JOIN turmas t ON m.turma_id = t.id
+      LEFT JOIN cursos mc ON t.curso_id = mc.id
       WHERE ${where}
       ORDER BY i.data_inscricao DESC
       LIMIT ? OFFSET ?

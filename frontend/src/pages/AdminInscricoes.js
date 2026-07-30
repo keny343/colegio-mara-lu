@@ -13,6 +13,19 @@ function StatusBadge({ status }) {
   return <span className={`badge ${map[status] || ''}`}>{status.replace('_', ' ')}</span>;
 }
 
+// Classe a mostrar na tabela: se o aluno já tem matrícula activa, mostra a turma REAL onde está
+// (reflecte transferências de curso/turma feitas depois da aprovação), não a série pedida na inscrição.
+// 10ª–13ª: "12ª (Ciências Físicas)". Abaixo da 10ª: só o nome da turma matriculada.
+function classeExibida(i) {
+  if (i.matricula_turma_nome) {
+    if (Number(i.matricula_serie_classe) >= 10) {
+      return `${i.matricula_serie_classe}ª (${i.matricula_curso_nome || '—'})`;
+    }
+    return i.matricula_turma_nome;
+  }
+  return normalizeSeriesName(i.serie_nome);
+}
+
 export default function AdminInscricoes() {
   const [searchParams] = useSearchParams();
   const [inscricoes, setInscricoes] = useState([]);
@@ -157,7 +170,7 @@ export default function AdminInscricoes() {
                         {i.telefone_emergencia || i.responsavel_telefone || i.responsavel_email || '—'}
                       </div>
                     </td>
-                    <td>{normalizeSeriesName(i.serie_nome)}</td>
+                    <td>{classeExibida(i)}</td>
                     <td>{i.ano_letivo}</td>
                     <td style={{ fontSize: '0.85rem' }}>{new Date(i.data_inscricao).toLocaleDateString('pt-BR')}</td>
                     <td><StatusBadge status={i.status} /></td>
@@ -318,9 +331,10 @@ export default function AdminInscricoes() {
                   onChange={e => setNovoStatus({ ...novoStatus, turma_id: e.target.value })}>
                   <option value="">Aprovar sem turma (matricular depois)</option>
                   {turmas.map(t => (
-<option key={t.id} value={t.id}>
-  {t.nome} — {t.serie_classe}ª{t.curso_nome ? ` · ${t.curso_nome}` : ''} ({t.turno})
-</option>                  ))}
+                    <option key={t.id} value={t.id}>
+                      {t.nome} — {t.serie_classe}ª{t.curso_nome ? ` · ${t.curso_nome}` : ''} ({t.turno})
+                    </option>
+                  ))}
                 </select>
                 <p style={{ fontSize: '0.8rem', color: 'var(--cinza)', marginTop: 6 }}>
                   Ao selecionar uma turma, o aluno passa a ver horários e disciplinas no portal.
@@ -347,4 +361,3 @@ export default function AdminInscricoes() {
     </div>
   );
 }
-//agr vai dar certo
