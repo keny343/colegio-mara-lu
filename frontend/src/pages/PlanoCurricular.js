@@ -1,9 +1,12 @@
-import React, { useEffect, useState } from 'react';
+import React, { useState } from 'react';
 import api from '../services/api';
 import { useAuth } from '../contexts/AuthContext';
 import { FileText, Upload, Download, Eye } from 'lucide-react';
 import Toast, { useToast } from '../components/Toast';
 import { fileUrl } from '../services/fileUrl';
+import { useFetch } from '../hooks/useFetch';
+import { Card, FormField, Input, Button, DataTable, EmptyState, LoadingState, ErrorState } from '../components/ui';
+import './PlanoCurricular.css';
 
 export default function PlanoCurricular() {
   const { user } = useAuth();
@@ -12,17 +15,13 @@ export default function PlanoCurricular() {
   const isProfessor = user?.role === 'professor';
   const podePublicar = isAdmin || isCoordenador;
 
-  const [planos, setPlanos] = useState([]);
   const [titulo, setTitulo] = useState('Plano curricular');
   const [arquivo, setArquivo] = useState(null);
   const [erro, setErro] = useState('');
   const [saving, setSaving] = useState(false);
   const { toast, showToast, clearToast } = useToast();
 
-  const carregar = () =>
-    api.get('/planos-curriculares').then(r => setPlanos(r.data)).catch(() => {});
-
-  useEffect(() => { carregar(); }, []);
+  const { data: planos = [], loading, error, refetch } = useFetch(() => api.get('/planos-curriculares'), []);
 
   const enviar = async (e) => {
     e.preventDefault();
@@ -38,7 +37,7 @@ export default function PlanoCurricular() {
       setArquivo(null);
       const fileInput = document.getElementById('plano-file-input');
       if (fileInput) fileInput.value = '';
-      carregar();
+      refetch();
     } catch (err) {
       const msg = err.response?.data?.message || 'Erro ao publicar plano.';
       setErro(msg);
@@ -48,13 +47,44 @@ export default function PlanoCurricular() {
     }
   };
 
+  const columns = [
+    {
+      key: 'titulo', label: 'Título',
+      render: (p) => (
+        <div className="plano-titulo">
+          <FileText size={16} color="var(--laranja)" />
+          <strong>{p.titulo}</strong>
+        </div>
+      ),
+    },
+    {
+      key: 'ambito', label: 'Âmbito',
+      render: (p) => (
+        <span className="ambito-pill">{p.curso_coordenado || p.nivel_coordenado || 'Geral'}</span>
+      ),
+    },
+    { key: 'coordenador_nome', label: 'Coordenador' },
+    {
+      key: 'criado_em', label: 'Data',
+      render: (p) => <span className="mat-data">{new Date(p.criado_em).toLocaleDateString('pt-AO')}</span>,
+    },
+    {
+      key: 'abrir', label: 'Abrir',
+      render: (p) => (
+        <a className="btn btn-outline btn-sm" href={fileUrl(p.caminho)} target="_blank" rel="noreferrer">
+          <Download size={13} /> Abrir
+        </a>
+      ),
+    },
+  ];
+
   return (
     <div className="page-container">
       {toast && <Toast message={toast.message} type={toast.type} onClose={clearToast} key={toast.key} />}
 
       <div className="page-header">
-        <h2><FileText size={22} style={{ verticalAlign: 'middle', marginRight: 8 }} />Plano curricular</h2>
-        <p style={{ color: 'var(--cinza)' }}>
+        <h2><FileText size={22} /> Plano curricular</h2>
+        <p>
           {podePublicar
             ? 'Publique o plano para o ciclo ou curso que coordena. Professores e alunos recebem notificação automática.'
             : isProfessor
@@ -64,112 +94,65 @@ export default function PlanoCurricular() {
       </div>
 
       {erro && (
-        <div className="alert alert-error" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <div className="alert alert-error plano-erro">
           <span>{erro}</span>
           <button type="button" className="alert-close" aria-label="Fechar mensagem de erro" onClick={() => setErro('')}>×</button>
         </div>
       )}
 
       {podePublicar && (
-        <div className="card" style={{ marginBottom: '1.5rem' }}>
-          <h3 style={{ marginTop: 0, marginBottom: '1.25rem', fontSize: '1rem', color: 'var(--castanho)' }}>
-            Publicar novo plano
-          </h3>
-          <form onSubmit={enviar}>
-            <div className="form-group">
-              <label className="form-label">Título</label>
-              <input
-                className="form-control"
+        <Card title="Publicar novo plano" className="plano-form-card">
+          <form onSubmit={enviar} className="plano-form">
+            <FormField label="Título" htmlFor="plano-titulo">
+              <Input
+                id="plano-titulo"
                 value={titulo}
-                onChange={e => setTitulo(e.target.value)}
+                onChange={(e) => setTitulo(e.target.value)}
                 placeholder="Ex: Plano curricular 2024/2025 — 10ª classe"
               />
-            </div>
-            <div className="form-group">
-              <label className="form-label">Ficheiro *</label>
-              <input
+            </FormField>
+            <FormField label="Ficheiro" htmlFor="plano-file-input" required hint="PDF, Word ou imagem. Máximo 25 MB.">
+              <Input
                 id="plano-file-input"
                 type="file"
-                className="form-control"
                 accept=".pdf,.doc,.docx,.jpg,.jpeg,.png"
-                onChange={e => setArquivo(e.target.files?.[0] || null)}
+                onChange={(e) => setArquivo(e.target.files?.[0] || null)}
               />
-              <small style={{ color: 'var(--cinza)', fontSize: '0.8rem' }}>PDF, Word ou imagem. Máximo 25 MB.</small>
-            </div>
-            <button type="submit" className="btn btn-primary" disabled={saving}>
-              <Upload size={16} /> {saving ? 'A publicar...' : 'Publicar plano'}
-            </button>
+            </FormField>
+            <Button type="submit" variant="primary" loading={saving} icon={<Upload size={16} />}>
+              {saving ? 'A publicar...' : 'Publicar plano'}
+            </Button>
           </form>
-        </div>
+        </Card>
       )}
 
-      {/* Vista do professor — destaque para planos recebidos */}
       {isProfessor && !podePublicar && planos.length > 0 && (
-        <div style={{ marginBottom: '1rem' }}>
-          <div className="alert" style={{ background: 'var(--laranja-suave)', border: '1px solid rgba(232,100,26,0.25)', color: 'var(--castanho)', borderRadius: 10 }}>
-            📋 Tem <strong>{planos.length}</strong> plano(s) curricular(es) disponível(is) do(s) coordenador(es) das suas turmas.
-          </div>
+        <div className="plano-alert">
+          📋 Tem <strong>{planos.length}</strong> plano(s) curricular(es) disponível(is) do(s) coordenador(es) das suas turmas.
         </div>
       )}
 
-      <div className="card" style={{ padding: 0 }}>
-        <div style={{ padding: '1rem 1rem 0.5rem', display: 'flex', alignItems: 'center', gap: 8 }}>
+      <div className="card mat-card">
+        <div className="mat-head">
           <Eye size={18} color="var(--castanho)" />
-          <h3 style={{ margin: 0, fontSize: '1rem' }}>Planos disponíveis</h3>
-          <span style={{ marginLeft: 'auto', background: 'var(--bege-medio)', borderRadius: 20, padding: '2px 10px', fontSize: '0.8rem', fontWeight: 700, color: 'var(--castanho)' }}>
-            {planos.length}
-          </span>
+          <h3>Planos disponíveis</h3>
+          <span className="mat-count">{planos.length}</span>
         </div>
-        {planos.length === 0 ? (
-          <div className="empty-state" style={{ padding: '2rem' }}>
-            <FileText size={40} style={{ opacity: 0.3 }} />
-            <p style={{ color: 'var(--cinza)' }}>
-              {isProfessor
-                ? 'Nenhum plano curricular disponível. O coordenador ainda não publicou o plano para as suas turmas.'
-                : 'Nenhum plano publicado ainda.'}
-            </p>
-          </div>
+        {loading ? (
+          <LoadingState />
+        ) : error ? (
+          <ErrorState error={error} onRetry={refetch} />
         ) : (
-          <table className="table">
-            <thead>
-              <tr>
-                <th>Título</th>
-                <th>Âmbito</th>
-                <th>Coordenador</th>
-                <th>Data</th>
-                <th>Abrir</th>
-              </tr>
-            </thead>
-            <tbody>
-              {planos.map(p => (
-                <tr key={p.id}>
-                  <td>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                      <FileText size={16} color="var(--laranja)" />
-                      <strong>{p.titulo}</strong>
-                    </div>
-                  </td>
-                  <td>
-                    <span style={{ background: 'var(--bege-medio)', borderRadius: 6, padding: '2px 8px', fontSize: '0.8rem', fontWeight: 600 }}>
-                      {p.curso_coordenado || p.nivel_coordenado || 'Geral'}
-                    </span>
-                  </td>
-                  <td>{p.coordenador_nome}</td>
-                  <td>{new Date(p.criado_em).toLocaleDateString('pt-AO')}</td>
-                  <td>
-                    <a
-                      className="btn btn-outline btn-sm"
-                      href={fileUrl(p.caminho)}
-                      target="_blank"
-                      rel="noreferrer"
-                    >
-                      <Download size={13} /> Abrir
-                    </a>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+          <DataTable
+            columns={columns}
+            rows={planos}
+            keyField="id"
+            emptyMessage={
+              isProfessor
+                ? 'Nenhum plano curricular disponível. O coordenador ainda não publicou o plano para as suas turmas.'
+                : 'Nenhum plano publicado ainda.'
+            }
+          />
         )}
       </div>
     </div>

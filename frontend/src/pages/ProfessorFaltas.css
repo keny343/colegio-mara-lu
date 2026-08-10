@@ -1,0 +1,6 @@
+.page-header-title { display: flex; align-items: center; gap: 8px; }
+.page-header-icon { color: var(--laranja); }
+
+.turma-grid { display: grid; gap: 10px; }
+.falta-form { margin-top: 20px; display: flex; flex-direction: column; gap: 16px; max-width: 560px; }
+.falta-msg { margin-top: 10px; }

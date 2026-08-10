@@ -1,0 +1,42 @@
+.perfil-erro { margin-bottom: 1rem; }
+
+.perfil-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 1.5rem; }
+.perfil-avatar-card { text-align: center; padding: 2.5rem 2rem; }
+
+.perfil-foto-btn {
+  width: 90px; height: 90px; border-radius: 50%;
+  margin: 0 auto 1.25rem; padding: 0; border: 3px solid var(--laranja);
+  cursor: pointer; overflow: hidden; position: relative; display: block;
+  background: linear-gradient(135deg, var(--castanho), var(--castanho-medio));
+}
+.perfil-foto-btn:disabled { cursor: default; opacity: 0.7; }
+.perfil-foto-img { width: 100%; height: 100%; object-fit: cover; }
+.perfil-foto-inicial {
+  display: flex; align-items: center; justify-content: center;
+  width: 100%; height: 100%; font-size: 2rem; color: white;
+  font-family: 'Playfair Display', serif; font-weight: 700;
+}
+.perfil-foto-overlay {
+  position: absolute; inset: 0; background: rgba(0, 0, 0, 0.45);
+  display: flex; align-items: center; justify-content: center; color: #fff;
+}
+.perfil-upload-msg { font-size: 0.82rem; color: var(--cinza); margin-top: -8px; margin-bottom: 1rem; }
+.perfil-nome { font-size: 1.3rem; margin-bottom: 4px; }
+.perfil-email { color: var(--cinza); font-size: 0.9rem; margin-bottom: 1rem; }
+.perfil-role { background: var(--laranja-suave); color: var(--laranja); font-weight: 700; }
+.perfil-escopo { margin-top: 12px; font-size: 0.85rem; color: var(--castanho-medio); display: flex; align-items: center; gap: 4px; justify-content: center; }
+
+.perfil-situacao { margin-top: 1.5rem; text-align: left; border-top: 1px solid var(--bege); padding-top: 1.25rem; }
+.perfil-situacao-titulo { font-size: 0.75rem; font-weight: 700; text-transform: uppercase; color: var(--castanho-medio); margin-bottom: 10px; letter-spacing: 0.05em; }
+.perfil-situacao-linha { font-size: 0.85rem; margin-bottom: 6px; }
+.perfil-situacao-linha span { color: var(--cinza); }
+
+.perfil-dados-card { padding: 1.5rem; }
+.perfil-dados-titulo { font-size: 1.1rem; margin-bottom: 1.5rem; display: flex; align-items: center; gap: 8px; }
+.perfil-dados-titulo svg { color: var(--laranja); }
+.perfil-form-col { display: flex; flex-direction: column; gap: 1rem; }
+.perfil-sem-dados { color: var(--cinza); font-size: 0.9rem; }
+.perfil-quicklink { margin-top: 12px; }
+
+.perfil-section { margin-top: 1.5rem; }
+.perfil-acoes { display: flex; gap: 12px; }

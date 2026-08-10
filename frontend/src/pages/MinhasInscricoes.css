@@ -1,0 +1,15 @@
+.badge-inline { display: inline-flex; align-items: center; gap: 4px; }
+
+.page-header-row { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; flex-wrap: wrap; }
+
+.insc-list { display: flex; flex-direction: column; gap: 1rem; }
+.insc-item { display: flex; align-items: center; gap: 1.5rem; flex-wrap: wrap; }
+.insc-main { flex: 1; min-width: 220px; }
+.insc-nome { font-weight: 700; color: var(--castanho); font-size: 1.05rem; }
+.insc-meta { font-size: 0.9rem; color: var(--cinza); margin-top: 4px; }
+.insc-status { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.insc-motivo { font-size: 0.8rem; color: var(--vermelho); max-width: 200px; }
+.insc-actions { display: flex; gap: 8px; }
+
+.nova-card { max-width: 600px; }
+.nova-actions { display: flex; gap: 12px; }

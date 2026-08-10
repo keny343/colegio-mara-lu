@@ -1,0 +1,10 @@
+.notif-list { display: flex; flex-direction: column; gap: 1rem; }
+.notif-item { display: flex; align-items: flex-start; gap: 1rem; border-left: 4px solid var(--laranja); }
+.notif-item--verde { border-left-color: var(--verde); }
+.notif-item--vermelho { border-left-color: var(--vermelho); }
+.notif-item--laranja { border-left-color: var(--laranja); }
+.notif-icon { flex-shrink: 0; margin-top: 2px; }
+.notif-body { flex: 1; min-width: 0; }
+.notif-titulo { font-weight: 700; color: var(--castanho); margin-bottom: 4px; }
+.notif-mensagem { color: var(--cinza); line-height: 1.6; }
+.notif-data { font-size: 0.8rem; color: var(--cinza); margin-top: 8px; }

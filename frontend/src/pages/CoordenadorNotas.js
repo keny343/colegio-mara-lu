@@ -5,46 +5,36 @@ import api from '../services/api';
 import { podeAcederNotas, podeEditarNotas, isProfessor } from '../utils/roles';
 import { TRIMESTRES, mediaTrimestre, mediaAnual } from '../utils/notasPeriodos';
 import Toast, { useToast } from '../components/Toast.js';
+import { Button, EmptyState, FormField, Modal, Select, LoadingState } from '../components/ui';
+import './CoordenadorNotas.css';
 
-/* ──────────────────────────────────────────────
-   Modal de confirmação de nota lançada
-────────────────────────────────────────────── */
+function StatusPill({ status, fallback }) {
+  const tones = {
+    aprovado: 'verde',
+    aprovado_apos_recurso: 'verde',
+    aprovado_2a_chamada: 'verde',
+    recurso: 'amarelo',
+    pendente_2a_chamada: 'amarelo',
+    reprovado: 'vermelho',
+    reprovado_apos_recurso: 'vermelho',
+    incompleto: 'cinza',
+    aguarda_nota_final: 'cinza',
+  };
+  const cls = tones[status] ? ` status-pill--${tones[status]}` : ' status-pill--cinza';
+  return <span className={`status-pill${cls}`}>{fallback || status}</span>;
+}
+
 function NotaModal({ info, onClose }) {
-  if (!info) return null;
   return (
-    <div style={{
-      position: 'fixed', inset: 0, zIndex: 1000,
-      background: 'rgba(0,0,0,0.45)', display: 'flex',
-      alignItems: 'center', justifyContent: 'center',
-    }}>
-      <div style={{
-        background: '#fff', borderRadius: 18, padding: '2.5rem 2rem',
-        maxWidth: 380, width: '90%', textAlign: 'center',
-        boxShadow: '0 20px 60px rgba(0,0,0,0.2)',
-        animation: 'fadeInScale 0.25s ease',
-      }}>
-        <div style={{
-          width: 64, height: 64, borderRadius: '50%',
-          background: 'rgba(34,197,94,0.15)', display: 'flex',
-          alignItems: 'center', justifyContent: 'center', margin: '0 auto 1.25rem',
-        }}>
-          <CheckCircle size={36} color="#16a34a" />
-        </div>
-        <h3 style={{ margin: '0 0 0.5rem', fontSize: '1.25rem', color: 'var(--castanho)' }}>
-          Nota lançada!
-        </h3>
-        <p style={{ color: 'var(--cinza)', margin: '0 0 1.5rem', fontSize: '0.95rem' }}>
-          A nota de <strong>{info.aluno}</strong> para o período <strong>{info.periodo}</strong> foi guardada com sucesso.
+    <Modal open={!!info} onClose={onClose} title="Nota lançada!" size="sm" aria-label="Nota lançada">
+      <div className="nota-modal-body">
+        <div className="nota-modal-icon"><CheckCircle size={36} /></div>
+        <p className="nota-modal-text">
+          A nota de <strong>{info?.aluno}</strong> para o período <strong>{info?.periodo}</strong> foi guardada com sucesso.
         </p>
-        <button
-          className="btn btn-primary"
-          style={{ width: '100%' }}
-          onClick={onClose}
-        >
-          Fechar
-        </button>
+        <Button variant="primary" block onClick={onClose}>Fechar</Button>
       </div>
-    </div>
+    </Modal>
   );
 }
 
@@ -256,11 +246,8 @@ export default function CoordenadorNotas({ modoProfessor = false }) {
         periodo,
         nota: parseFloat(valor),
       });
-
-      // Busca nome do aluno para o modal
       const alunoInfo = alunos.find(a => a.matricula_id === matricula_id);
       setNotaModal({ aluno: alunoInfo?.aluno_nome || 'Aluno', periodo });
-
       await carregarNotas();
     } catch (e) {
       setErro(e.response?.data?.message || 'Erro ao guardar nota.');
@@ -316,29 +303,19 @@ export default function CoordenadorNotas({ modoProfessor = false }) {
     );
   }
 
-  if (loading) return <div className="loading"><div className="spinner" /></div>;
+  if (loading) return <LoadingState />;
 
   const turmaSel = turmas.find(t => String(t.id) === String(turmaId));
   const titulo = professor && !podeEditarNotas(user) ? 'Lançamento de notas' : 'Notas — coordenação';
 
   return (
     <div className="page-container">
-      <style>{`
-        @keyframes fadeInScale {
-          from { opacity: 0; transform: scale(0.85); }
-          to   { opacity: 1; transform: scale(1); }
-        }
-      `}</style>
-
-      {/* Modal nota guardada */}
       <NotaModal info={notaModal} onClose={() => setNotaModal(null)} />
-
-      {/* Toast global */}
       {toast && <Toast message={toast.message} type={toast.type} onClose={clearToast} key={toast.key} />}
 
       <div className="page-header">
-        <h2><ClipboardList size={22} style={{ verticalAlign: 'middle', marginRight: 8 }} />{titulo}</h2>
-        <p style={{ color: 'var(--cinza)' }}>
+        <h2 className="page-header-title"><ClipboardList size={22} />{titulo}</h2>
+        <p className="page-header-sub">
           {professor && !podeEditarNotas(user)
             ? 'Lance as notas das disciplinas que leciona. Depois de guardadas, só o coordenador pode alterá-las.'
             : 'Como coordenador, consulta notas no seu ciclo ou curso e altera apenas notas já lançadas pelos professores.'}
@@ -346,63 +323,53 @@ export default function CoordenadorNotas({ modoProfessor = false }) {
           {serieClasse != null && serieClasse <= 6 ? ' Escala 0–10.' : serieClasse != null ? ' Escala 0–20.' : ''}
         </p>
         {podeEditarNotas(user) && user.role !== 'admin' && (
-          <p style={{ fontSize: '0.85rem', color: 'var(--castanho-medio)' }}>
-            Âmbito: {user.nivel_coordenado || user.curso_coordenado || '—'}
-          </p>
+          <p className="page-header-ambito">Âmbito: {user.nivel_coordenado || user.curso_coordenado || '—'}</p>
         )}
       </div>
 
       {erro && (
-        <div className="alert alert-error" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <div className="alert alert-error alert-dismiss">
           <span>{erro}</span>
           <button type="button" className="alert-close" aria-label="Fechar mensagem de erro" onClick={() => setErro('')}>×</button>
         </div>
       )}
 
-      <div className="card" style={{ marginBottom: '1.5rem' }}>
+      <div className="card filtro-card">
         <div className="form-row">
-          <div className="form-group">
-            <label className="form-label">Turma *</label>
-            <select className="form-control form-select" value={turmaId} onChange={e => { setTurmaId(e.target.value); setDisciplinaId(''); }}>
+          <FormField label="Turma *" htmlFor="cn-turma">
+            <Select id="cn-turma" value={turmaId} onChange={e => { setTurmaId(e.target.value); setDisciplinaId(''); }}>
               <option value="">Selecionar turma...</option>
               {turmas.map(t => (
                 <option key={t.id} value={t.id}>{t.nome} — {t.serie_classe}ª{t.curso_nome ? ` · ${t.curso_nome}` : ''} ({t.ano_letivo})</option>
               ))}
-            </select>
-          </div>
-          <div className="form-group">
-            <label className="form-label">Disciplina *</label>
-            <select className="form-control form-select" value={disciplinaId} onChange={e => setDisciplinaId(e.target.value)} disabled={!turmaId}>
+            </Select>
+          </FormField>
+          <FormField label="Disciplina *" htmlFor="cn-disciplina">
+            <Select id="cn-disciplina" value={disciplinaId} onChange={e => setDisciplinaId(e.target.value)} disabled={!turmaId}>
               <option value="">Selecionar disciplina...</option>
               {disciplinasDaTurma.map(d => (
                 <option key={d.id} value={d.id}>{d.nome}</option>
               ))}
-            </select>
-          </div>
-          <div className="form-group" style={{ display: 'flex', alignItems: 'flex-end' }}>
-            <button type="button" className="btn btn-outline" onClick={carregarNotas} disabled={!turmaId || !disciplinaId || loadingNotas}>
-              <RefreshCw size={16} /> Actualizar
-            </button>
+            </Select>
+          </FormField>
+          <div className="filtro-acoes">
+            <Button variant="outline" icon={<RefreshCw size={16} />} onClick={carregarNotas} disabled={!turmaId || !disciplinaId || loadingNotas}>
+              Actualizar
+            </Button>
           </div>
         </div>
         {turmaSel && (
-          <p style={{ fontSize: '0.85rem', color: 'var(--cinza)', margin: 0 }}>
-            Notas de <strong>0 a {limites.max}</strong> para a {turmaSel.serie_classe}ª classe
-          </p>
+          <p className="filtro-info">Notas de <strong>0 a {limites.max}</strong> para a {turmaSel.serie_classe}ª classe</p>
         )}
       </div>
 
       {turmaId && (
-        <div className="card" style={{ marginBottom: '1.5rem', padding: 0, overflow: 'auto' }}>
-          <h3 style={{ padding: '1rem 1rem 0.5rem', margin: 0, fontSize: '1.05rem', color: 'var(--castanho)' }}>
-            Pauta final — situação do aluno (todas as disciplinas)
-          </h3>
+        <div className="card pauta-card">
+          <h3 className="nota-section-title">Pauta final — situação do aluno (todas as disciplinas)</h3>
           {loadingPauta ? (
-            <p style={{ padding: '0 1rem 1rem', color: 'var(--cinza)' }}>A carregar pauta...</p>
+            <p className="pauta-loading">A carregar pauta...</p>
           ) : !pauta || pauta.alunos.length === 0 ? (
-            <p style={{ padding: '0 1rem 1rem', color: 'var(--cinza)' }}>
-              Sem disciplinas/alunos suficientes para calcular a pauta desta turma.
-            </p>
+            <p className="pauta-loading">Sem disciplinas/alunos suficientes para calcular a pauta desta turma.</p>
           ) : (
             <table className="table">
               <thead>
@@ -416,33 +383,28 @@ export default function CoordenadorNotas({ modoProfessor = false }) {
               <tbody>
                 {pauta.alunos.map((a) => {
                   const badges = {
-                    aprovado:               { label: 'Aprovado',            bg: '#dcfce7', color: '#15803d' },
-                    aprovado_apos_recurso:  { label: 'Aprovado (recurso)',  bg: '#dcfce7', color: '#15803d' },
-                    recurso:                { label: 'Vai a recurso',       bg: '#fef3c7', color: '#92400e' },
-                    reprovado:              { label: 'Reprovado',           bg: '#fee2e2', color: '#b91c1c' },
-                    reprovado_apos_recurso: { label: 'Reprovado (recurso)', bg: '#fee2e2', color: '#b91c1c' },
-                    incompleto:             { label: 'Notas incompletas',   bg: '#f3f4f6', color: '#6b7280' },
+                    aprovado: 'Aprovado',
+                    aprovado_apos_recurso: 'Aprovado (recurso)',
+                    recurso: 'Vai a recurso',
+                    reprovado: 'Reprovado',
+                    reprovado_apos_recurso: 'Reprovado (recurso)',
+                    incompleto: 'Notas incompletas',
                   };
-                  const b = badges[a.resultado] || badges.incompleto;
                   const aguardaExameDefesa = (a.disciplinas || []).filter(d => d.avaliacao_status === 'aguarda_nota_final');
                   const aguardaChamada2 = (a.disciplinas || []).filter(d => d.avaliacao_status === 'pendente_2a_chamada');
                   return (
                     <tr key={a.matricula_id}>
                       <td><strong>{a.aluno_nome}</strong></td>
                       <td>
-                        <span style={{ background: b.bg, color: b.color, borderRadius: 6, padding: '2px 10px', fontSize: '0.78rem', fontWeight: 700 }}>
-                          {b.label}
-                        </span>
+                        <StatusPill status={a.resultado} fallback={badges[a.resultado] || 'Notas incompletas'} />
                         {aguardaExameDefesa.length > 0 && (
-                          <div style={{ fontSize: '0.72rem', color: '#92400e', marginTop: 2 }}>
-                            Aguarda {pauta.config_avaliacao?.exame_nacional ? 'Exame Nacional' : 'Defesa Final'}
-                          </div>
+                          <div className="pauta-aviso">Aguarda {pauta.config_avaliacao?.exame_nacional ? 'Exame Nacional' : 'Defesa Final'}</div>
                         )}
                         {aguardaChamada2.length > 0 && (
-                          <div style={{ fontSize: '0.72rem', color: '#92400e', marginTop: 2 }}>Aguarda 2ª chamada</div>
+                          <div className="pauta-aviso">Aguarda 2ª chamada</div>
                         )}
                       </td>
-                      <td style={{ fontSize: '0.85rem' }}>
+                      <td className="cell-motivo">
                         {a.negativas.length === 0 ? '—' : a.negativas.map(n => n.nome).join(', ')}
                       </td>
                       {podeLancarRecurso && (
@@ -450,80 +412,48 @@ export default function CoordenadorNotas({ modoProfessor = false }) {
                           {a.resultado === 'recurso' && a.negativas.map((n) => {
                             const key = `${a.matricula_id}-${n.disciplina_id}`;
                             return (
-                              <div key={key} style={{ display: 'flex', gap: 4, alignItems: 'center', marginBottom: 4 }}>
-                                <span style={{ fontSize: '0.75rem', color: 'var(--cinza)', minWidth: 90 }}>{n.nome} (recurso)</span>
+                              <div key={key} className="nota-row">
+                                <span className="nota-label">{n.nome} (recurso)</span>
                                 <input
                                   type="number"
-                                  className="form-control"
-                                  style={{ width: 60, fontSize: '0.8rem' }}
-                                  min={0}
-                                  max={20}
-                                  step="0.1"
+                                  className="form-control nota-input"
+                                  min={0} max={20} step="0.1"
                                   value={recursoForm[key] ?? ''}
                                   onChange={(e) => setRecursoForm(f => ({ ...f, [key]: e.target.value }))}
                                 />
-                                <button
-                                  type="button"
-                                  className="btn btn-primary btn-sm"
-                                  disabled={savingRecurso[key]}
-                                  onClick={() => salvarRecurso(a.matricula_id, n.disciplina_id)}
-                                >
-                                  <Save size={12} />
-                                </button>
+                                <Button variant="primary" size="sm" icon={<Save size={12} />} disabled={savingRecurso[key]} onClick={() => salvarRecurso(a.matricula_id, n.disciplina_id)} aria-label="Guardar recurso" />
                               </div>
                             );
                           })}
                           {aguardaExameDefesa.map((d) => {
                             const key = `${a.matricula_id}-${d.disciplina_id}`;
                             return (
-                              <div key={key} style={{ display: 'flex', gap: 4, alignItems: 'center', marginBottom: 4 }}>
-                                <span style={{ fontSize: '0.75rem', color: 'var(--cinza)', minWidth: 90 }}>
-                                  {d.nome} ({pauta.config_avaliacao?.exame_nacional ? 'Exame' : 'Defesa'})
-                                </span>
+                              <div key={key} className="nota-row">
+                                <span className="nota-label">{d.nome} ({pauta.config_avaliacao?.exame_nacional ? 'Exame' : 'Defesa'})</span>
                                 <input
                                   type="number"
-                                  className="form-control"
-                                  style={{ width: 60, fontSize: '0.8rem' }}
-                                  min={0}
-                                  max={20}
-                                  step="0.1"
+                                  className="form-control nota-input"
+                                  min={0} max={20} step="0.1"
                                   value={pautaNotaFinalForm[key] ?? ''}
                                   onChange={(e) => setPautaNotaFinalForm(f => ({ ...f, [key]: e.target.value }))}
                                 />
-                                <button
-                                  type="button"
-                                  className="btn btn-primary btn-sm"
-                                  disabled={savingPautaNotaFinal[key]}
-                                  onClick={() => salvarNotaFinalPauta(a.matricula_id, d.disciplina_id)}
-                                >
-                                  <Save size={12} />
-                                </button>
+                                <Button variant="primary" size="sm" icon={<Save size={12} />} disabled={savingPautaNotaFinal[key]} onClick={() => salvarNotaFinalPauta(a.matricula_id, d.disciplina_id)} aria-label="Guardar nota final" />
                               </div>
                             );
                           })}
                           {aguardaChamada2.map((d) => {
                             const key = `${a.matricula_id}-${d.disciplina_id}`;
                             return (
-                              <div key={key} style={{ display: 'flex', gap: 4, alignItems: 'center', marginBottom: 4 }}>
-                                <span style={{ fontSize: '0.75rem', color: 'var(--cinza)', minWidth: 90 }}>{d.nome} (2ª chamada)</span>
+                              <div key={key} className="nota-row">
+                                <span className="nota-label">{d.nome} (2ª chamada)</span>
                                 <input
                                   type="number"
-                                  className="form-control"
-                                  style={{ width: 60, fontSize: '0.8rem' }}
-                                  min={0}
-                                  max={20}
-                                  step="0.1"
+                                  className="form-control nota-input"
+                                  min={0} max={20} step="0.1"
                                   value={pautaChamada2Form[key] ?? ''}
                                   onChange={(e) => setPautaChamada2Form(f => ({ ...f, [key]: e.target.value }))}
                                 />
-                                <button
-                                  type="button"
-                                  className="btn btn-primary btn-sm"
-                                  disabled={savingPautaChamada2[key]}
-                                  onClick={() => salvarChamada2Pauta(a.matricula_id, d.disciplina_id)}
-                                >
-                                  <Save size={12} />
-                                </button>
+                                <Button variant="primary" size="sm" icon={<Save size={12} />} disabled={savingPautaChamada2[key]} onClick={() => salvarChamada2Pauta(a.matricula_id, d.disciplina_id)} aria-label="Guardar 2ª chamada" />
                               </div>
                             );
                           })}
@@ -539,30 +469,27 @@ export default function CoordenadorNotas({ modoProfessor = false }) {
       )}
 
       {!turmaId || !disciplinaId ? (
-        <div className="card empty-state">
-          <ClipboardList size={48} style={{ opacity: 0.3 }} />
-          <h3>Seleccione turma e disciplina</h3>
+        <div className="card">
+          <EmptyState icon={<ClipboardList size={48} />} title="Seleccione turma e disciplina" />
         </div>
       ) : loadingNotas ? (
-        <div className="loading"><div className="spinner" /></div>
+        <LoadingState />
       ) : alunos.length === 0 ? (
-        <div className="card empty-state">
-          <h3>Nenhum aluno matriculado nesta turma</h3>
+        <div className="card">
+          <EmptyState title="Nenhum aluno matriculado nesta turma" />
         </div>
       ) : (
         <>
           {TRIMESTRES.map((trim) => (
-            <div key={trim.id} className="card" style={{ padding: 0, overflow: 'auto', marginBottom: '1.25rem' }}>
-              <h3 style={{ padding: '1rem 1rem 0.5rem', margin: 0, fontSize: '1.05rem', color: 'var(--castanho)' }}>
-                {trim.titulo}
-              </h3>
+            <div key={trim.id} className="card trim-card">
+              <h3 className="nota-section-title">{trim.titulo}</h3>
               <table className="table">
                 <thead>
                   <tr>
                     <th>Aluno</th>
-                    <th style={{ textAlign: 'center', fontSize: '0.85rem' }}>1ª Parcial</th>
-                    <th style={{ textAlign: 'center', fontSize: '0.85rem' }}>Prova trimestral</th>
-                    <th style={{ textAlign: 'center' }}>Média do trimestre</th>
+                    <th className="th-center th-small">1ª Parcial</th>
+                    <th className="th-center th-small">Prova trimestral</th>
+                    <th className="th-center">Média do trimestre</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -579,15 +506,12 @@ export default function CoordenadorNotas({ modoProfessor = false }) {
                         {celulas.map((per) => {
                           const editavel = podeEditarCelula(a.matricula_id, per.key);
                           return (
-                            <td key={per.key} style={{ textAlign: 'center', minWidth: 110 }}>
-                              <div style={{ display: 'flex', gap: 4, justifyContent: 'center', alignItems: 'center', flexDirection: 'column' }}>
+                            <td key={per.key} className="td-center td-cell-nota">
+                              <div className="nota-celula">
                                 <input
                                   type="number"
-                                  className="form-control"
-                                  style={{ width: 64, textAlign: 'center', fontSize: '0.85rem' }}
-                                  min={limites.min}
-                                  max={limites.max}
-                                  step="0.1"
+                                  className="form-control nota-cell-input"
+                                  min={limites.min} max={limites.max} step="0.1"
                                   placeholder={`${limites.min}-${limites.max}`}
                                   value={periodosAluno[per.key] ?? ''}
                                   readOnly={!editavel}
@@ -598,21 +522,19 @@ export default function CoordenadorNotas({ modoProfessor = false }) {
                                   }))}
                                 />
                                 {editavel && (
-                                  <button
-                                    type="button"
-                                    className="btn btn-primary btn-sm"
+                                  <Button
+                                    variant="primary" size="sm" icon={<Save size={12} />}
                                     disabled={saving[`${a.matricula_id}-${per.key}`]}
                                     onClick={() => salvarNota(a.matricula_id, per.key)}
                                     title="Guardar"
-                                  >
-                                    <Save size={12} />
-                                  </button>
+                                    aria-label={`Guardar nota de ${a.aluno_nome} (${per.label})`}
+                                  />
                                 )}
                               </div>
                             </td>
                           );
                         })}
-                        <td style={{ textAlign: 'center', fontWeight: 700 }}>{mediaTri ?? '—'}</td>
+                        <td className="td-center td-media">{mediaTri ?? '—'}</td>
                       </tr>
                     );
                   })}
@@ -620,36 +542,26 @@ export default function CoordenadorNotas({ modoProfessor = false }) {
               </table>
             </div>
           ))}
-          <div className="card" style={{ padding: '1rem' }}>
-            <h3 style={{ margin: '0 0 0.75rem', fontSize: '1rem' }}>Resumo — média anual por aluno</h3>
+          <div className="card resumo-card">
+            <h3 className="nota-section-title resumo-title">Resumo — média anual por aluno</h3>
             {!configDisciplina.exame_nacional && !configDisciplina.defesa_final ? (
               <table className="table">
                 <thead>
                   <tr>
                     <th>Aluno</th>
-                    <th style={{ textAlign: 'center' }}>Média anual</th>
-                    <th style={{ textAlign: 'center' }}>Situação</th>
+                    <th className="th-center">Média anual</th>
+                    <th className="th-center">Situação</th>
                   </tr>
                 </thead>
                 <tbody>
                   {alunos.map((a) => (
                     <tr key={a.matricula_id}>
                       <td>{a.aluno_nome}</td>
-                      <td style={{ textAlign: 'center', fontWeight: 700 }}>{mediaAluno(a.matricula_id) ?? '—'}</td>
-                      <td style={{ textAlign: 'center' }}>
-                        {a.situacao === 'aprovado' && (
-                          <span style={{ background: '#dcfce7', color: '#15803d', borderRadius: 6, padding: '2px 10px', fontSize: '0.78rem', fontWeight: 700 }}>
-                            Aprovado
-                          </span>
-                        )}
-                        {a.situacao === 'reprovado' && (
-                          <span style={{ background: '#fee2e2', color: '#b91c1c', borderRadius: 6, padding: '2px 10px', fontSize: '0.78rem', fontWeight: 700 }}>
-                            Reprovado
-                          </span>
-                        )}
-                        {!a.situacao && (
-                          <span style={{ color: 'var(--cinza)', fontSize: '0.78rem' }}>Notas incompletas</span>
-                        )}
+                      <td className="td-center td-media">{mediaAluno(a.matricula_id) ?? '—'}</td>
+                      <td className="td-center">
+                        {a.situacao === 'aprovado' && <StatusPill status="aprovado" fallback="Aprovado" />}
+                        {a.situacao === 'reprovado' && <StatusPill status="reprovado" fallback="Reprovado" />}
+                        {!a.situacao && <span className="text-cinza">Notas incompletas</span>}
                       </td>
                     </tr>
                   ))}
@@ -657,7 +569,7 @@ export default function CoordenadorNotas({ modoProfessor = false }) {
               </table>
             ) : (
               <>
-                <p style={{ fontSize: '0.82rem', color: 'var(--cinza)', marginTop: 0 }}>
+                <p className="resumo-nota">
                   Esta classe/curso está configurada para <strong>{configDisciplina.exame_nacional ? 'Exame Nacional (7ª prova)' : 'Defesa Final'}</strong>.
                   Média final = Média da Escola × 70% + {configDisciplina.exame_nacional ? 'Exame Nacional' : 'Defesa Final'} × 30%.
                 </p>
@@ -665,66 +577,57 @@ export default function CoordenadorNotas({ modoProfessor = false }) {
                   <thead>
                     <tr>
                       <th>Aluno</th>
-                      <th style={{ textAlign: 'center' }}>Média da Escola</th>
-                      <th style={{ textAlign: 'center' }}>{configDisciplina.exame_nacional ? 'Exame Nacional' : 'Defesa Final'}</th>
-                      <th style={{ textAlign: 'center' }}>Média Final</th>
-                      <th style={{ textAlign: 'center' }}>Situação</th>
-                      {podeAlterarCoord && <th style={{ textAlign: 'center' }}>2ª Chamada</th>}
+                      <th className="th-center">Média da Escola</th>
+                      <th className="th-center">{configDisciplina.exame_nacional ? 'Exame Nacional' : 'Defesa Final'}</th>
+                      <th className="th-center">Média Final</th>
+                      <th className="th-center">Situação</th>
+                      {podeAlterarCoord && <th className="th-center">2ª Chamada</th>}
                     </tr>
                   </thead>
                   <tbody>
                     {alunos.map((a) => {
                       const av = a.avaliacao || {};
                       const statusBadges = {
-                        aprovado:              { label: 'Aprovado',              bg: '#dcfce7', color: '#15803d' },
-                        aprovado_2a_chamada:   { label: 'Aprovado (2ª chamada)',  bg: '#dcfce7', color: '#15803d' },
-                        pendente_2a_chamada:   { label: 'Pendente 2ª chamada',    bg: '#fef3c7', color: '#92400e' },
-                        reprovado:             { label: 'Reprovado',              bg: '#fee2e2', color: '#b91c1c' },
-                        aguarda_nota_final:    { label: `Aguarda ${configDisciplina.exame_nacional ? 'Exame Nacional' : 'Defesa Final'}`, bg: '#f3f4f6', color: '#6b7280' },
-                        incompleto:            { label: 'Notas incompletas',      bg: '#f3f4f6', color: '#6b7280' },
+                        aprovado: 'Aprovado',
+                        aprovado_2a_chamada: 'Aprovado (2ª chamada)',
+                        pendente_2a_chamada: 'Pendente 2ª chamada',
+                        reprovado: 'Reprovado',
+                        aguarda_nota_final: `Aguarda ${configDisciplina.exame_nacional ? 'Exame Nacional' : 'Defesa Final'}`,
+                        incompleto: 'Notas incompletas',
                       };
-                      const b = statusBadges[av.status] || statusBadges.incompleto;
                       const jaTemNotaFinal = configDisciplina.exame_nacional ? a.periodos?.EXN != null : a.periodos?.DEF != null;
                       return (
                         <tr key={a.matricula_id}>
                           <td><strong>{a.aluno_nome}</strong></td>
-                          <td style={{ textAlign: 'center' }}>{av.media_escola ?? '—'}</td>
-                          <td style={{ textAlign: 'center' }}>
+                          <td className="td-center">{av.media_escola ?? '—'}</td>
+                          <td className="td-center">
                             {jaTemNotaFinal || !podeAlterarCoord ? (
                               (configDisciplina.exame_nacional ? a.periodos?.EXN : a.periodos?.DEF) ?? '—'
                             ) : (
-                              <div style={{ display: 'flex', gap: 4, justifyContent: 'center' }}>
+                              <div className="nota-celula">
                                 <input
-                                  type="number" className="form-control" style={{ width: 60, fontSize: '0.8rem' }}
-                                  min={0} max={20} step="0.1"
+                                  type="number" className="form-control nota-input" min={0} max={20} step="0.1"
                                   value={notaFinalForm[a.matricula_id] ?? ''}
                                   onChange={(e) => setNotaFinalForm(f => ({ ...f, [a.matricula_id]: e.target.value }))}
                                 />
-                                <button type="button" className="btn btn-primary btn-sm" disabled={savingNotaFinal[a.matricula_id]} onClick={() => salvarNotaFinal(a.matricula_id)}>
-                                  <Save size={12} />
-                                </button>
+                                <Button variant="primary" size="sm" icon={<Save size={12} />} disabled={savingNotaFinal[a.matricula_id]} onClick={() => salvarNotaFinal(a.matricula_id)} aria-label="Guardar nota final" />
                               </div>
                             )}
                           </td>
-                          <td style={{ textAlign: 'center', fontWeight: 700 }}>{av.media_final ?? '—'}</td>
-                          <td style={{ textAlign: 'center' }}>
-                            <span style={{ background: b.bg, color: b.color, borderRadius: 6, padding: '2px 10px', fontSize: '0.78rem', fontWeight: 700 }}>
-                              {b.label}
-                            </span>
+                          <td className="td-center td-media">{av.media_final ?? '—'}</td>
+                          <td className="td-center">
+                            <StatusPill status={av.status} fallback={statusBadges[av.status] || 'Notas incompletas'} />
                           </td>
                           {podeAlterarCoord && (
-                            <td style={{ textAlign: 'center' }}>
+                            <td className="td-center">
                               {av.status === 'pendente_2a_chamada' && (
-                                <div style={{ display: 'flex', gap: 4, justifyContent: 'center' }}>
+                                <div className="nota-celula">
                                   <input
-                                    type="number" className="form-control" style={{ width: 60, fontSize: '0.8rem' }}
-                                    min={0} max={20} step="0.1"
+                                    type="number" className="form-control nota-input" min={0} max={20} step="0.1"
                                     value={chamada2Form[a.matricula_id] ?? ''}
                                     onChange={(e) => setChamada2Form(f => ({ ...f, [a.matricula_id]: e.target.value }))}
                                   />
-                                  <button type="button" className="btn btn-primary btn-sm" disabled={savingChamada2[a.matricula_id]} onClick={() => salvarChamada2(a.matricula_id)}>
-                                    <Save size={12} />
-                                  </button>
+                                  <Button variant="primary" size="sm" icon={<Save size={12} />} disabled={savingChamada2[a.matricula_id]} onClick={() => salvarChamada2(a.matricula_id)} aria-label="Guardar 2ª chamada" />
                                 </div>
                               )}
                             </td>

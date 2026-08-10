@@ -3,25 +3,19 @@ import { useAuth } from '../contexts/AuthContext';
 import { MessageCircle, Send, Bell, CheckCircle, User, Search } from 'lucide-react';
 import api from '../services/api';
 import Toast, { useToast } from '../components/Toast';
+import { Badge, Button, EmptyState, FormField, Input, Select, Textarea, LoadingState } from '../components/ui';
+import './Mensagens.css';
 
 const tipoBadge = (tipo) => {
   const map = {
-    nota_lancada:       { label: 'Nota',        color: '#2563eb', bg: '#eff6ff' },
-    novo_material:      { label: 'Material',     color: '#7c3aed', bg: '#f5f3ff' },
-    plano_curricular:   { label: 'Plano',        color: '#065f46', bg: '#ecfdf5' },
-    mensagem:           { label: 'Mensagem',     color: '#b45309', bg: '#fffbeb' },
-    atribuicao:         { label: 'Atribuição',   color: '#0369a1', bg: '#f0f9ff' },
+    nota_lancada: { label: 'Nota', tone: 'blue' },
+    novo_material: { label: 'Material', tone: 'blue' },
+    plano_curricular: { label: 'Plano', tone: 'green' },
+    mensagem: { label: 'Mensagem', tone: 'yellow' },
+    atribuicao: { label: 'Atribuição', tone: 'blue' },
   };
-  const c = map[tipo] || { label: tipo?.replace('_', ' ') || 'Aviso', color: '#6b7280', bg: '#f9fafb' };
-  return (
-    <span style={{
-      background: c.bg, color: c.color, borderRadius: 6,
-      padding: '2px 8px', fontSize: '0.72rem', fontWeight: 700,
-      textTransform: 'uppercase', letterSpacing: 0.5,
-    }}>
-      {c.label}
-    </span>
-  );
+  const c = map[tipo] || { label: tipo?.replace('_', ' ') || 'Aviso', tone: 'gray' };
+  return <Badge tone={c.tone} className="tipo-badge">{c.label}</Badge>;
 };
 
 const roleLabel = (role) => ({
@@ -43,7 +37,6 @@ function ChatArea({ destinatarioId, destinatarioNome, currentUserId, onSent, onO
     api.get(`/mensagens/conversa/${destinatarioId}`)
       .then(res => {
         setMsgs(res.data);
-        // O backend já marcou as mensagens deste contacto como lidas ao abrir a conversa
         onOpened && onOpened(destinatarioId);
       })
       .catch(() => setMsgs([]))
@@ -64,7 +57,6 @@ function ChatArea({ destinatarioId, destinatarioNome, currentUserId, onSent, onO
       carregar();
       onSent && onSent();
     } catch (err) {
-      // erro de envio: texto fica no input para o utilizador tentar de novo
       setErroEnvio(err.response?.data?.message || 'Não foi possível enviar. Tente novamente.');
     } finally {
       setSending(false);
@@ -72,27 +64,19 @@ function ChatArea({ destinatarioId, destinatarioNome, currentUserId, onSent, onO
   };
 
   return (
-    <div style={{ marginTop: '1rem', border: '1px solid var(--bege)', borderRadius: 12, overflow: 'hidden' }}>
-      <div style={{ padding: '0.6rem 1rem', background: 'var(--bege-claro)', fontWeight: 700, fontSize: '0.85rem', color: 'var(--castanho)' }}>
-        Conversa com {destinatarioNome}
-      </div>
-      <div style={{ maxHeight: 280, overflowY: 'auto', padding: '0.8rem 1rem', display: 'flex', flexDirection: 'column', gap: 8 }}>
+    <div className="chat-box">
+      <div className="chat-header">Conversa com {destinatarioNome}</div>
+      <div className="chat-scroll">
         {loading ? (
-          <p style={{ fontSize: '0.85rem', color: 'var(--cinza)' }}>A carregar conversa...</p>
+          <p className="chat-vazio">A carregar conversa...</p>
         ) : msgs.length === 0 ? (
-          <p style={{ fontSize: '0.85rem', color: 'var(--cinza)' }}>Ainda não há mensagens. Escreva a primeira.</p>
+          <p className="chat-vazio">Ainda não há mensagens. Escreva a primeira.</p>
         ) : msgs.map(m => {
           const minha = Number(m.remetente_id) === Number(currentUserId);
           return (
-            <div key={m.id} style={{ alignSelf: minha ? 'flex-end' : 'flex-start', maxWidth: '75%' }}>
-              <div style={{
-                background: minha ? 'var(--laranja)' : 'var(--bege)',
-                color: minha ? '#fff' : 'var(--castanho)',
-                borderRadius: 12, padding: '0.5rem 0.8rem', fontSize: '0.88rem',
-              }}>
-                {m.mensagem}
-              </div>
-              <div style={{ fontSize: '0.68rem', color: 'var(--cinza)', marginTop: 2, textAlign: minha ? 'right' : 'left' }}>
+            <div key={m.id} className={minha ? 'chat-bubble-wrap chat-bubble-wrap--minha' : 'chat-bubble-wrap'}>
+              <div className={minha ? 'chat-bubble chat-bubble--minha' : 'chat-bubble'}>{m.mensagem}</div>
+              <div className={minha ? 'chat-time chat-time--minha' : 'chat-time'}>
                 {new Date(m.criado_em).toLocaleString('pt-AO', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })}
               </div>
             </div>
@@ -100,20 +84,10 @@ function ChatArea({ destinatarioId, destinatarioNome, currentUserId, onSent, onO
         })}
         <div ref={bottomRef} />
       </div>
-      {erroEnvio && (
-        <div style={{ padding: '0.4rem 1rem', fontSize: '0.78rem', color: '#b91c1c' }}>{erroEnvio}</div>
-      )}
-      <form onSubmit={enviar} style={{ display: 'flex', gap: 8, padding: '0.6rem', borderTop: '1px solid var(--bege)' }}>
-        <input
-          className="form-control"
-          placeholder="Escreva uma mensagem..."
-          value={texto}
-          onChange={e => setTexto(e.target.value)}
-          style={{ flex: 1 }}
-        />
-        <button type="submit" className="btn btn-primary btn-sm" disabled={sending || !texto.trim()}>
-          <Send size={14} />
-        </button>
+      {erroEnvio && <div className="chat-erro">{erroEnvio}</div>}
+      <form onSubmit={enviar} className="chat-form">
+        <Input placeholder="Escreva uma mensagem..." value={texto} onChange={e => setTexto(e.target.value)} className="chat-input" />
+        <Button type="submit" variant="primary" size="sm" icon={<Send size={14} />} disabled={sending || !texto.trim()} aria-label="Enviar mensagem" />
       </form>
     </div>
   );
@@ -177,9 +151,6 @@ export default function Mensagens() {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [notifs]);
 
-  // Chamado pelo ChatArea quando uma conversa com um contacto é aberta/carregada.
-  // Zera o badge desse contacto na lista e marca as suas notificações como lidas localmente
-  // (o número total de não lidas, calculado a partir de `notifs`, desce automaticamente).
   const handleContactOpened = (contactId) => {
     const idNum = Number(contactId);
     setContatos(prev => prev.map(c => Number(c.id) === idNum ? { ...c, nao_lidas: 0 } : c));
@@ -191,7 +162,6 @@ export default function Mensagens() {
   const marcarLida = (id) => {
     setNotifs(prev => prev.map(n => n.id === id ? { ...n, lida: true } : n));
     api.patch(`/notificacoes/${id}/lida`).catch(() => {
-      // reverte se o servidor recusou (ex.: 403)
       setNotifs(prev => prev.map(n => n.id === id ? { ...n, lida: false } : n));
     });
   };
@@ -232,46 +202,44 @@ export default function Mensagens() {
     }
   };
 
-  if (loading) return <div className="loading"><div className="spinner" /></div>;
+  if (loading) return <LoadingState />;
 
   const naoLidas = notifs.filter(n => !n.lida).length;
   const podeEnviar = ['admin', 'coordenador', 'professor', 'aluno'].includes(user?.role);
 
   const destinatarioOpts = () => {
     if (user?.role === 'admin') return [
-      { value: 'todos',         label: '🌐 Todos' },
-      { value: 'admins',        label: '🛡️ Administradores' },
+      { value: 'todos', label: '🌐 Todos' },
+      { value: 'admins', label: '🛡️ Administradores' },
       { value: 'coordenadores', label: '🏫 Coordenadores' },
-      { value: 'professores',   label: '👩‍🏫 Professores' },
-      { value: 'alunos',        label: '🎒 Alunos' },
-      { value: 'usuario',       label: '👤 Pessoa específica' },
+      { value: 'professores', label: '👩‍🏫 Professores' },
+      { value: 'alunos', label: '🎒 Alunos' },
+      { value: 'usuario', label: '👤 Pessoa específica' },
     ];
     if (user?.role === 'coordenador') return [
       { value: 'professores', label: '👩‍🏫 Todos os professores que coordeno' },
-      { value: 'alunos',      label: '🎒 Todos os alunos que coordeno' },
-      { value: 'usuario',     label: '👤 Pessoa específica' },
+      { value: 'alunos', label: '🎒 Todos os alunos que coordeno' },
+      { value: 'usuario', label: '👤 Pessoa específica' },
     ];
     if (user?.role === 'professor') return [
-      { value: 'alunos',        label: '🎒 Todos os meus alunos' },
+      { value: 'alunos', label: '🎒 Todos os meus alunos' },
       { value: 'coordenadores', label: '🏫 O(s) meu(s) coordenador(es)' },
-      { value: 'usuario',       label: '👤 Pessoa específica' },
+      { value: 'usuario', label: '👤 Pessoa específica' },
     ];
     return [
       { value: 'usuario', label: '👤 Coordenador ou professor específico' },
     ];
   };
 
-  // Mostra o filtro opcional de turma só quando faz sentido para o alvo escolhido (envio em massa)
   const mostrarFiltroTurma =
     (user?.role === 'admin' && ['alunos', 'professores'].includes(form.alvo)) ||
     (user?.role === 'coordenador' && ['alunos', 'professores'].includes(form.alvo)) ||
     (user?.role === 'professor' && form.alvo === 'alunos');
 
-  // Contactos filtrados pela busca (nome/email) e, pro professor, pela turma que leciona
   const contatosFiltrados = contatos
     .filter(c => {
       if (user?.role !== 'professor' || !chatTurmaFiltro) return true;
-      if (c.role !== 'aluno') return true; // coordenador continua sempre visível
+      if (c.role !== 'aluno') return true;
       return Array.isArray(c.turma_ids) && c.turma_ids.includes(Number(chatTurmaFiltro));
     })
     .filter(c => {
@@ -287,35 +255,29 @@ export default function Mensagens() {
       {toast && <Toast message={toast.message} type={toast.type} onClose={clearToast} key={toast.key} />}
 
       <div className="page-header">
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 8 }}>
+        <div className="msg-header-row">
           <div>
             <h2>Mensagens e Notificações</h2>
             <p>
               {naoLidas > 0
-                ? <span style={{ color: 'var(--laranja)', fontWeight: 600 }}>{naoLidas} mensagem(ns) não lida(s)</span>
+                ? <span className="msg-naolidas">{naoLidas} mensagem(ns) não lida(s)</span>
                 : 'Todas as mensagens lidas ✓'}
             </p>
           </div>
           {naoLidas > 0 && (
-            <button
-              className="btn btn-outline btn-sm"
-              onClick={marcarTodasLidas}
-              style={{ display: 'flex', alignItems: 'center', gap: 6 }}
-            >
-              <CheckCircle size={14} /> Marcar todas como lidas
-            </button>
+            <Button variant="outline" size="sm" icon={<CheckCircle size={14} />} onClick={marcarTodasLidas}>
+              Marcar todas como lidas
+            </Button>
           )}
         </div>
       </div>
 
       {podeEnviar && (
-        <div className="card" style={{ marginBottom: '1.5rem' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: '1.25rem' }}>
-            <div style={{ background: 'var(--castanho-claro)', borderRadius: 8, padding: 8 }}>
-              <Send size={18} color="var(--castanho)" />
-            </div>
-            <h3 style={{ margin: 0, fontSize: '1rem' }}>Enviar mensagem</h3>
-            <span style={{ marginLeft: 'auto', fontSize: '0.78rem', color: 'var(--cinza)', textAlign: 'right' }}>
+        <div className="card msg-enviar-card">
+          <div className="msg-enviar-head">
+            <div className="msg-enviar-icon"><Send size={18} /></div>
+            <h3>Enviar mensagem</h3>
+            <span className="msg-enviar-hint">
               {user?.role === 'admin' && 'Admin → todos, grupos ou pessoa específica'}
               {user?.role === 'coordenador' && 'Coordenador → a sua equipa (toda ou específica)'}
               {user?.role === 'professor' && 'Professor → alunos, coordenador ou pessoa específica'}
@@ -324,16 +286,15 @@ export default function Mensagens() {
           </div>
 
           {erro && (
-            <div className="alert alert-error" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+            <div className="alert alert-error alert-dismiss">
               <span>{erro}</span>
               <button type="button" className="alert-close" aria-label="Fechar mensagem de erro" onClick={() => setErro('')}>×</button>
             </div>
           )}
 
-          <div className="form-group">
-            <label className="form-label">Destinatário *</label>
-            <select
-              className="form-control form-select"
+          <FormField label="Destinatário *" htmlFor="msg-alvo">
+            <Select
+              id="msg-alvo"
               value={form.alvo}
               onChange={e => {
                 setForm({ ...form, alvo: e.target.value, destinatario_id: '', turma_id: '' });
@@ -344,59 +305,43 @@ export default function Mensagens() {
               {destinatarioOpts().map(o => (
                 <option key={o.value} value={o.value}>{o.label}</option>
               ))}
-            </select>
-          </div>
+            </Select>
+          </FormField>
 
           {form.alvo === 'usuario' ? (
             <div>
               {user?.role === 'professor' && turmas.length > 0 && (
-                <div className="form-group">
-                  <label className="form-label">Filtrar alunos por turma (opcional)</label>
-                  <select
-                    className="form-control form-select"
-                    value={chatTurmaFiltro}
-                    onChange={e => setChatTurmaFiltro(e.target.value)}
-                  >
+                <FormField label="Filtrar alunos por turma (opcional)" htmlFor="msg-filtro-turma">
+                  <Select id="msg-filtro-turma" value={chatTurmaFiltro} onChange={e => setChatTurmaFiltro(e.target.value)}>
                     <option value="">Todas as turmas</option>
                     {turmas.map(t => (
-                      <option key={t.id || t.turma_id} value={t.id || t.turma_id}>
-                        {t.nome || t.turma_nome}
-                      </option>
+                      <option key={t.id || t.turma_id} value={t.id || t.turma_id}>{t.nome || t.turma_nome}</option>
                     ))}
-                  </select>
-                </div>
+                  </Select>
+                </FormField>
               )}
 
-              <div className="form-group" style={{ position: 'relative' }}>
+              <div className="form-group msg-contato-grupo">
                 <label className="form-label">Pessoa específica *</label>
 
                 {destinatarioSelecionado ? (
-                  <div style={{
-                    display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                    gap: 8, padding: '0.55rem 0.8rem', borderRadius: 8,
-                    background: 'var(--laranja-suave)', border: '1px solid rgba(232,100,26,0.25)',
-                  }}>
-                    <span style={{ fontSize: '0.9rem', fontWeight: 600, color: 'var(--castanho)' }}>
+                  <div className="msg-contato-chip">
+                    <span className="msg-chip-info">
                       {destinatarioSelecionado.nome}
                       {destinatarioSelecionado.email && (
-                        <span style={{ fontWeight: 400, color: 'var(--cinza)' }}> · {destinatarioSelecionado.email}</span>
+                        <span className="msg-chip-email"> · {destinatarioSelecionado.email}</span>
                       )}
                     </span>
-                    <button
-                      type="button"
-                      className="btn btn-outline btn-sm"
-                      onClick={() => { setForm({ ...form, destinatario_id: '' }); setBuscaContato(''); }}
-                    >
+                    <Button variant="outline" size="sm" onClick={() => { setForm({ ...form, destinatario_id: '' }); setBuscaContato(''); }}>
                       Trocar
-                    </button>
+                    </Button>
                   </div>
                 ) : (
                   <>
-                    <div style={{ position: 'relative' }}>
-                      <Search size={15} style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', color: 'var(--cinza)' }} />
-                      <input
-                        className="form-control"
-                        style={{ paddingLeft: 32 }}
+                    <div className="msg-busca">
+                      <Search size={15} className="msg-busca-icon" />
+                      <Input
+                        className="msg-busca-input"
                         placeholder="Escreva o nome ou email..."
                         value={buscaContato}
                         onChange={e => setBuscaContato(e.target.value)}
@@ -406,14 +351,9 @@ export default function Mensagens() {
                     </div>
 
                     {dropdownAberto && (
-                      <div style={{
-                        position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 20,
-                        marginTop: 4, maxHeight: 260, overflowY: 'auto',
-                        background: '#fff', border: '1px solid var(--bege)', borderRadius: 10,
-                        boxShadow: '0 8px 24px rgba(0,0,0,0.1)',
-                      }}>
+                      <div className="msg-dropdown">
                         {contatosFiltrados.length === 0 ? (
-                          <p style={{ padding: '0.7rem 0.9rem', fontSize: '0.85rem', color: 'var(--cinza)', margin: 0 }}>
+                          <p className="msg-dropdown-vazio">
                             {contatos.length === 0
                               ? 'Ainda não tens contactos disponíveis para mensagem directa.'
                               : 'Nenhum contacto corresponde à busca/filtro.'}
@@ -424,36 +364,19 @@ export default function Mensagens() {
                             if (!grupo.length) return null;
                             return (
                               <div key={r}>
-                                <div style={{
-                                  padding: '0.4rem 0.9rem', fontSize: '0.7rem', fontWeight: 700,
-                                  textTransform: 'uppercase', letterSpacing: 0.5, color: 'var(--cinza)',
-                                  background: 'var(--bege-claro)',
-                                }}>
-                                  {roleLabel(r)}
-                                </div>
+                                <div className="msg-dropdown-grupo">{roleLabel(r)}</div>
                                 {grupo.map(c => (
                                   <div
                                     key={c.id}
+                                    className="msg-contato-item"
                                     onMouseDown={() => { setForm({ ...form, destinatario_id: String(c.id) }); setDropdownAberto(false); }}
-                                    style={{
-                                      padding: '0.55rem 0.9rem', cursor: 'pointer', fontSize: '0.88rem',
-                                      color: 'var(--castanho)', borderBottom: '1px solid var(--bege-claro)',
-                                      display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8,
-                                    }}
-                                    onMouseEnter={e => e.currentTarget.style.background = 'var(--bege-claro)'}
-                                    onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
                                   >
-                                    <span style={{ minWidth: 0 }}>
-                                      <span style={{ fontWeight: 600 }}>{c.nome}</span>
-                                      {c.email && <span style={{ color: 'var(--cinza)' }}> · {c.email}</span>}
+                                    <span className="msg-contato-nome">
+                                      <span className="msg-contato-nome-forte">{c.nome}</span>
+                                      {c.email && <span className="msg-contato-nome-email"> · {c.email}</span>}
                                     </span>
                                     {c.nao_lidas > 0 && (
-                                      <span style={{
-                                        background: 'var(--laranja)', color: '#fff', borderRadius: 20,
-                                        padding: '1px 8px', fontSize: '0.72rem', fontWeight: 700, flexShrink: 0,
-                                      }}>
-                                        {c.nao_lidas}
-                                      </span>
+                                      <span className="msg-naolidas-pill">{c.nao_lidas}</span>
                                     )}
                                   </div>
                                 ))}
@@ -479,58 +402,36 @@ export default function Mensagens() {
             </div>
           ) : (
             <form onSubmit={enviarMensagem}>
-              <div className="form-row">
-                <div className="form-group">
-                  <label className="form-label">Título *</label>
-                  <input
-                    className="form-control"
-                    value={form.titulo}
-                    placeholder="Ex: Aviso importante, Reunião de pais..."
-                    onChange={e => setForm({ ...form, titulo: e.target.value })}
-                  />
-                </div>
-              </div>
+              <FormField label="Título *" htmlFor="msg-titulo">
+                <Input id="msg-titulo" value={form.titulo} placeholder="Ex: Aviso importante, Reunião de pais..." onChange={e => setForm({ ...form, titulo: e.target.value })} />
+              </FormField>
 
               {mostrarFiltroTurma && (
-                <div className="form-group">
-                  <label className="form-label">Turma específica (opcional)</label>
-                  <select
-                    className="form-control form-select"
-                    value={form.turma_id}
-                    onChange={e => setForm({ ...form, turma_id: e.target.value })}
-                  >
+                <FormField label="Turma específica (opcional)" htmlFor="msg-turma">
+                  <Select id="msg-turma" value={form.turma_id} onChange={e => setForm({ ...form, turma_id: e.target.value })}>
                     <option value="">Todas as turmas sob a sua gestão</option>
                     {turmas.map(t => (
-                      <option key={t.id || t.turma_id} value={t.id || t.turma_id}>
-                        {t.nome || t.turma_nome}
-                      </option>
+                      <option key={t.id || t.turma_id} value={t.id || t.turma_id}>{t.nome || t.turma_nome}</option>
                     ))}
-                  </select>
-                </div>
+                  </Select>
+                </FormField>
               )}
 
-              <div className="form-group">
-                <label className="form-label">Mensagem *</label>
-                <textarea
-                  className="form-control"
-                  rows="4"
-                  placeholder="Escreva aqui a sua mensagem..."
-                  value={form.mensagem}
-                  onChange={e => setForm({ ...form, mensagem: e.target.value })}
-                />
-              </div>
-              <button type="submit" className="btn btn-primary" disabled={sending}>
-                <Send size={15} /> {sending ? 'A enviar...' : 'Enviar mensagem'}
-              </button>
+              <FormField label="Mensagem *" htmlFor="msg-corpo">
+                <Textarea id="msg-corpo" rows="4" placeholder="Escreva aqui a sua mensagem..." value={form.mensagem} onChange={e => setForm({ ...form, mensagem: e.target.value })} />
+              </FormField>
+              <Button type="submit" variant="primary" icon={<Send size={15} />} loading={sending}>
+                {sending ? 'A enviar...' : 'Enviar mensagem'}
+              </Button>
             </form>
           )}
         </div>
       )}
 
       {respondendoPara && (
-        <div className="card" style={{ marginBottom: '1.5rem' }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
-            <h3 style={{ margin: 0, fontSize: '1rem' }}>Conversa</h3>
+        <div className="card msg-resposta-card">
+          <div className="msg-resposta-head">
+            <h3>Conversa</h3>
             <button type="button" className="alert-close" aria-label="Fechar conversa" onClick={() => setRespondendoPara(null)}>×</button>
           </div>
           <ChatArea
@@ -543,97 +444,67 @@ export default function Mensagens() {
         </div>
       )}
 
-      <div className="card">
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: '1rem' }}>
-          <Bell size={18} color="var(--castanho)" />
-          <h3 style={{ margin: 0, fontSize: '1rem' }}>Caixa de entrada</h3>
-          {naoLidas > 0 && (
-            <span style={{
-              background: 'var(--laranja)', color: '#fff',
-              borderRadius: 20, padding: '1px 8px',
-              fontSize: '0.78rem', fontWeight: 700,
-            }}>
-              {naoLidas}
-            </span>
-          )}
+      <div className="card msg-inbox-card">
+        <div className="msg-inbox-head">
+          <Bell size={18} />
+          <h3>Caixa de entrada</h3>
+          {naoLidas > 0 && <span className="msg-inbox-count">{naoLidas}</span>}
         </div>
 
         {notifs.length === 0 ? (
-          <div className="empty-state">
-            <MessageCircle size={48} />
-            <h3>Nenhuma mensagem ainda</h3>
-            <p>As notificações da escola aparecerão aqui.</p>
-          </div>
+          <EmptyState icon={<MessageCircle size={48} />} title="Nenhuma mensagem ainda" message="As notificações da escola aparecerão aqui." />
         ) : (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+          <div className="msg-lista">
             {notifs.map(n => (
               <div
                 key={n.id}
+                className={n.lida ? 'msg-item msg-item--lida' : 'msg-item'}
                 onClick={() => !n.lida && marcarLida(n.id)}
-                style={{
-                  display: 'flex', gap: 14, alignItems: 'flex-start',
-                  padding: '1rem 1.2rem', borderRadius: 12,
-                  background: n.lida ? 'var(--bege-claro)' : 'var(--laranja-suave)',
-                  border: n.lida ? '1px solid var(--bege)' : '1px solid rgba(232,100,26,0.25)',
-                  cursor: n.lida ? 'default' : 'pointer', transition: 'all 0.2s',
-                }}
               >
-                <div style={{
-                  width: 42, height: 42, borderRadius: '50%', flexShrink: 0,
-                  background: n.lida ? 'var(--bege)' : 'var(--laranja)',
-                  display: 'flex', alignItems: 'center', justifyContent: 'center',
-                }}>
-                  <MessageCircle size={18} color={n.lida ? 'var(--cinza)' : 'white'} />
+                <div className={n.lida ? 'msg-item-avatar msg-item-avatar--lida' : 'msg-item-avatar'}>
+                  <MessageCircle size={18} />
                 </div>
 
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8, flexWrap: 'wrap' }}>
-                    <p style={{ fontSize: '0.92rem', fontWeight: n.lida ? 400 : 600, color: 'var(--castanho)', margin: 0 }}>
-                      {n.titulo && <span style={{ display: 'block', fontSize: '0.8rem', fontWeight: 700, color: 'var(--castanho-medio)', marginBottom: 2, textTransform: 'uppercase', letterSpacing: 0.5 }}>{n.titulo}</span>}
+                <div className="msg-item-corpo">
+                  <div className="msg-item-topo">
+                    <p className={n.lida ? 'msg-item-texto msg-item-texto--lida' : 'msg-item-texto'}>
+                      {n.titulo && <span className="msg-item-titulo">{n.titulo}</span>}
                       {n.mensagem}
                     </p>
-                    {!n.lida && (
-                      <span style={{ width: 10, height: 10, borderRadius: '50%', background: 'var(--laranja)', flexShrink: 0, marginTop: 4 }} />
-                    )}
+                    {!n.lida && <span className="msg-item-dot" />}
                   </div>
-                  <div style={{ display: 'flex', gap: 10, marginTop: 6, alignItems: 'center', flexWrap: 'wrap' }}>
+                  <div className="msg-item-meta">
                     {n.remetente_nome && (
-                      <span style={{
-                        fontSize: '0.78rem', fontWeight: 600, color: 'var(--castanho)',
-                        display: 'flex', alignItems: 'center', gap: 4,
-                      }}>
+                      <span className="msg-item-remetente">
                         <User size={11} />
                         {n.remetente_nome}
                         {n.remetente_role && (
-                          <span style={{ fontWeight: 400, color: 'var(--cinza)', textTransform: 'capitalize' }}>
+                          <span className="msg-item-remetente-role">
                             ({n.remetente_role === 'admin' ? 'Administração' : n.remetente_role === 'coordenador' ? 'Coordenador' : n.remetente_role === 'professor' ? 'Professor' : n.remetente_role})
                           </span>
                         )}
                       </span>
                     )}
                     {n.criado_em && (
-                      <span style={{ fontSize: '0.75rem', color: 'var(--cinza)' }}>
+                      <span className="msg-item-data">
                         {new Date(n.criado_em).toLocaleDateString('pt-AO', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
                       </span>
                     )}
                     {n.tipo && tipoBadge(n.tipo)}
-                    {!n.lida && (
-                      <span style={{ fontSize: '0.75rem', color: 'var(--laranja)', fontWeight: 600 }}>
-                        Clica para marcar como lida
-                      </span>
-                    )}
+                    {!n.lida && <span className="msg-item-lida-hint">Clica para marcar como lida</span>}
                     {n.remetente_id && Number(n.remetente_id) !== Number(user.id) && (
-                      <button
-                        type="button"
-                        className="btn btn-outline btn-sm"
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        icon={<MessageCircle size={12} />}
+                        className="msg-item-responder"
                         onClick={(e) => {
                           e.stopPropagation();
                           setRespondendoPara({ id: Number(n.remetente_id), nome: n.remetente_nome || 'Utilizador' });
                         }}
-                        style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 4 }}
                       >
-                        <MessageCircle size={12} /> Responder
-                      </button>
+                        Responder
+                      </Button>
                     )}
                   </div>
                 </div>

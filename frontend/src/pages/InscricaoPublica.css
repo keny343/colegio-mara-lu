@@ -1,0 +1,33 @@
+.insc-screen {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(135deg, var(--castanho) 0%, var(--castanho-medio) 100%);
+  padding: 2rem;
+}
+.insc-container { width: 100%; max-width: 720px; }
+.insc-header { text-align: center; margin-bottom: 2rem; }
+.insc-icon {
+  width: 64px; height: 64px; background: var(--laranja); border-radius: 16px;
+  display: flex; align-items: center; justify-content: center; margin: 0 auto 1rem;
+}
+.insc-header h2 { color: white; font-size: 1.8rem; }
+.insc-header p { color: var(--bege); margin-top: 4px; }
+
+.insc-success-screen {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(135deg, var(--castanho), var(--castanho-medio));
+  padding: 2rem;
+}
+.insc-success-card { max-width: 520px; width: 100%; text-align: center; }
+.insc-success-icon { margin: 0 auto 1rem; }
+.insc-success-card h2 { color: var(--castanho); margin-bottom: 0.5rem; }
+.insc-success-card p { color: var(--cinza); margin-bottom: 1.5rem; }
+
+.insc-footer { text-align: center; margin-top: 1.5rem; padding-top: 1.5rem; border-top: 1px solid var(--bege); }
+.insc-footer p { color: var(--cinza); font-size: 0.9rem; }
+.insc-footer a { color: var(--laranja); font-weight: 600; }

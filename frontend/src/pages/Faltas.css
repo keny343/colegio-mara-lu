@@ -1,0 +1,43 @@
+.stats-grid--3 { grid-template-columns: repeat(3, 1fr); }
+
+.stat-card--castanho { border-left-color: var(--castanho-medio); }
+.stat-card--castanho .stat-number { color: var(--castanho-medio); }
+.stat-card--verde { border-left-color: var(--verde); }
+.stat-card--verde .stat-number { color: var(--verde); }
+.stat-card--vermelho { border-left-color: var(--vermelho); }
+.stat-card--vermelho .stat-number { color: var(--vermelho); }
+
+.falta-group { margin-bottom: 1.5rem; }
+.falta-group-head { display: flex; align-items: center; gap: 8px; margin-bottom: 0.75rem; }
+.falta-group-head h3 { font-size: 1rem; }
+.falta-count {
+  margin-left: auto;
+  background: var(--bege); border-radius: 20px; padding: 2px 10px;
+  font-size: 0.8rem; font-weight: 700; color: var(--castanho);
+}
+
+.falta-list { display: flex; flex-direction: column; gap: 6px; }
+.falta-item {
+  display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  border-radius: 8px; padding: 0.6rem 1rem; font-size: 0.85rem; flex-wrap: wrap;
+}
+.falta-item--justificada { background: #F0FDF4; border: 1px solid #BBF7D0; }
+.falta-item--injustificada { background: #FFF1F2; border: 1px solid #FFE4E6; }
+
+.falta-date { display: flex; align-items: center; gap: 8px; }
+.falta-just-text { color: var(--cinza); font-size: 0.78rem; }
+.falta-actions { display: flex; align-items: center; gap: 8px; }
+.falta-status {
+  font-size: 0.72rem; font-weight: 700; text-transform: uppercase; color: var(--vermelho);
+}
+.falta-status--ok { color: var(--verde); }
+.falta-just-btn { font-size: 0.72rem; padding: 2px 8px; }
+
+.falta-modal-info { color: var(--cinza); margin-bottom: 1.25rem; font-size: 0.9rem; }
+.falta-file-row { display: flex; align-items: center; gap: 10px; }
+.falta-file-label { cursor: pointer; margin-bottom: 0; }
+
+@media (max-width: 640px) {
+  .stats-grid--3 { grid-template-columns: repeat(2, 1fr); }
+  .stats-grid--3 .stat-card:last-child { grid-column: 1 / -1; }
+}

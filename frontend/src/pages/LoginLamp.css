@@ -100,6 +100,27 @@
 
 .login-card { box-shadow: var(--sombra-lg); }
 
+.login-header { text-align: center; margin-bottom: 1.5rem; }
+.login-icon {
+  width: 56px; height: 56px; background: var(--laranja); border-radius: 16px;
+  display: flex; align-items: center; justify-content: center; margin: 0 auto 0.75rem;
+}
+.login-title { font-size: 1.5rem; }
+.login-subtitle { color: var(--cinza); margin-top: 4px; }
+
+.password-wrap { position: relative; }
+.password-wrap .form-control { padding-right: 44px; }
+.password-toggle {
+  position: absolute; right: 12px; top: 50%; transform: translateY(-50%);
+  background: none; border: none; cursor: pointer; color: var(--cinza); padding: 4px;
+}
+.password-toggle:hover { color: var(--laranja); }
+.password-toggle:focus-visible { outline: 2px solid var(--laranja); border-radius: 6px; }
+
+.login-footer { text-align: center; margin-top: 1.5rem; padding-top: 1.5rem; border-top: 1px solid var(--bege); }
+.login-footer p { color: var(--cinza); font-size: 0.9rem; }
+.login-footer a { color: var(--laranja); font-weight: 600; }
+
 @media (prefers-reduced-motion: reduce) {
   .lamp-fixture, .light-cone, .login-card-wrap { transition: none !important; }
 }

@@ -4,6 +4,8 @@ import api from '../services/api';
 import { useAuth } from '../contexts/AuthContext';
 import { useConfirm } from '../contexts/ConfirmContext';
 import { useNotification } from '../contexts/NotificationContext';
+import { Badge, Button, FormField, Input, LoadingState, Modal, Select } from '../components/ui';
+import './AdminPages.css';
 
 // ===== USUÁRIOS =====
 export function AdminUsuarios() {
@@ -169,25 +171,32 @@ export function AdminUsuarios() {
     }
   };
 
-  if (loading) return <div className="loading"><div className="spinner" /></div>;
+  if (loading) return <LoadingState />;
+
+  const roleBadge = (r) => (
+    r === 'admin' ? <Badge tone="red">🔑 Admin</Badge> :
+    r === 'coordenador' ? <Badge tone="yellow">🧩 Coordenador</Badge> :
+    r === 'professor' ? <Badge tone="blue">📚 Professor</Badge> :
+    <Badge tone="gray">🎓 Aluno</Badge>
+  );
 
   return (
     <div className="page-container">
-      <div className="page-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12, flexWrap: 'wrap' }}>
+      <div className="page-header ap-header">
         <div>
           <h2>{isAdmin ? 'Usuários' : 'Equipa — designar coordenação'}</h2>
-          <p style={{ color: 'var(--cinza)' }}>
+          <p className="ap-subtitle">
             {isAdmin
               ? `${usuarios.length} usuário(s) registrado(s)`
               : 'Designe professores como coordenadores do seu ciclo ou curso (para alterar notas já lançadas).'}
           </p>
         </div>
         {isAdmin && (
-          <button className="btn btn-primary" onClick={abrirNovo}><Plus size={18} /> Novo usuário</button>
+          <Button variant="primary" icon={<Plus size={18} />} onClick={abrirNovo}>Novo usuário</Button>
         )}
       </div>
 
-      <div className="card" style={{ padding: 0 }}>
+      <div className="card ap-tabela-card">
         <div className="table-container">
           <table className="table">
             <thead>
@@ -206,49 +215,42 @@ export function AdminUsuarios() {
             <tbody>
               {usuarios.map(u => (
                 <tr key={u.id}>
-                  <td style={{ color: 'var(--cinza)', fontSize: '0.85rem' }}>#{u.id}</td>
+                  <td className="ap-id">#{u.id}</td>
                   <td><strong>{u.nome}</strong></td>
                   <td>{u.email}</td>
                   <td>{u.telefone || '—'}</td>
                   <td>{u.cpf || '—'}</td>
                   <td>
-                    <span className={`badge ${u.role === 'admin' ? 'badge-aprovada' : u.role === 'coordenador' ? 'badge-em_analise' : 'badge-pendente'}`}>
-                      {u.role === 'admin' ? '🔑 Admin' : u.role === 'coordenador' ? '🧩 Coordenador' : u.role === 'professor' ? '📚 Professor' : '🎓 Aluno'}
-                    </span>
+                    {roleBadge(u.role)}
                     {(u.curso_coordenado || u.nivel_coordenado) && (
-                      <div style={{ fontSize: '0.75rem', color: 'var(--cinza)', display: 'block', marginTop: 4 }}>
-                        {u.nivel_coordenado || u.curso_coordenado}
-                      </div>
+                      <div className="ap-coord-info">{u.nivel_coordenado || u.curso_coordenado}</div>
                     )}
                   </td>
-                  <td style={{ fontSize: '0.85rem' }}>{new Date(u.criado_em).toLocaleDateString('pt-BR')}</td>
+                  <td className="ap-data">{new Date(u.criado_em).toLocaleDateString('pt-BR')}</td>
                   <td>
-                    <span className={`badge ${u.ativo ? 'badge-aprovada' : 'badge-cancelada'}`}>
-                      {u.ativo ? 'Ativo' : 'Inativo'}
-                    </span>
+                    <Badge tone={u.ativo ? 'green' : 'red'}>{u.ativo ? 'Ativo' : 'Inativo'}</Badge>
                   </td>
                   <td>
-                    <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                    <div className="ap-acoes">
                       {isAdmin && (
-                        <button className="btn btn-sm btn-outline" onClick={() => abrirEditar(u)} title="Editar">
-                          <Edit2 size={14} />
-                        </button>
+                        <Button variant="outline" size="sm" icon={<Edit2 size={14} />} onClick={() => abrirEditar(u)} aria-label="Editar" />
                       )}
                       {isAdmin && ['professor', 'coordenador'].includes(u.role) && (
-                        <button className="btn btn-sm btn-primary" type="button" onClick={() => abrirCoordenador(u)} title="Designar coordenador">
+                        <Button variant="primary" size="sm" type="button" onClick={() => abrirCoordenador(u)} title="Designar coordenador">
                           Coord.
-                        </button>
+                        </Button>
                       )}
                       {isAdmin && (
-                        <button
-                          className={`btn btn-sm ${u.ativo ? 'btn-outline' : 'btn-primary'}`}
+                        <Button
+                          variant={u.ativo ? 'outline' : 'primary'}
+                          size="sm"
+                          icon={u.ativo ? <ToggleLeft size={14} /> : <ToggleRight size={14} />}
                           onClick={() => toggleAtivo(u)}
-                          title={u.ativo ? 'Desativar' : 'Ativar'}
                           disabled={saving}
-                          style={{ whiteSpace: 'nowrap' }}
+                          className="ap-toggle"
                         >
-                          {u.ativo ? <ToggleLeft size={14} /> : <ToggleRight size={14} />} {u.ativo ? 'Desativar' : 'Ativar'}
-                        </button>
+                          {u.ativo ? 'Desativar' : 'Ativar'}
+                        </Button>
                       )}
                     </div>
                   </td>
@@ -259,181 +261,133 @@ export function AdminUsuarios() {
         </div>
       </div>
 
-      {modal && (
-        <div className="modal-overlay" onClick={() => setModal(false)}>
-          <div className="modal" style={{ maxWidth: 560 }} onClick={e => e.stopPropagation()}>
-            <div className="modal-header">
-              <h3 className="modal-title">Novo usuário</h3>
-              <button className="modal-close" onClick={() => setModal(false)}><X size={18} /></button>
-            </div>
-            {erro && <div className="alert alert-error">{erro}</div>}
-            <form onSubmit={salvar}>
-              <div className="form-group">
-                <label className="form-label">Nome completo *</label>
-                <input className="form-control" value={form.nome} onChange={e => setForm({ ...form, nome: e.target.value })} required />
-              </div>
-              <div className="form-row">
-                <div className="form-group">
-                  <label className="form-label">BI *</label>
-                  <input className="form-control" value={form.bi} onChange={e => setForm({ ...form, bi: e.target.value })} required />
-                  <div style={{ fontSize: '0.8rem', color: 'var(--cinza)', marginTop: 6 }}>
-                    Senha inicial será o próprio BI.
-                  </div>
-                </div>
-                <div className="form-group">
-                  <label className="form-label">Perfil *</label>
-                  <select className="form-control form-select" value={form.role} onChange={e => setForm({ ...form, role: e.target.value })}>
-                    <option value="professor">Professor</option>
-                    <option value="admin">Admin</option>
-                  </select>
-                  <div style={{ fontSize: '0.8rem', color: 'var(--cinza)', marginTop: 6 }}>
-                    Coordenadores são designados depois, no botão &quot;Coord.&quot;
-                  </div>
-                </div>
-              </div>
-              <div className="form-row">
-                <div className="form-group">
-                  <label className="form-label">E-mail (opcional)</label>
-                  <input className="form-control" value={form.email} onChange={e => setForm({ ...form, email: e.target.value })} placeholder="Se vazio, será gerado automaticamente" />
-                </div>
-                <div className="form-group">
-                  <label className="form-label">Telefone</label>
-                  <input className="form-control" value={form.telefone} onChange={e => setForm({ ...form, telefone: e.target.value })} placeholder="+244 9xx xxx xxx" />
-                </div>
-              </div>
-              <div style={{ display: 'flex', gap: 12 }}>
-                <button type="button" className="btn btn-outline" onClick={() => setModal(false)}>Cancelar</button>
-                <button type="submit" className="btn btn-primary" style={{ flex: 1 }} disabled={saving}>
-                  {saving ? 'Salvando...' : <><Save size={16} /> Criar usuário</>}
-                </button>
-              </div>
-            </form>
+      <Modal open={modal} onClose={() => setModal(false)} title="Novo usuário" size="md">
+        {erro && <div className="alert alert-error">{erro}</div>}
+        <form onSubmit={salvar}>
+          <FormField label="Nome completo *" htmlFor="us-nome" required>
+            <Input id="us-nome" value={form.nome} onChange={e => setForm({ ...form, nome: e.target.value })} required />
+          </FormField>
+          <div className="form-row">
+            <FormField label="BI *" htmlFor="us-bi" hint="Senha inicial será o próprio BI." required>
+              <Input id="us-bi" value={form.bi} onChange={e => setForm({ ...form, bi: e.target.value })} required />
+            </FormField>
+            <FormField label="Perfil *" htmlFor="us-role" hint="Coordenadores são designados depois, no botão &quot;Coord.&quot;" required>
+              <Select id="us-role" value={form.role} onChange={e => setForm({ ...form, role: e.target.value })}>
+                <option value="professor">Professor</option>
+                <option value="admin">Admin</option>
+              </Select>
+            </FormField>
           </div>
-        </div>
-      )}
+          <div className="form-row">
+            <FormField label="E-mail (opcional)" htmlFor="us-email">
+              <Input id="us-email" value={form.email} onChange={e => setForm({ ...form, email: e.target.value })} placeholder="Se vazio, será gerado automaticamente" />
+            </FormField>
+            <FormField label="Telefone" htmlFor="us-telefone">
+              <Input id="us-telefone" value={form.telefone} onChange={e => setForm({ ...form, telefone: e.target.value })} placeholder="+244 9xx xxx xxx" />
+            </FormField>
+          </div>
+          <div className="ap-modal-acoes">
+            <Button variant="outline" onClick={() => setModal(false)}>Cancelar</Button>
+            <Button type="submit" variant="primary" block icon={<Save size={16} />} loading={saving}>
+              {saving ? 'Salvando...' : 'Criar usuário'}
+            </Button>
+          </div>
+        </form>
+      </Modal>
 
-      {coordModal && (
-        <div className="modal-overlay" onClick={() => setCoordModal(null)}>
-          <div className="modal" style={{ maxWidth: 520 }} onClick={e => e.stopPropagation()}>
-            <div className="modal-header">
-              <h3 className="modal-title">Designar coordenador — {coordModal.nome}</h3>
-              <button className="modal-close" onClick={() => setCoordModal(null)}><X size={18} /></button>
-            </div>
-            {erro && <div className="alert alert-error">{erro}</div>}
-            <p style={{ fontSize: '0.88rem', color: 'var(--cinza)', marginBottom: '1rem', lineHeight: 1.5 }}>
-              O coordenador verifica inscrições e altera notas lançadas pelos professores no ciclo ou curso seleccionado.
+      <Modal open={!!coordModal} onClose={() => setCoordModal(null)} title={coordModal ? `Designar coordenador — ${coordModal.nome}` : ''} size="md">
+        {erro && <div className="alert alert-error">{erro}</div>}
+        <p className="ap-coord-desc">
+          O coordenador verifica inscrições e altera notas lançadas pelos professores no ciclo ou curso seleccionado.
+        </p>
+        <FormField label="Âmbito da coordenação *" htmlFor="coord-tipo">
+          {isAdmin ? (
+            <Select id="coord-tipo" value={coordForm.tipo} onChange={e => setCoordForm({ ...coordForm, tipo: e.target.value })}>
+              <option value="1_ciclo">1º ciclo (Pré-escolar até 6ª classe)</option>
+              <option value="2_ciclo">2º ciclo (7ª até 9ª classe)</option>
+              <option value="curso">Coordenador de curso (10ª classe em diante)</option>
+            </Select>
+          ) : (
+            <p className="ap-coord-fixo">
+              {coordForm.tipo === 'curso'
+                ? `Curso: ${user?.curso_coordenado || '—'}`
+                : coordForm.tipo === '2_ciclo'
+                  ? '2º ciclo (7ª–9ª classe)'
+                  : '1º ciclo (Pré-escolar–6ª classe)'}
             </p>
-            <div className="form-group">
-              <label className="form-label">Âmbito da coordenação *</label>
-              {isAdmin ? (
-                <select className="form-control form-select" value={coordForm.tipo} onChange={e => setCoordForm({ ...coordForm, tipo: e.target.value })}>
-                  <option value="1_ciclo">1º ciclo (Pré-escolar até 6ª classe)</option>
-                  <option value="2_ciclo">2º ciclo (7ª até 9ª classe)</option>
-                  <option value="curso">Coordenador de curso (10ª classe em diante)</option>
-                </select>
-              ) : (
-                <p className="form-control" style={{ background: 'var(--bege-claro)' }}>
-                  {coordForm.tipo === 'curso'
-                    ? `Curso: ${user?.curso_coordenado || '—'}`
-                    : coordForm.tipo === '2_ciclo'
-                      ? '2º ciclo (7ª–9ª classe)'
-                      : '1º ciclo (Pré-escolar–6ª classe)'}
-                </p>
-              )}
-            </div>
-            {coordForm.tipo === 'curso' && (
-              <div className="form-group">
-                <label className="form-label">Curso *</label>
-                {isAdmin ? (
-                <select className="form-control form-select" value={coordForm.curso_id} onChange={e => setCoordForm({ ...coordForm, curso_id: e.target.value })}>
-                  <option value="">Selecionar curso...</option>
-                  {cursos.map(c => <option key={c.id} value={c.id}>{c.nome}</option>)}
-                </select>
-                ) : (
-                  <p className="form-control" style={{ background: 'var(--bege-claro)' }}>{user?.curso_coordenado || '—'}</p>
-                )}
-                <p style={{ fontSize: '0.8rem', color: 'var(--cinza)', marginTop: 6 }}>
-                  Aplica-se às turmas desse curso (10ª–13ª ou 10ª–12ª, conforme o curso).
-                </p>
-              </div>
+          )}
+        </FormField>
+        {coordForm.tipo === 'curso' && (
+          <FormField label="Curso *" htmlFor="coord-curso" hint="Aplica-se às turmas desse curso (10ª–13ª ou 10ª–12ª, conforme o curso).">
+            {isAdmin ? (
+              <Select id="coord-curso" value={coordForm.curso_id} onChange={e => setCoordForm({ ...coordForm, curso_id: e.target.value })}>
+                <option value="">Selecionar curso...</option>
+                {cursos.map(c => <option key={c.id} value={c.id}>{c.nome}</option>)}
+              </Select>
+            ) : (
+              <p className="ap-coord-fixo">{user?.curso_coordenado || '—'}</p>
             )}
-            {coordModal.role === 'professor' && (
-              <div className="form-group">
-                <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}>
-                  <input type="checkbox" checked={coordForm.manter_professor} onChange={e => setCoordForm({ ...coordForm, manter_professor: e.target.checked })} />
-                  Manter também como professor (recomendado se lecciona)
-                </label>
-              </div>
-            )}
-            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-              <button type="button" className="btn btn-outline" onClick={() => setCoordModal(null)}>Cancelar</button>
-              {isAdmin && (coordModal.curso_coordenado || coordModal.nivel_coordenado) && (
-                <button type="button" className="btn btn-danger" onClick={removerCoordenador} disabled={saving}>Remover coordenação</button>
-              )}
-              <button type="button" className="btn btn-primary" style={{ flex: 1 }} onClick={salvarCoordenador} disabled={saving || (coordForm.tipo === 'curso' && !coordForm.curso_id)}>
-                {saving ? 'A guardar...' : 'Confirmar'}
-              </button>
-            </div>
+          </FormField>
+        )}
+        {coordModal?.role === 'professor' && (
+          <div className="form-group">
+            <label className="ap-checkbox-label">
+              <input type="checkbox" checked={coordForm.manter_professor} onChange={e => setCoordForm({ ...coordForm, manter_professor: e.target.checked })} />
+              Manter também como professor (recomendado se lecciona)
+            </label>
           </div>
+        )}
+        <div className="ap-modal-acoes ap-modal-acoes--wrap">
+          <Button variant="outline" onClick={() => setCoordModal(null)}>Cancelar</Button>
+          {isAdmin && (coordModal?.curso_coordenado || coordModal?.nivel_coordenado) && (
+            <Button variant="danger" onClick={removerCoordenador} disabled={saving}>Remover coordenação</Button>
+          )}
+          <Button variant="primary" block onClick={salvarCoordenador} disabled={saving || (coordForm.tipo === 'curso' && !coordForm.curso_id)} loading={saving}>
+            {saving ? 'A guardar...' : 'Confirmar'}
+          </Button>
         </div>
-      )}
+      </Modal>
 
-      {editModal && (
-        <div className="modal-overlay" onClick={() => setEditModal(null)}>
-          <div className="modal" style={{ maxWidth: 560 }} onClick={e => e.stopPropagation()}>
-            <div className="modal-header">
-              <h3 className="modal-title">Editar usuário</h3>
-              <button className="modal-close" onClick={() => setEditModal(null)}><X size={18} /></button>
-            </div>
-            {erro && <div className="alert alert-error">{erro}</div>}
-            <div className="alert alert-info">
-              BI (login): <strong>{editModal.cpf || '—'}</strong> • Senha inicial: <strong>BI</strong>
-            </div>
-            <form onSubmit={salvarEdicao}>
-              <div className="form-group">
-                <label className="form-label">Nome completo</label>
-                <input className="form-control" value={editForm.nome} onChange={e => setEditForm({ ...editForm, nome: e.target.value })} />
-              </div>
-              <div className="form-row">
-                <div className="form-group">
-                  <label className="form-label">E-mail</label>
-                  <input className="form-control" value={editForm.email} onChange={e => setEditForm({ ...editForm, email: e.target.value })} />
-                </div>
-                <div className="form-group">
-                  <label className="form-label">Telefone</label>
-                  <input className="form-control" value={editForm.telefone} onChange={e => setEditForm({ ...editForm, telefone: e.target.value })} />
-                </div>
-              </div>
-              <div className="form-row">
-                <div className="form-group">
-                  <label className="form-label">Perfil</label>
-                  <select className="form-control form-select" value={editForm.role} onChange={e => setEditForm({ ...editForm, role: e.target.value })} disabled={editModal?.role === 'coordenador'}>
-                    <option value="aluno">Aluno</option>
-                    <option value="professor">Professor</option>
-                    <option value="admin">Admin</option>
-                  </select>
-                  {editModal?.role === 'coordenador' && (
-                    <div style={{ fontSize: '0.8rem', color: 'var(--cinza)', marginTop: 6 }}>Use &quot;Coord.&quot; para alterar a coordenação.</div>
-                  )}
-                </div>
-                <div className="form-group">
-                  <label className="form-label">Status</label>
-                  <select className="form-control form-select" value={editForm.ativo ? '1' : '0'} onChange={e => setEditForm({ ...editForm, ativo: e.target.value === '1' })}>
-                    <option value="1">Ativo</option>
-                    <option value="0">Inativo</option>
-                  </select>
-                </div>
-              </div>
-              <div style={{ display: 'flex', gap: 12 }}>
-                <button type="button" className="btn btn-outline" onClick={() => setEditModal(null)}>Cancelar</button>
-                <button type="submit" className="btn btn-primary" style={{ flex: 1 }} disabled={saving}>
-                  {saving ? 'Salvando...' : <><Save size={16} /> Salvar</>}
-                </button>
-              </div>
-            </form>
-          </div>
+      <Modal open={!!editModal} onClose={() => setEditModal(null)} title="Editar usuário" size="md">
+        {erro && <div className="alert alert-error">{erro}</div>}
+        <div className="alert alert-info">
+          BI (login): <strong>{editModal?.cpf || '—'}</strong> • Senha inicial: <strong>BI</strong>
         </div>
-      )}
+        <form onSubmit={salvarEdicao}>
+          <FormField label="Nome completo" htmlFor="ed-nome">
+            <Input id="ed-nome" value={editForm.nome} onChange={e => setEditForm({ ...editForm, nome: e.target.value })} />
+          </FormField>
+          <div className="form-row">
+            <FormField label="E-mail" htmlFor="ed-email">
+              <Input id="ed-email" value={editForm.email} onChange={e => setEditForm({ ...editForm, email: e.target.value })} />
+            </FormField>
+            <FormField label="Telefone" htmlFor="ed-telefone">
+              <Input id="ed-telefone" value={editForm.telefone} onChange={e => setEditForm({ ...editForm, telefone: e.target.value })} />
+            </FormField>
+          </div>
+          <div className="form-row">
+            <FormField label="Perfil" htmlFor="ed-role" hint={editModal?.role === 'coordenador' ? 'Use "Coord." para alterar a coordenação.' : undefined}>
+              <Select id="ed-role" value={editForm.role} onChange={e => setEditForm({ ...editForm, role: e.target.value })} disabled={editModal?.role === 'coordenador'}>
+                <option value="aluno">Aluno</option>
+                <option value="professor">Professor</option>
+                <option value="admin">Admin</option>
+              </Select>
+            </FormField>
+            <FormField label="Status" htmlFor="ed-ativo">
+              <Select id="ed-ativo" value={editForm.ativo ? '1' : '0'} onChange={e => setEditForm({ ...editForm, ativo: e.target.value === '1' })}>
+                <option value="1">Ativo</option>
+                <option value="0">Inativo</option>
+              </Select>
+            </FormField>
+          </div>
+          <div className="ap-modal-acoes">
+            <Button variant="outline" onClick={() => setEditModal(null)}>Cancelar</Button>
+            <Button type="submit" variant="primary" block icon={<Save size={16} />} loading={saving}>
+              {saving ? 'Salvando...' : 'Salvar'}
+            </Button>
+          </div>
+        </form>
+      </Modal>
     </div>
   );
 }
@@ -489,50 +443,54 @@ export function AdminSeries() {
     }
   };
 
-  if (loading) return <div className="loading"><div className="spinner" /></div>;
+  if (loading) return <LoadingState />;
 
   const niveis = [...new Set(series.map(s => s.nivel))];
 
   return (
     <div className="page-container">
-      <div className="page-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+      <div className="page-header ap-header">
         <div>
           <h2>Classes e Vagas</h2>
-          <p style={{ color: 'var(--cinza)' }}>Gerencie as classes disponíveis para inscrição</p>
+          <p className="ap-subtitle">Gerencie as classes disponíveis para inscrição</p>
         </div>
-        <button className="btn btn-primary" onClick={abrirNovo}><Plus size={18} /> Nova Classe</button>
+        <Button variant="primary" icon={<Plus size={18} />} onClick={abrirNovo}>Nova Classe</Button>
       </div>
 
       {niveis.map(nivel => (
-        <div key={nivel} style={{ marginBottom: '2rem' }}>
-          <h3 style={{ color: 'var(--castanho-medio)', fontSize: '1rem', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: 8 }}>
+        <div key={nivel} className="ap-nivel">
+          <h3 className="ap-nivel-titulo">
             <BookOpen size={16} /> {nivel}
           </h3>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: '1rem' }}>
+          <div className="ap-serie-grid">
             {series.filter(s => s.nivel === nivel).map(s => {
               const pct = Math.round(((s.vagas_total - s.vagas_disponiveis) / s.vagas_total) * 100);
               return (
-                <div key={s.id} className="card" style={{ position: 'relative' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 12 }}>
-                    <h4 style={{ fontSize: '1.05rem', color: 'var(--castanho)' }}>{s.nome}</h4>
-                    <div style={{ display: 'flex', gap: 6 }}>
-                      <button className="btn btn-sm btn-outline" onClick={() => abrirEditar(s)}><Edit2 size={12} /></button>
-                      <button className="btn btn-sm btn-danger" onClick={() => excluir(s.id)}><Trash2 size={12} /></button>
+                <div key={s.id} className="card ap-serie-card">
+                  <div className="ap-serie-topo">
+                    <h4 className="ap-serie-nome">{s.nome}</h4>
+                    <div className="ap-serie-acoes">
+                      <Button variant="outline" size="sm" icon={<Edit2 size={12} />} onClick={() => abrirEditar(s)} aria-label="Editar" />
+                      <Button variant="danger" size="sm" icon={<Trash2 size={12} />} onClick={() => excluir(s.id)} aria-label="Desactivar" />
                     </div>
                   </div>
-                  <div style={{ fontSize: '0.85rem', color: 'var(--cinza)', marginBottom: 12 }}>
-                    Ano Letivo: <strong>{s.ano_letivo}</strong>
-                  </div>
-                  <div style={{ marginBottom: 8 }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.8rem', marginBottom: 4 }}>
-                      <span style={{ color: 'var(--cinza)' }}>Ocupação</span>
-                      <span style={{ fontWeight: 600 }}>{s.vagas_total - s.vagas_disponiveis}/{s.vagas_total}</span>
+                  <div className="ap-serie-ano">Ano Letivo: <strong>{s.ano_letivo}</strong></div>
+                  <div className="ap-ocupacao">
+                    <div className="ap-ocupacao-topo">
+                      <span className="ap-ocupacao-label">Ocupação</span>
+                      <span className="ap-ocupacao-valor">{s.vagas_total - s.vagas_disponiveis}/{s.vagas_total}</span>
                     </div>
-                    <div style={{ height: 8, background: '#F0E4D7', borderRadius: 4 }}>
-                      <div style={{ width: `${pct}%`, height: '100%', background: pct > 80 ? 'var(--vermelho)' : pct > 50 ? 'var(--amarelo)' : 'var(--verde)', borderRadius: 4 }} />
+                    <div className="ap-ocupacao-barra">
+                      <div
+                        className="ap-ocupacao-preenchida"
+                        style={{
+                          width: `${pct}%`,
+                          background: pct > 80 ? 'var(--vermelho)' : pct > 50 ? 'var(--amarelo)' : 'var(--verde)',
+                        }}
+                      />
                     </div>
                   </div>
-                  <div style={{ fontSize: '0.85rem', color: pct >= 100 ? 'var(--vermelho)' : 'var(--verde)', fontWeight: 600 }}>
+                  <div className="ap-ocupacao-status" style={{ color: pct >= 100 ? 'var(--vermelho)' : 'var(--verde)' }}>
                     {s.vagas_disponiveis > 0 ? `${s.vagas_disponiveis} vagas disponíveis` : 'Sem vagas'}
                   </div>
                 </div>
@@ -542,49 +500,36 @@ export function AdminSeries() {
         </div>
       ))}
 
-      {modal && (
-        <div className="modal-overlay" onClick={() => setModal(false)}>
-          <div className="modal" style={{ maxWidth: 460 }} onClick={e => e.stopPropagation()}>
-            <div className="modal-header">
-              <h3 className="modal-title">{editando ? 'Editar Classe' : 'Nova Classe'}</h3>
-              <button className="modal-close" onClick={() => setModal(false)}><X size={18} /></button>
-            </div>
-            <form onSubmit={salvar}>
-              {erro && <div className="alert alert-error">{erro}</div>}
-              <div className="form-group">
-                <label className="form-label">Nome *</label>
-                <input name="nome" className="form-control" value={form.nome} onChange={e => setForm({ ...form, nome: e.target.value })} placeholder="Ex: 1º Ano" required />
-              </div>
-              <div className="form-group">
-                <label className="form-label">Nível *</label>
-                <select className="form-control form-select" value={form.nivel} onChange={e => setForm({ ...form, nivel: e.target.value })} required>
-                  <option value="">Selecionar...</option>
-                  <option>Ensino Primário (pré até 6ª)</option>
-                  <option>I Ciclo (Ensino Secundário 7ª–9ª)</option>
-                  <option>II Ciclo (Ensino Secundário 10ª–13ª)</option>
-                </select>
-              </div>
-              <div className="form-row">
-                <div className="form-group">
-                  <label className="form-label">Total de Vagas</label>
-                  <input type="number" className="form-control" value={form.vagas_total} onChange={e => setForm({ ...form, vagas_total: e.target.value })} min={1} />
-                </div>
-                <div className="form-group">
-                  <label className="form-label">Ano Letivo</label>
-                  <input type="number" className="form-control" value={form.ano_letivo} onChange={e => setForm({ ...form, ano_letivo: e.target.value })} />
-                </div>
-              </div>
-              <div style={{ display: 'flex', gap: 12 }}>
-                <button type="button" className="btn btn-outline" onClick={() => setModal(false)}>Cancelar</button>
-                <button type="submit" className="btn btn-primary" style={{ flex: 1 }} disabled={saving}>
-                  {saving ? 'Salvando...' : editando ? 'Salvar' : 'Criar Classe'}
-                </button>
-              </div>
-            </form>
+      <Modal open={modal} onClose={() => setModal(false)} title={editando ? 'Editar Classe' : 'Nova Classe'} size="sm">
+        <form onSubmit={salvar}>
+          {erro && <div className="alert alert-error">{erro}</div>}
+          <FormField label="Nome *" htmlFor="ser-nome" required>
+            <Input id="ser-nome" value={form.nome} onChange={e => setForm({ ...form, nome: e.target.value })} placeholder="Ex: 1º Ano" required />
+          </FormField>
+          <FormField label="Nível *" htmlFor="ser-nivel" required>
+            <Select id="ser-nivel" value={form.nivel} onChange={e => setForm({ ...form, nivel: e.target.value })} required>
+              <option value="">Selecionar...</option>
+              <option>Ensino Primário (pré até 6ª)</option>
+              <option>I Ciclo (Ensino Secundário 7ª–9ª)</option>
+              <option>II Ciclo (Ensino Secundário 10ª–13ª)</option>
+            </Select>
+          </FormField>
+          <div className="form-row">
+            <FormField label="Total de Vagas" htmlFor="ser-vagas">
+              <Input id="ser-vagas" type="number" value={form.vagas_total} onChange={e => setForm({ ...form, vagas_total: e.target.value })} min={1} />
+            </FormField>
+            <FormField label="Ano Letivo" htmlFor="ser-ano">
+              <Input id="ser-ano" type="number" value={form.ano_letivo} onChange={e => setForm({ ...form, ano_letivo: e.target.value })} />
+            </FormField>
           </div>
-        </div>
-      )}
+          <div className="ap-modal-acoes">
+            <Button variant="outline" onClick={() => setModal(false)}>Cancelar</Button>
+            <Button type="submit" variant="primary" block loading={saving}>
+              {saving ? 'Salvando...' : editando ? 'Salvar' : 'Criar Classe'}
+            </Button>
+          </div>
+        </form>
+      </Modal>
     </div>
   );
 }
-

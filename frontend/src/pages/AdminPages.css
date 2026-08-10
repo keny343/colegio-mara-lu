@@ -1,0 +1,37 @@
+.ap-header { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; flex-wrap: wrap; }
+.ap-subtitle { color: var(--cinza); }
+.ap-tabela-card { padding: 0; }
+.ap-id { color: var(--cinza); font-size: 0.85rem; }
+.ap-data { font-size: 0.85rem; }
+.ap-coord-info { font-size: 0.75rem; color: var(--cinza); display: block; margin-top: 4px; }
+.ap-acoes { display: flex; gap: 6px; flex-wrap: wrap; }
+.ap-toggle { white-space: nowrap; }
+
+.ap-modal-acoes { display: flex; gap: 12px; margin-top: 1rem; align-items: stretch; }
+.ap-modal-acoes .btn-outline { flex-shrink: 0; }
+.ap-modal-acoes .btn-primary { flex: 1; }
+.ap-modal-acoes--wrap { flex-wrap: wrap; }
+.ap-modal-acoes--wrap .btn-primary { flex: 1 1 100%; }
+
+.ap-coord-desc { font-size: 0.88rem; color: var(--cinza); margin: 0 0 1rem; line-height: 1.5; }
+.ap-coord-fixo { background: var(--bege-claro); border-radius: 8px; padding: 0.55rem 0.8rem; margin: 0; }
+.ap-checkbox-label { display: flex; align-items: center; gap: 8px; cursor: pointer; font-size: 0.9rem; }
+
+.ap-nivel { margin-bottom: 2rem; }
+.ap-nivel-titulo {
+  color: var(--castanho-medio); font-size: 1rem; text-transform: uppercase;
+  letter-spacing: 0.05em; margin-bottom: 1rem; display: flex; align-items: center; gap: 8px;
+}
+.ap-serie-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 1rem; }
+.ap-serie-card { position: relative; }
+.ap-serie-topo { display: flex; justify-content: space-between; margin-bottom: 12px; }
+.ap-serie-nome { font-size: 1.05rem; color: var(--castanho); margin: 0; }
+.ap-serie-acoes { display: flex; gap: 6px; }
+.ap-serie-ano { font-size: 0.85rem; color: var(--cinza); margin-bottom: 12px; }
+.ap-ocupacao { margin-bottom: 8px; }
+.ap-ocupacao-topo { display: flex; justify-content: space-between; font-size: 0.8rem; margin-bottom: 4px; }
+.ap-ocupacao-label { color: var(--cinza); }
+.ap-ocupacao-valor { font-weight: 600; }
+.ap-ocupacao-barra { height: 8px; background: #F0E4D7; border-radius: 4px; overflow: hidden; }
+.ap-ocupacao-preenchida { height: 100%; border-radius: 4px; transition: width 0.3s; }
+.ap-ocupacao-status { font-size: 0.85rem; font-weight: 600; }

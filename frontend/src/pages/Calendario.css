@@ -1,0 +1,87 @@
+.cal-layout { display: grid; grid-template-columns: 1fr 320px; gap: 1.5rem; align-items: start; }
+
+.cal-nav { display: flex; align-items: center; justify-content: space-between; margin-bottom: 1.5rem; }
+.cal-nav-btn {
+  background: var(--bege); border: none; border-radius: 8px; width: 36px; height: 36px;
+  cursor: pointer; display: flex; align-items: center; justify-content: center;
+}
+.cal-nav-btn:hover { background: var(--bege-medio); }
+.cal-nav-titulo { font-size: 1.2rem; margin: 0; }
+
+.cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; }
+.cal-grid-head { text-align: center; font-size: 0.75rem; font-weight: 700; color: var(--cinza); padding: 6px 0; text-transform: uppercase; }
+
+.cal-celula {
+  min-height: 70px; border-radius: 8px; padding: 6px;
+  background: transparent;
+  border: 1px solid transparent;
+  cursor: pointer; transition: all 0.2s;
+  position: relative; display: flex; flex-direction: column; overflow: hidden;
+}
+.cal-celula:hover { background: var(--bege-claro); }
+.cal-celula--hoje { background: var(--laranja); }
+.cal-celula--hoje:hover { background: var(--laranja); }
+.cal-celula--selecionada { background: var(--bege-medio); border: 2px solid var(--castanho); }
+.cal-celula--com-itens { background: var(--bege-claro); }
+.cal-celula--vazia { cursor: default; }
+.cal-celula--vazia:hover { background: transparent; }
+
+.cal-celula-numero { font-size: 0.85rem; font-weight: 400; color: var(--castanho); z-index: 1; }
+.cal-celula-numero--hoje { font-weight: 700; color: white; }
+
+.cal-celula-dots { display: flex; flex-wrap: wrap; gap: 1.5px; margin-top: 2px; flex: 1; align-content: flex-start; }
+.cal-dot { width: 5px; height: 5px; border-radius: 50%; opacity: 0.8; }
+.cal-dot-aula { background: var(--laranja); }
+.cal-tipo-periodo { background: var(--azul); }
+.cal-tipo-feriado { background: var(--verde); }
+.cal-tipo-teste { background: var(--vermelho); }
+.cal-tipo-aula { background: var(--laranja); }
+
+.cal-celula-aulas {
+  font-size: 0.6rem; background: var(--laranja); color: white;
+  padding: 1px 4px; border-radius: 3px; margin-top: auto;
+  text-align: center; font-weight: 700;
+}
+
+.cal-legenda { display: flex; gap: 12px; margin-top: 1.5rem; flex-wrap: wrap; }
+.cal-legenda-item { display: flex; align-items: center; gap: 6px; font-size: 0.8rem; color: var(--cinza); }
+.cal-legenda-dot { width: 10px; height: 10px; border-radius: 50%; }
+
+.cal-sidebar-titulo {
+  font-size: 1rem; margin: 0 0 1rem; display: flex; align-items: center; gap: 8px;
+}
+.cal-sidebar-vazio { color: var(--cinza); font-size: 0.85rem; }
+.cal-sidebar-lista { display: flex; flex-direction: column; gap: 8px; }
+.cal-sidebar-secao { font-size: 0.75rem; font-weight: 700; color: var(--castanho); text-transform: uppercase; margin-top: 0.5rem; }
+.cal-sidebar-secao:first-child { margin-top: 0; }
+
+.cal-item {
+  display: flex; gap: 10px; background: var(--bege-claro); border-radius: 8px;
+  padding: 8px 10px; border-left: 3px solid var(--bege-medio);
+}
+.cal-item-aula { border-left-color: var(--laranja); }
+.cal-item.cal-tipo-periodo { border-left-color: var(--azul); }
+.cal-item.cal-tipo-feriado { border-left-color: var(--verde); }
+.cal-item.cal-tipo-teste { border-left-color: var(--vermelho); }
+.cal-item-hora {
+  display: flex; align-items: center; gap: 4px; color: var(--castanho);
+  font-weight: 700; font-size: 0.8rem; min-width: 60px;
+}
+.cal-item-titulo { font-size: 0.9rem; font-weight: 600; }
+.cal-item-sub { font-size: 0.75rem; color: var(--cinza); }
+
+.cal-evento { display: flex; gap: 10px; align-items: flex-start; }
+.cal-evento-data { text-align: center; min-width: 36px; }
+.cal-evento-dia { font-size: 1.1rem; font-weight: 700; color: var(--castanho); line-height: 1; }
+.cal-evento-sema { font-size: 0.65rem; color: var(--cinza); text-transform: uppercase; }
+.cal-evento-corpo {
+  flex: 1; background: var(--bege-claro); border-radius: 8px;
+  padding: 6px 10px; border-left: 3px solid var(--bege-medio);
+}
+.cal-evento-corpo.cal-tipo-periodo { border-left-color: var(--azul); }
+.cal-evento-corpo.cal-tipo-feriado { border-left-color: var(--verde); }
+.cal-evento-corpo.cal-tipo-teste { border-left-color: var(--vermelho); }
+
+@media (max-width: 900px) {
+  .cal-layout { grid-template-columns: 1fr; }
+}

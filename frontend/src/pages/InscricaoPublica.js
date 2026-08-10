@@ -1,17 +1,23 @@
-import React, { useEffect, useState } from 'react';
+import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { GraduationCap, CheckCircle } from 'lucide-react';
 import api from '../services/api';
+import { useFetch } from '../hooks/useFetch';
+import { Button, Input, Select, FormField, LoadingState, ErrorState } from '../components/ui';
+import './InscricaoPublica.css';
 
 export default function InscricaoPublica() {
   const navigate = useNavigate();
-  const [series, setSeries] = useState([]);
-  const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState(false);
   const [biFile, setBiFile] = useState(null);
   const [historicoFile, setHistoricoFile] = useState(null);
+
+  const { data: series = [], loading: loadingSeries, error: seriesError, refetch: reloadSeries } = useFetch(
+    () => api.get('/series'),
+    []
+  );
 
   const [form, setForm] = useState({
     primeiro_nome: '',
@@ -27,13 +33,7 @@ export default function InscricaoPublica() {
     ano_letivo: new Date().getFullYear() + 1,
   });
 
-  useEffect(() => {
-    api.get('/series')
-      .then(r => setSeries(r.data))
-      .finally(() => setLoading(false));
-  }, []);
-
-  const handleChange = e => setForm({ ...form, [e.target.name]: e.target.value });
+  const handleChange = (e) => setForm({ ...form, [e.target.name]: e.target.value });
 
   const classeNumeroDaSerie = (nome) => {
     if (!nome) return null;
@@ -49,7 +49,7 @@ export default function InscricaoPublica() {
     setError('');
     setSaving(true);
     try {
-      const selectedSerie = series.find(s => String(s.id) === String(form.serie_id));
+      const selectedSerie = series.find((s) => String(s.id) === String(form.serie_id));
       const classeNumero = classeNumeroDaSerie(selectedSerie?.nome);
       const precisaBoletim = typeof classeNumero === 'number' && classeNumero >= 2;
 
@@ -85,20 +85,18 @@ export default function InscricaoPublica() {
     }
   };
 
-  const niveis = [...new Set(series.map(s => s.nivel))];
-  const selectedSerie = series.find(s => String(s.id) === String(form.serie_id));
+  const niveis = [...new Set(series.map((s) => s.nivel))];
+  const selectedSerie = series.find((s) => String(s.id) === String(form.serie_id));
   const classeNumero = classeNumeroDaSerie(selectedSerie?.nome);
   const precisaBoletim = typeof classeNumero === 'number' && classeNumero >= 2;
 
   if (success) {
     return (
-      <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'linear-gradient(135deg, var(--castanho), var(--castanho-medio))', padding: '2rem' }}>
-        <div className="card" style={{ maxWidth: 520, width: '100%', textAlign: 'center' }}>
-          <CheckCircle size={56} color="var(--verde)" style={{ margin: '0 auto 1rem' }} />
-          <h2 style={{ color: 'var(--castanho)', marginBottom: '0.5rem' }}>Inscrição enviada!</h2>
-          <p style={{ color: 'var(--cinza)', marginBottom: '1.5rem' }}>
-            Aguarde a aprovação/matrícula do colégio. Depois disso, você poderá entrar com o seu BI (senha = BI).
-          </p>
+      <div className="insc-success-screen">
+        <div className="card insc-success-card">
+          <CheckCircle size={56} color="var(--verde)" className="insc-success-icon" />
+          <h2>Inscrição enviada!</h2>
+          <p>Aguarde a aprovação/matrícula do colégio. Depois disso, você poderá entrar com o seu BI (senha = BI).</p>
           <Link to="/login" className="btn btn-primary btn-full">Ir para o Login</Link>
         </div>
       </div>
@@ -106,147 +104,121 @@ export default function InscricaoPublica() {
   }
 
   return (
-    <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'linear-gradient(135deg, var(--castanho) 0%, var(--castanho-medio) 100%)', padding: '2rem' }}>
-      <div style={{ width: '100%', maxWidth: 720 }}>
-        <div style={{ textAlign: 'center', marginBottom: '2rem' }}>
-          <div style={{ width: 64, height: 64, background: 'var(--laranja)', borderRadius: 16, display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 1rem' }}>
+    <div className="insc-screen">
+      <div className="insc-container">
+        <div className="insc-header">
+          <div className="insc-icon">
             <GraduationCap size={32} color="white" />
           </div>
-          <h2 style={{ color: 'white', fontSize: '1.8rem' }}>Inscrição do Aluno</h2>
-          <p style={{ color: 'var(--bege)', marginTop: 4 }}>Preencha os dados do aluno para iniciar o processo</p>
+          <h2>Inscrição do Aluno</h2>
+          <p>Preencha os dados do aluno para iniciar o processo</p>
         </div>
 
         <div className="card">
-          {error && <div className="alert alert-error">{error}</div>}
-          {loading ? (
-            <div className="loading"><div className="spinner" /></div>
+          {error && <div className="alert alert-error" role="alert">{error}</div>}
+          {loadingSeries ? (
+            <LoadingState label="A carregar classes..." />
+          ) : seriesError ? (
+            <ErrorState error={seriesError} onRetry={reloadSeries} />
           ) : (
-            <form onSubmit={handleSubmit}>
+            <form onSubmit={handleSubmit} noValidate>
               <div className="form-row">
-                <div className="form-group">
-                  <label className="form-label">Primeiro Nome *</label>
-                  <input name="primeiro_nome" className="form-control" value={form.primeiro_nome} onChange={handleChange} required />
-                </div>
-                <div className="form-group">
-                  <label className="form-label">Último Nome *</label>
-                  <input name="ultimo_nome" className="form-control" value={form.ultimo_nome} onChange={handleChange} required />
-                </div>
+                <FormField label="Primeiro Nome" htmlFor="insc-primeiro-nome" required>
+                  <Input id="insc-primeiro-nome" name="primeiro_nome" value={form.primeiro_nome} onChange={handleChange} required autoComplete="given-name" />
+                </FormField>
+                <FormField label="Último Nome" htmlFor="insc-ultimo-nome" required>
+                  <Input id="insc-ultimo-nome" name="ultimo_nome" value={form.ultimo_nome} onChange={handleChange} required autoComplete="family-name" />
+                </FormField>
               </div>
 
               <div className="form-row">
-                <div className="form-group">
-                  <label className="form-label">Nº do Bilhete (BI) *</label>
-                  <input name="bi" className="form-control" value={form.bi} onChange={handleChange} required placeholder="Ex: 123456789LA123" />
-                  <div style={{ fontSize: '0.8rem', color: 'var(--cinza)', marginTop: 6 }}>
-                    A senha inicial do aluno será o próprio BI.
-                  </div>
-                </div>
-                <div className="form-group">
-                  <label className="form-label">Data de Nascimento *</label>
-                  <input name="data_nascimento" type="date" className="form-control" value={form.data_nascimento} onChange={handleChange} required />
-                </div>
+                <FormField label="Nº do Bilhete (BI)" htmlFor="insc-bi" required hint="A senha inicial do aluno será o próprio BI.">
+                  <Input id="insc-bi" name="bi" value={form.bi} onChange={handleChange} required placeholder="Ex: 123456789LA123" autoComplete="off" />
+                </FormField>
+                <FormField label="Data de Nascimento" htmlFor="insc-nascimento" required>
+                  <Input id="insc-nascimento" name="data_nascimento" type="date" value={form.data_nascimento} onChange={handleChange} required />
+                </FormField>
+              </div>
+
+              <FormField label="Foto/Cópia do BI" htmlFor="insc-bi-arquivo" required>
+                <Input
+                  id="insc-bi-arquivo"
+                  type="file"
+                  accept=".pdf,.jpg,.jpeg,.png"
+                  onChange={(e) => setBiFile(e.target.files?.[0] || null)}
+                  required
+                />
+              </FormField>
+
+              <div className="form-row">
+                <FormField label="Nacionalidade" htmlFor="insc-nacionalidade">
+                  <Input id="insc-nacionalidade" name="nacionalidade" value={form.nacionalidade} onChange={handleChange} />
+                </FormField>
+                <FormField label="Telefone de Emergência" htmlFor="insc-telefone">
+                  <Input id="insc-telefone" name="telefone_emergencia" value={form.telefone_emergencia} onChange={handleChange} placeholder="+244 9xx xxx xxx" />
+                </FormField>
               </div>
 
               <div className="form-row">
-                <div className="form-group" style={{ gridColumn: '1 / -1' }}>
-                  <label className="form-label">Foto/Cópia do BI *</label>
-                  <input
-                    type="file"
-                    className="form-control"
-                    accept=".pdf,.jpg,.jpeg,.png"
-                    onChange={e => setBiFile(e.target.files?.[0] || null)}
-                    required
-                  />
-                </div>
-              </div>
-
-              <div className="form-row">
-                <div className="form-group">
-                  <label className="form-label">Nacionalidade</label>
-                  <input name="nacionalidade" className="form-control" value={form.nacionalidade} onChange={handleChange} />
-                </div>
-                <div className="form-group">
-                  <label className="form-label">Telefone de Emergência</label>
-                  <input name="telefone_emergencia" className="form-control" value={form.telefone_emergencia} onChange={handleChange} placeholder="+244 9xx xxx xxx" />
-                </div>
-              </div>
-
-              <div className="form-row">
-                <div className="form-group">
-                  <label className="form-label">Nome da Mãe</label>
-                  <input name="nome_mae" className="form-control" value={form.nome_mae} onChange={handleChange} />
-                </div>
-                <div className="form-group">
-                  <label className="form-label">Nome do Pai</label>
-                  <input name="nome_pai" className="form-control" value={form.nome_pai} onChange={handleChange} />
-                </div>
+                <FormField label="Nome da Mãe" htmlFor="insc-mae">
+                  <Input id="insc-mae" name="nome_mae" value={form.nome_mae} onChange={handleChange} />
+                </FormField>
+                <FormField label="Nome do Pai" htmlFor="insc-pai">
+                  <Input id="insc-pai" name="nome_pai" value={form.nome_pai} onChange={handleChange} />
+                </FormField>
               </div>
 
               {precisaBoletim && (
                 <>
-                  <div className="form-row">
-                    <div className="form-group" style={{ gridColumn: '1 / -1' }}>
-                      <label className="form-label">Nome do Encarregado *</label>
-                      <input
-                        name="nome_encarregado"
-                        className="form-control"
-                        value={form.nome_encarregado}
-                        onChange={handleChange}
-                        required={precisaBoletim}
-                      />
-                    </div>
-                  </div>
-                  <div className="form-row">
-                    <div className="form-group" style={{ gridColumn: '1 / -1' }}>
-                      <label className="form-label">Certificado / Boletim de Notas da Classe Anterior *</label>
-                      <input
-                        type="file"
-                        className="form-control"
-                        accept=".pdf,.jpg,.jpeg,.png"
-                        onChange={e => setHistoricoFile(e.target.files?.[0] || null)}
-                        required={precisaBoletim}
-                      />
-                    </div>
-                  </div>
+                  <FormField label="Nome do Encarregado" htmlFor="insc-encarregado" required>
+                    <Input id="insc-encarregado" name="nome_encarregado" value={form.nome_encarregado} onChange={handleChange} required />
+                  </FormField>
+                  <FormField label="Certificado / Boletim de Notas da Classe Anterior" htmlFor="insc-boletim" required>
+                    <Input
+                      id="insc-boletim"
+                      type="file"
+                      accept=".pdf,.jpg,.jpeg,.png"
+                      onChange={(e) => setHistoricoFile(e.target.files?.[0] || null)}
+                      required
+                    />
+                  </FormField>
                 </>
               )}
 
               <div className="form-row">
-                <div className="form-group">
-                  <label className="form-label">Classe *</label>
-                  <select name="serie_id" className="form-control form-select" value={form.serie_id} onChange={handleChange} required>
+                <FormField label="Classe" htmlFor="insc-serie" required>
+                  <Select id="insc-serie" name="serie_id" value={form.serie_id} onChange={handleChange} required>
                     <option value="">Selecionar...</option>
-                    {niveis.map(nivel => (
+                    {niveis.map((nivel) => (
                       <optgroup key={nivel} label={nivel}>
-                        {series.filter(s => s.nivel === nivel).map(s => (
+                        {series.filter((s) => s.nivel === nivel).map((s) => (
                           <option key={s.id} value={s.id} disabled={s.vagas_disponiveis <= 0}>
                             {s.nome} {s.vagas_disponiveis <= 0 ? '(Sem vagas)' : `(${s.vagas_disponiveis} vagas)`}
                           </option>
                         ))}
                       </optgroup>
                     ))}
-                  </select>
-                </div>
-                <div className="form-group">
-                  <label className="form-label">Ano Letivo *</label>
-                  <select name="ano_letivo" className="form-control form-select" value={form.ano_letivo} onChange={handleChange}>
+                  </Select>
+                </FormField>
+                <FormField label="Ano Letivo" htmlFor="insc-ano" required>
+                  <Select id="insc-ano" name="ano_letivo" value={form.ano_letivo} onChange={handleChange}>
                     <option value={new Date().getFullYear()}>{new Date().getFullYear()}</option>
                     <option value={new Date().getFullYear() + 1}>{new Date().getFullYear() + 1}</option>
-                  </select>
-                </div>
+                  </Select>
+                </FormField>
               </div>
 
-              <div className="alert alert-info" style={{ marginBottom: '1rem' }}>
+              <div className="alert alert-info">
                 Depois de enviar, o colégio vai analisar a sua inscrição e os documentos. Só após aprovação o aluno consegue entrar no portal.
               </div>
 
-              <button type="submit" className="btn btn-primary btn-full" disabled={saving}>
+              <Button type="submit" variant="primary" block loading={saving}>
                 {saving ? 'Enviando...' : 'Enviar Inscrição'}
-              </button>
+              </Button>
 
-              <div style={{ textAlign: 'center', marginTop: '1.5rem', paddingTop: '1.5rem', borderTop: '1px solid var(--bege)' }}>
-                <p style={{ color: 'var(--cinza)', fontSize: '0.9rem' }}>
-                  Já tem inscrição aprovada? <Link to="/login" style={{ color: 'var(--laranja)', fontWeight: 600 }}>Entrar</Link>
+              <div className="insc-footer">
+                <p>
+                  Já tem inscrição aprovada? <Link to="/login">Entrar</Link>
                 </p>
               </div>
             </form>
@@ -256,4 +228,3 @@ export default function InscricaoPublica() {
     </div>
   );
 }
-

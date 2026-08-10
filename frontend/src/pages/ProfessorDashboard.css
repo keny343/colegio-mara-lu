@@ -1,0 +1,11 @@
+.page-header-sub { color: var(--cinza); }
+
+.dash-actions { display: flex; gap: 12px; margin-bottom: 2rem; flex-wrap: wrap; }
+.dash-actions-sm { gap: 8px; margin-bottom: 1.25rem; }
+
+.cell-sub { font-size: 0.82rem; color: var(--cinza); }
+.cell-verde { color: var(--verde); font-weight: 600; }
+.cell-sem-notas { font-weight: 600; }
+.cell-text-vermelho { color: var(--vermelho); }
+
+.prof-card-table { padding: 0; }

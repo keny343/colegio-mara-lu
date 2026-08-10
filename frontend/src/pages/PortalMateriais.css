@@ -1,0 +1,13 @@
+.mat-card { padding: 0; }
+.mat-head {
+  display: flex; align-items: center; gap: 8px;
+  padding: 1rem 1rem 0.5rem;
+}
+.mat-head h3 { margin: 0; font-size: 1rem; }
+.mat-count {
+  margin-left: auto;
+  background: var(--bege);
+  border-radius: 20px; padding: 2px 10px;
+  font-size: 0.8rem; font-weight: 700; color: var(--castanho);
+}
+.mat-data { color: var(--cinza); font-size: 0.85rem; }

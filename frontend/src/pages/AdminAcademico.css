@@ -1,0 +1,32 @@
+.tab-pill { border-radius: 999px; }
+
+.acad-header { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; flex-wrap: wrap; }
+.acad-header p { color: var(--cinza); }
+.acad-tabs { display: flex; gap: 8px; flex-wrap: wrap; }
+
+.card-table { padding: 0; }
+.card-table-head { display: flex; justify-content: space-between; align-items: center; padding: 1.25rem 1.25rem 0; gap: 12px; flex-wrap: wrap; }
+.card-table-title { font-size: 1.1rem; }
+.text-cinza { color: var(--cinza); }
+.acoes-row { display: flex; gap: 8px; }
+.acoes-wrap { flex-wrap: wrap; }
+
+.chave-pill { border: none; border-radius: 20px; padding: 3px 12px; font-size: 0.75rem; font-weight: 700; cursor: pointer; background: var(--bege-claro); color: var(--cinza); }
+.chave-pill--on { background: #fef3c7; color: #92400e; }
+
+.horario-card { margin: 1rem; }
+.horario-title { margin-bottom: 1rem; }
+.horario-list { margin: 1rem; }
+
+.atribuir-title { margin-bottom: 1rem; }
+.atrib-aviso { font-size: 0.85rem; color: var(--cinza); margin-top: 6px; }
+
+.classes-aviso { color: var(--cinza); font-size: 0.85rem; margin-bottom: 1.25rem; }
+.classes-row { align-items: flex-end; }
+.classes-table { margin-top: 1.5rem; }
+
+.check-label { display: flex; align-items: center; gap: 8px; cursor: pointer; font-size: 0.9rem; color: var(--castanho); }
+
+.modal-actions { display: flex; gap: 12px; }
+.modal-erro { margin-bottom: 1rem; }
+.modal-info { color: var(--cinza); font-size: 0.9rem; margin-bottom: 1rem; }

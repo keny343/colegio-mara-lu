@@ -1,0 +1,69 @@
+.portal-hero {
+  background: linear-gradient(135deg, var(--castanho), var(--castanho-medio));
+  border-radius: var(--radius-lg);
+  padding: 2rem;
+  margin-bottom: 2rem;
+  color: white;
+}
+.portal-hero-inner { display: flex; align-items: center; gap: 1rem; margin-bottom: 0.75rem; }
+.portal-avatar {
+  width: 52px; height: 52px; border-radius: 50%; background: rgba(255, 255, 255, 0.2);
+  display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+}
+.portal-hero-titulo { font-size: 1.5rem; margin: 0; }
+.portal-hero-sub { color: rgba(255, 255, 255, 0.75); margin: 0; font-size: 0.9rem; }
+.portal-hero-alert { margin-top: 1rem; background: rgba(255, 255, 255, 0.15); border: 1px solid rgba(255, 255, 255, 0.3); color: white; }
+.portal-chips { display: flex; gap: 12px; flex-wrap: wrap; margin-top: 1rem; }
+.portal-chip {
+  background: rgba(255, 255, 255, 0.15); border-radius: 8px;
+  padding: 0.4rem 0.9rem; font-size: 0.85rem;
+}
+.portal-chip-label { opacity: 0.75; }
+
+.portal-notifs { margin-bottom: 1.5rem; border-left: 4px solid var(--laranja); }
+.portal-notif-item {
+  padding: 0.6rem 0; border-bottom: 1px solid var(--bege-medio);
+  font-size: 0.9rem; display: flex; gap: 8px; align-items: flex-start;
+}
+.portal-notif-item:last-child { border-bottom: none; }
+.portal-notif-icone { margin-top: 2px; display: inline-flex; }
+
+.portal-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 1.5rem; }
+.portal-col { min-width: 0; }
+.portal-section-head { display: flex; align-items: center; gap: 8px; margin-bottom: 1.25rem; }
+.portal-section-head--click { cursor: pointer; user-select: none; margin-bottom: 0; }
+.portal-icone { background: var(--castanho-claro); border-radius: 8px; padding: 8px; display: flex; }
+.portal-icone-laranja { color: var(--laranja); }
+.portal-section-titulo { font-size: 1.1rem; margin: 0; }
+.portal-contador { margin-left: auto; background: var(--bege-medio); border-radius: 20px; padding: 2px 10px; font-size: 0.8rem; font-weight: 700; color: var(--castanho); }
+.portal-chevron { margin-left: auto; color: var(--cinza); display: flex; }
+
+.portal-lista { display: flex; flex-direction: column; gap: 8px; }
+.portal-lista-item {
+  display: flex; align-items: center; justify-content: space-between;
+  background: var(--bege-claro); border-radius: 8px; padding: 0.6rem 0.9rem;
+}
+.portal-lista-nome { font-weight: 600; font-size: 0.9rem; }
+.portal-lista-professor { font-size: 0.78rem; color: var(--cinza); max-width: 130px; text-align: right; }
+
+.portal-horarios { display: flex; flex-direction: column; gap: 6px; }
+.portal-dia { font-size: 0.75rem; font-weight: 700; color: var(--castanho); text-transform: uppercase; letter-spacing: 1px; padding: 4px 0 2px; }
+.portal-aula {
+  display: flex; justify-content: space-between; align-items: center;
+  background: var(--bege-claro); border-radius: 7px; padding: 0.45rem 0.8rem; margin-bottom: 4px; font-size: 0.85rem;
+}
+.portal-aula-nome { font-weight: 600; }
+.portal-aula-hora { color: var(--cinza); font-size: 0.78rem; }
+
+.portal-notas { margin-top: 1.5rem; }
+.portal-media-geral { margin: 0 0 1rem; font-size: 0.95rem; }
+.portal-media-geral-hint { color: var(--cinza); font-size: 0.85rem; }
+.portal-trimestre { margin-bottom: 1.5rem; }
+.portal-trimestre-titulo { margin: 0 0 0.75rem; font-size: 1rem; color: var(--castanho); }
+.portal-th-centro { text-align: center; }
+.portal-td-nome { font-weight: 600; }
+.portal-nota { font-weight: 600; }
+.portal-nota--vazio { color: var(--cinza); font-size: 0.85rem; }
+.portal-media-badge {
+  display: inline-block; font-weight: 700; padding: 3px 10px; border-radius: 20px; font-size: 0.85rem;
+}

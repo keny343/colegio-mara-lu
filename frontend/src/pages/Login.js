@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { GraduationCap, Eye, EyeOff } from 'lucide-react';
+import { Button, Input, FormField } from '../components/ui';
 import './LoginLamp.css';
 
 export default function Login() {
@@ -13,9 +14,9 @@ export default function Login() {
   const [showPass, setShowPass] = useState(false);
   const [lampOn, setLampOn] = useState(true);
 
-  const handleChange = e => setForm({ ...form, [e.target.name]: e.target.value });
+  const handleChange = (e) => setForm({ ...form, [e.target.name]: e.target.value });
 
-  const handleSubmit = async e => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     if (!lampOn) return;
     setError('');
@@ -41,7 +42,7 @@ export default function Login() {
         <button
           type="button"
           className="lamp-fixture"
-          onClick={() => setLampOn(v => !v)}
+          onClick={() => setLampOn((v) => !v)}
           aria-pressed={lampOn}
           aria-label={lampOn ? 'Apagar candeeiro e ocultar o formulário' : 'Acender candeeiro e mostrar o formulário'}
         >
@@ -58,40 +59,65 @@ export default function Login() {
 
       <div className="login-card-wrap" aria-hidden={!lampOn}>
         <div className="card login-card">
-          <div style={{ textAlign: 'center', marginBottom: '1.5rem' }}>
-            <div style={{ width: 56, height: 56, background: 'var(--laranja)', borderRadius: 16, display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 0.75rem' }}>
+          <div className="login-header">
+            <div className="login-icon">
               <GraduationCap size={28} color="white" />
             </div>
-            <h2 style={{ fontSize: '1.5rem' }}>Colégio Mara & Lu</h2>
-            <p style={{ color: 'var(--cinza)', marginTop: 4 }}>Entre na sua conta</p>
+            <h2 className="login-title">Colégio Mara &amp; Lu</h2>
+            <p className="login-subtitle">Entre na sua conta</p>
           </div>
 
-          <form onSubmit={handleSubmit}>
-            {error && <div className="alert alert-error">{error}</div>}
+          <form onSubmit={handleSubmit} noValidate>
+            {error && <div className="alert alert-error" role="alert">{error}</div>}
 
-            <div className="form-group">
-              <label className="form-label">E-mail ou BI</label>
-              <input name="email" type="text" className="form-control" placeholder="seu@email.com ou nº do BI" value={form.email} onChange={handleChange} tabIndex={lampOn ? 0 : -1} required />
-            </div>
+            <FormField label="E-mail ou BI" htmlFor="login-email" required>
+              <Input
+                id="login-email"
+                name="email"
+                type="text"
+                placeholder="seu@email.com ou nº do BI"
+                value={form.email}
+                onChange={handleChange}
+                tabIndex={lampOn ? 0 : -1}
+                autoComplete="username"
+                required
+              />
+            </FormField>
 
-            <div className="form-group">
-              <label className="form-label">Senha</label>
-              <div style={{ position: 'relative' }}>
-                <input name="senha" type={showPass ? 'text' : 'password'} className="form-control" placeholder="••••••••" value={form.senha} onChange={handleChange} tabIndex={lampOn ? 0 : -1} required style={{ paddingRight: 44 }} />
-                <button type="button" onClick={() => setShowPass(!showPass)} tabIndex={lampOn ? 0 : -1} aria-label={showPass ? 'Ocultar senha' : 'Mostrar senha'} style={{ position: 'absolute', right: 12, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--cinza)' }}>
+            <FormField label="Senha" htmlFor="login-senha" required>
+              <div className="password-wrap">
+                <Input
+                  id="login-senha"
+                  name="senha"
+                  type={showPass ? 'text' : 'password'}
+                  placeholder="••••••••"
+                  value={form.senha}
+                  onChange={handleChange}
+                  tabIndex={lampOn ? 0 : -1}
+                  autoComplete="current-password"
+                  required
+                />
+                <button
+                  type="button"
+                  className="password-toggle"
+                  onClick={() => setShowPass((v) => !v)}
+                  tabIndex={lampOn ? 0 : -1}
+                  aria-label={showPass ? 'Ocultar senha' : 'Mostrar senha'}
+                  aria-pressed={showPass}
+                >
                   {showPass ? <EyeOff size={18} /> : <Eye size={18} />}
                 </button>
               </div>
-            </div>
+            </FormField>
 
-            <button type="submit" className="btn btn-primary btn-full" disabled={loading} tabIndex={lampOn ? 0 : -1}>
+            <Button type="submit" variant="primary" block loading={loading} tabIndex={lampOn ? 0 : -1}>
               {loading ? 'Entrando...' : 'Entrar'}
-            </button>
+            </Button>
           </form>
 
-          <div style={{ textAlign: 'center', marginTop: '1.5rem', paddingTop: '1.5rem', borderTop: '1px solid var(--bege)' }}>
-            <p style={{ color: 'var(--cinza)', fontSize: '0.9rem' }}>
-              Ainda não se inscreveu? <Link to="/inscricao" tabIndex={lampOn ? 0 : -1} style={{ color: 'var(--laranja)', fontWeight: 600 }}>Fazer inscrição</Link>
+          <div className="login-footer">
+            <p>
+              Ainda não se inscreveu? <Link to="/inscricao" tabIndex={lampOn ? 0 : -1}>Fazer inscrição</Link>
             </p>
           </div>
         </div>

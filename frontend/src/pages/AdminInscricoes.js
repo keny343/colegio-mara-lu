@@ -1,18 +1,37 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { Eye, CheckCircle, FileText, X } from 'lucide-react';
+import { Eye, CheckCircle } from 'lucide-react';
 import api from '../services/api';
 import { normalizeSeriesName } from '../utils/serieName';
 import { fileUrl } from '../services/fileUrl';
 import Toast, { useToast } from '../components/Toast';
+import {
+  Badge, Button, FormField, Select, Textarea, Modal,
+  DataTable, Pagination, LoadingState,
+} from '../components/ui';
+import './AdminInscricoes.css';
 
-function StatusBadge({ status }) {
-  const map = {
-    pendente: 'badge-pendente', em_analise: 'badge-em_analise',
-    aprovada: 'badge-aprovada', rejeitada: 'badge-rejeitada', cancelada: 'badge-cancelada'
-  };
-  return <span className={`badge ${map[status] || ''}`}>{status.replace('_', ' ')}</span>;
-}
+const STATUS_TONE = {
+  pendente: 'yellow',
+  em_analise: 'blue',
+  aprovada: 'green',
+  rejeitada: 'red',
+  cancelada: 'gray',
+};
+
+const STATUS_OPTIONS = [
+  ['pendente', 'Pendente'],
+  ['em_analise', 'Em Análise'],
+  ['aprovada', 'Aprovada ✓'],
+  ['rejeitada', 'Rejeitada ✗'],
+  ['cancelada', 'Cancelada'],
+];
+
+const DOC_STATUS_TONE = {
+  pendente: 'yellow',
+  aprovado: 'green',
+  rejeitado: 'red',
+};
 
 // Classe a mostrar na tabela: se o aluno já tem matrícula activa, mostra a turma REAL onde está
 // (reflecte transferências de curso/turma feitas depois da aprovação), não a série pedida na inscrição.
@@ -86,108 +105,105 @@ export default function AdminInscricoes() {
     } finally { setSalvando(false); }
   };
 
-  const totalPages = Math.ceil(total / 15);
-
-  const docUrl = (caminho) => fileUrl(caminho);
+  const columns = [
+    {
+      key: 'id', label: '#', headerWidth: '64px',
+      render: (i) => <span className="col-muted">#{i.id}</span>,
+    },
+    {
+      key: 'aluno_nome', label: 'Aluno',
+      render: (i) => <strong>{i.aluno_nome}</strong>,
+    },
+    {
+      key: 'encarregado', label: 'Encarregado',
+      render: (i) => (
+        <div>
+          <div>{i.encarregado_nome || i.responsavel_nome || '—'}</div>
+          <div className="col-sub">{i.telefone_emergencia || i.responsavel_telefone || i.responsavel_email || '—'}</div>
+        </div>
+      ),
+    },
+    { key: 'classe', label: 'Classe', render: (i) => classeExibida(i) },
+    { key: 'ano_letivo', label: 'Ano', headerWidth: '70px' },
+    {
+      key: 'data_inscricao', label: 'Data',
+      render: (i) => <span className="col-muted">{new Date(i.data_inscricao).toLocaleDateString('pt-BR')}</span>,
+    },
+    {
+      key: 'status', label: 'Status',
+      render: (i) => <Badge tone={STATUS_TONE[i.status] || 'gray'}>{i.status.replace('_', ' ')}</Badge>,
+    },
+    {
+      key: 'acoes', label: 'Ações',
+      render: (i) => (
+        <div className="row-actions">
+          <Button variant="outline" size="sm" icon={<Eye size={14} />} onClick={() => verDetalhe(i.id)} title="Ver detalhes" />
+          <Button variant="primary" size="sm" icon={<CheckCircle size={14} />} onClick={() => abrirStatus(i)} title="Alterar status" />
+        </div>
+      ),
+    },
+  ];
 
   return (
     <div className="page-container">
       {toast && <Toast message={toast.message} type={toast.type} onClose={clearToast} key={toast.key} />}
       <div className="page-header">
         <h2>Gestão de Inscrições</h2>
-        <p style={{ color: 'var(--cinza)' }}>{total} inscrição(ões) encontrada(s)</p>
+        <p>{total} inscrição(ões) encontrada(s)</p>
       </div>
 
-      <div className="card" style={{ marginBottom: '1.5rem', padding: '1.25rem' }}>
-        <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', alignItems: 'flex-end' }}>
-          <div style={{ flex: 1, minWidth: 180 }}>
-            <label className="form-label">Status</label>
-            <select className="form-control form-select" value={filtros.status}
-              onChange={e => setFiltros({ ...filtros, status: e.target.value, page: 1 })}>
+      <div className="card filters-card">
+        <div className="filters-row">
+          <FormField label="Status" htmlFor="filtro-status" className="filter-field">
+            <Select id="filtro-status" value={filtros.status} onChange={(e) => setFiltros({ ...filtros, status: e.target.value, page: 1 })}>
               <option value="">Todos os status</option>
-              <option value="pendente">Pendente</option>
-              <option value="em_analise">Em Análise</option>
-              <option value="aprovada">Aprovada</option>
-              <option value="rejeitada">Rejeitada</option>
-              <option value="cancelada">Cancelada</option>
-            </select>
-          </div>
-          <div style={{ flex: 1, minWidth: 140 }}>
-            <label className="form-label">Ano Letivo</label>
-            <select className="form-control form-select" value={filtros.ano_letivo}
-              onChange={e => setFiltros({ ...filtros, ano_letivo: e.target.value, page: 1 })}>
+              {STATUS_OPTIONS.map(([value, label]) => <option key={value} value={value}>{label.replace(/[✓✗]/g, '').trim()}</option>)}
+            </Select>
+          </FormField>
+          <FormField label="Ano Letivo" htmlFor="filtro-ano" className="filter-field">
+            <Select id="filtro-ano" value={filtros.ano_letivo} onChange={(e) => setFiltros({ ...filtros, ano_letivo: e.target.value, page: 1 })}>
               <option value="">Todos os anos</option>
               <option value="2025">2025</option>
               <option value="2026">2026</option>
-            </select>
-          </div>
-          <button className="btn btn-outline" onClick={() => setFiltros({ status: '', ano_letivo: '', busca: '', page: 1 })}>
+            </Select>
+          </FormField>
+          <Button variant="outline" onClick={() => setFiltros({ status: '', ano_letivo: '', busca: '', page: 1 })}>
             Limpar Filtros
-          </button>
+          </Button>
         </div>
       </div>
 
-      {loading ? (
-        <div className="loading"><div className="spinner" /></div>
-      ) : inscricoes.length === 0 ? (
-        <div className="card empty-state"><FileText size={48} /><h3>Nenhuma inscrição encontrada</h3></div>
-      ) : (
-        <div className="card" style={{ padding: 0 }}>
-          <div className="table-container">
-            <table className="table">
-              <thead>
-                <tr>
-                  <th>#</th><th>Aluno</th><th>Encarregado</th><th>classe</th>
-                  <th>Ano</th><th>Data</th><th>Status</th><th>Ações</th>
-                </tr>
-              </thead>
-              <tbody>
-                {inscricoes.map(i => (
-                  <tr key={i.id}>
-                    <td style={{ color: 'var(--cinza)', fontSize: '0.85rem' }}>#{i.id}</td>
-                    <td><strong>{i.aluno_nome}</strong></td>
-                    <td>
-                      <div>{i.encarregado_nome || i.responsavel_nome || '—'}</div>
-                      <div style={{ fontSize: '0.8rem', color: 'var(--cinza)' }}>
-                        {i.telefone_emergencia || i.responsavel_telefone || i.responsavel_email || '—'}
-                      </div>
-                    </td>
-                    <td>{classeExibida(i)}</td>
-                    <td>{i.ano_letivo}</td>
-                    <td style={{ fontSize: '0.85rem' }}>{new Date(i.data_inscricao).toLocaleDateString('pt-BR')}</td>
-                    <td><StatusBadge status={i.status} /></td>
-                    <td>
-                      <div style={{ display: 'flex', gap: 6 }}>
-                        <button className="btn btn-sm btn-outline" onClick={() => verDetalhe(i.id)} title="Ver detalhes"><Eye size={14} /></button>
-                        <button className="btn btn-sm btn-primary" onClick={() => abrirStatus(i)} title="Alterar status"><CheckCircle size={14} /></button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-          {totalPages > 1 && (
-            <div style={{ display: 'flex', justifyContent: 'center', gap: 8, padding: '1rem' }}>
-              {Array.from({ length: totalPages }, (_, i) => i + 1).map(p => (
-                <button key={p} className={`btn btn-sm ${p === filtros.page ? 'btn-primary' : 'btn-outline'}`}
-                  onClick={() => setFiltros({ ...filtros, page: p })}>{p}</button>
-              ))}
-            </div>
-          )}
-        </div>
-      )}
+      <div className="card list-card">
+        {loading ? (
+          <LoadingState />
+        ) : (
+          <DataTable
+            columns={columns}
+            rows={inscricoes}
+            keyField="id"
+            sortable={false}
+            emptyMessage="Nenhuma inscrição encontrada"
+          />
+        )}
+        <Pagination
+          page={filtros.page}
+          pageSize={15}
+          total={total}
+          onPageChange={(p) => setFiltros({ ...filtros, page: p })}
+          showTotal={false}
+        />
+      </div>
 
-      {detalhe && (
-        <div className="modal-overlay" onClick={() => setDetalhe(null)}>
-          <div className="modal" style={{ maxWidth: 680 }} onClick={e => e.stopPropagation()}>
-            <div className="modal-header">
-              <h3 className="modal-title">Inscrição #{detalhe.id}</h3>
-              <button className="modal-close" onClick={() => setDetalhe(null)}><X size={18} /></button>
-            </div>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem' }}>
+      <Modal
+        open={!!detalhe}
+        onClose={() => setDetalhe(null)}
+        title={detalhe ? `Inscrição #${detalhe.id}` : ''}
+      >
+        {detalhe && (
+          <>
+            <div className="detail-grid">
               <div>
-                <h4 style={{ color: 'var(--castanho-medio)', marginBottom: 12, fontSize: '0.85rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Dados do Aluno</h4>
+                <h4 className="detail-title">Dados do Aluno</h4>
                 {[
                   ['Nome', detalhe.nome],
                   ['Data Nasc.', detalhe.data_nascimento && new Date(detalhe.data_nascimento).toLocaleDateString('pt-BR')],
@@ -197,32 +213,32 @@ export default function AdminInscricoes() {
                   ['Pai', detalhe.nome_pai],
                   ['Tel. Emergência', detalhe.telefone_emergencia],
                 ].map(([label, val]) => val ? (
-                  <div key={label} style={{ marginBottom: 8, fontSize: '0.9rem' }}>
-                    <span style={{ color: 'var(--cinza)' }}>{label}: </span><strong>{val}</strong>
+                  <div key={label} className="detail-row">
+                    <span>{label}: </span><strong>{val}</strong>
                   </div>
                 ) : null)}
               </div>
               <div>
-                <h4 style={{ color: 'var(--castanho-medio)', marginBottom: 12, fontSize: '0.85rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Encarregado de Educação</h4>
+                <h4 className="detail-title">Encarregado de Educação</h4>
                 {[
                   ['Nome', detalhe.responsavel || detalhe.responsavel_nome],
                   ['E-mail', detalhe.responsavel_email],
                   ['Telefone', detalhe.responsavel_telefone],
                   ['Endereço', detalhe.responsavel_endereco],
                 ].map(([label, val]) => val ? (
-                  <div key={label} style={{ marginBottom: 8, fontSize: '0.9rem' }}>
-                    <span style={{ color: 'var(--cinza)' }}>{label}: </span><strong>{val}</strong>
+                  <div key={label} className="detail-row">
+                    <span>{label}: </span><strong>{val}</strong>
                   </div>
                 ) : null)}
-                <h4 style={{ color: 'var(--castanho-medio)', margin: '1rem 0 12px', fontSize: '0.85rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Inscrição</h4>
+                <h4 className="detail-title" style={{ margin: '1rem 0 12px' }}>Inscrição</h4>
                 {[
                   ['Série', normalizeSeriesName(detalhe.serie_nome)],
                   ['Nível', detalhe.nivel],
                   ['Ano', detalhe.ano_letivo],
                   ['Status', detalhe.status],
                 ].map(([label, val]) => val ? (
-                  <div key={label} style={{ marginBottom: 8, fontSize: '0.9rem' }}>
-                    <span style={{ color: 'var(--cinza)' }}>{label}: </span><strong>{val}</strong>
+                  <div key={label} className="detail-row">
+                    <span>{label}: </span><strong>{val}</strong>
                   </div>
                 ) : null)}
               </div>
@@ -235,25 +251,23 @@ export default function AdminInscricoes() {
             )}
 
             {detalhe.documentos?.length > 0 && (
-              <div style={{ marginTop: '1.5rem' }}>
-                <h4 style={{ color: 'var(--castanho-medio)', marginBottom: 12, fontSize: '0.85rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Documentos Enviados</h4>
+              <div className="detail-docs">
+                <h4 className="detail-title">Documentos Enviados</h4>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                   {detalhe.documentos.map(d => {
-                    const url = docUrl(d.caminho_arquivo);
+                    const url = fileUrl(d.caminho_arquivo);
                     return (
-                      <div key={d.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 14px', background: 'var(--bege-claro)', borderRadius: 8 }}>
-                        <div>
-                          <div style={{ fontWeight: 600, fontSize: '0.9rem' }}>{d.tipo.replace(/_/g, ' ')}</div>
-                          <div style={{ fontSize: '0.8rem', color: 'var(--cinza)' }}>{d.nome_arquivo}</div>
+                      <div key={d.id} className="doc-row">
+                        <div className="doc-row-main">
+                          <div className="doc-row-name">{d.tipo.replace(/_/g, ' ')}</div>
+                          <div className="doc-row-file">{d.nome_arquivo}</div>
                         </div>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                          <span className={`badge badge-${d.status}`}>
+                        <div className="doc-row-actions">
+                          <Badge tone={DOC_STATUS_TONE[d.status] || 'gray'}>
                             {d.status === 'pendente' ? 'Aguarda revisão' : d.status}
-                          </span>
+                          </Badge>
                           {url && (
-                            <a href={url} target="_blank" rel="noopener noreferrer"
-                              className="btn btn-sm btn-outline"
-                              style={{ fontSize: '0.75rem', padding: '3px 10px' }}>
+                            <a href={url} target="_blank" rel="noopener noreferrer" className="btn btn-sm btn-outline">
                               Ver
                             </a>
                           )}
@@ -275,71 +289,59 @@ export default function AdminInscricoes() {
                 <strong>Motivo rejeição:</strong> {detalhe.motivo_rejeicao}
               </div>
             )}
-          </div>
-        </div>
-      )}
+          </>
+        )}
+      </Modal>
 
-      {statusModal && (
-        <div className="modal-overlay" onClick={() => setStatusModal(null)}>
-          <div className="modal" style={{ maxWidth: 460 }} onClick={e => e.stopPropagation()}>
-            <div className="modal-header">
-              <h3 className="modal-title">Alterar Status — #{statusModal.id}</h3>
-              <button className="modal-close" onClick={() => setStatusModal(null)}><X size={18} /></button>
-            </div>
-            <p style={{ color: 'var(--cinza)', marginBottom: '1.5rem', fontSize: '0.9rem' }}>
+      <Modal
+        open={!!statusModal}
+        onClose={() => setStatusModal(null)}
+        title={statusModal ? `Alterar Status — #${statusModal.id}` : ''}
+        size="sm"
+        footer={
+          <>
+            <Button variant="outline" onClick={() => setStatusModal(null)} disabled={salvando}>
+              Cancelar
+            </Button>
+            <Button variant="primary" onClick={salvarStatus} loading={salvando} block>
+              {salvando ? 'Salvando...' : 'Confirmar'}
+            </Button>
+          </>
+        }
+      >
+        {statusModal && (
+          <>
+            <p className="status-hint" style={{ marginBottom: '1.5rem', fontSize: '0.9rem' }}>
               Aluno: <strong>{statusModal.aluno_nome}</strong> — {normalizeSeriesName(statusModal.serie_nome)}
             </p>
-            <div className="form-group">
-              <label className="form-label">Novo Status</label>
-              <select className="form-control form-select" value={novoStatus.status}
-                onChange={e => setNovoStatus({ ...novoStatus, status: e.target.value })}>
-                <option value="pendente">Pendente</option>
-                <option value="em_analise">Em Análise</option>
-                <option value="aprovada">Aprovada ✓</option>
-                <option value="rejeitada">Rejeitada ✗</option>
-                <option value="cancelada">Cancelada</option>
-              </select>
-            </div>
-            <div className="form-group">
-              <label className="form-label">Observação (interna)</label>
-              <textarea className="form-control" rows={2} value={novoStatus.observacao_admin}
-                onChange={e => setNovoStatus({ ...novoStatus, observacao_admin: e.target.value })}
-                placeholder="Nota interna sobre a decisão..." />
-            </div>
+            <FormField label="Novo Status" htmlFor="ns-status">
+              <Select id="ns-status" value={novoStatus.status} onChange={(e) => setNovoStatus({ ...novoStatus, status: e.target.value })}>
+                {STATUS_OPTIONS.map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+              </Select>
+            </FormField>
+            <FormField label="Observação (interna)" htmlFor="ns-obs">
+              <Textarea id="ns-obs" rows={2} value={novoStatus.observacao_admin} onChange={(e) => setNovoStatus({ ...novoStatus, observacao_admin: e.target.value })} placeholder="Nota interna sobre a decisão..." />
+            </FormField>
             {novoStatus.status === 'aprovada' && (
-              <div className="form-group">
-                <label className="form-label">Turma (matrícula académica)</label>
-                <select className="form-control form-select" value={novoStatus.turma_id}
-                  onChange={e => setNovoStatus({ ...novoStatus, turma_id: e.target.value })}>
+              <FormField label="Turma (matrícula académica)" htmlFor="ns-turma" hint="Ao selecionar uma turma, o aluno passa a ver horários e disciplinas no portal.">
+                <Select id="ns-turma" value={novoStatus.turma_id} onChange={(e) => setNovoStatus({ ...novoStatus, turma_id: e.target.value })}>
                   <option value="">Aprovar sem turma (matricular depois)</option>
                   {turmas.map(t => (
                     <option key={t.id} value={t.id}>
                       {t.nome} — {t.serie_classe}ª{t.curso_nome ? ` · ${t.curso_nome}` : ''} ({t.turno})
                     </option>
                   ))}
-                </select>
-                <p style={{ fontSize: '0.8rem', color: 'var(--cinza)', marginTop: 6 }}>
-                  Ao selecionar uma turma, o aluno passa a ver horários e disciplinas no portal.
-                </p>
-              </div>
+                </Select>
+              </FormField>
             )}
             {novoStatus.status === 'rejeitada' && (
-              <div className="form-group">
-                <label className="form-label">Motivo da Rejeição *</label>
-                <textarea className="form-control" rows={2} value={novoStatus.motivo_rejeicao}
-                  onChange={e => setNovoStatus({ ...novoStatus, motivo_rejeicao: e.target.value })}
-                  placeholder="Este motivo será visível para o responsável..." required />
-              </div>
+              <FormField label="Motivo da Rejeição" htmlFor="ns-motivo" required>
+                <Textarea id="ns-motivo" rows={2} value={novoStatus.motivo_rejeicao} onChange={(e) => setNovoStatus({ ...novoStatus, motivo_rejeicao: e.target.value })} placeholder="Este motivo será visível para o responsável..." required />
+              </FormField>
             )}
-            <div style={{ display: 'flex', gap: 12 }}>
-              <button className="btn btn-outline" onClick={() => setStatusModal(null)}>Cancelar</button>
-              <button className="btn btn-primary" style={{ flex: 1 }} onClick={salvarStatus} disabled={salvando}>
-                {salvando ? 'Salvando...' : 'Confirmar'}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+          </>
+        )}
+      </Modal>
     </div>
   );
 }

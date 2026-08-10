@@ -48,7 +48,6 @@ export function useFetch(fetcher, deps = []) {
       active = false;
       cancelled = true;
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, deps);
 
   return { data, loading, error, setData, refetch: run };

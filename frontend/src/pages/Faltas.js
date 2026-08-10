@@ -1,9 +1,11 @@
 import React, { useEffect, useState } from 'react';
 import { AlertTriangle, CheckCircle, Calendar, Upload, X, FileText } from 'lucide-react';
 import api from '../services/api';
+import { Modal, FormField, Textarea, Button, LoadingState, EmptyState } from '../components/ui';
+import './Faltas.css';
 
 export default function Faltas() {
-  const [faltas, setFaltas]   = useState([]);
+  const [faltas, setFaltas] = useState([]);
   const [loading, setLoading] = useState(true);
   const [justModal, setJustModal] = useState(null); // falta selecionada
   const [justForm, setJustForm] = useState({ motivo: '', documento: null });
@@ -28,7 +30,10 @@ export default function Faltas() {
   };
 
   const enviarJustificacao = async () => {
-    if (!justForm.motivo.trim()) { setJustErro('Por favor descreva o motivo da falta.'); return; }
+    if (!justForm.motivo.trim()) {
+      setJustErro('Por favor descreva o motivo da falta.');
+      return;
+    }
     setJustSaving(true);
     setJustErro('');
     try {
@@ -46,17 +51,21 @@ export default function Faltas() {
     }
   };
 
-  if (loading) return <div className="loading"><div className="spinner" /></div>;
-
   const porDisciplina = faltas.reduce((acc, f) => {
     if (!acc[f.disciplina]) acc[f.disciplina] = [];
     acc[f.disciplina].push(f);
     return acc;
   }, {});
 
-  const total         = faltas.length;
-  const justificadas  = faltas.filter(f => f.justificativa).length;
+  const total = faltas.length;
+  const justificadas = faltas.filter(f => f.justificativa).length;
   const injustificadas = total - justificadas;
+
+  const stats = [
+    { label: 'Total de faltas', value: total, tone: 'castanho' },
+    { label: 'Justificadas', value: justificadas, tone: 'verde' },
+    { label: 'Injustificadas', value: injustificadas, tone: 'vermelho' },
+  ];
 
   return (
     <div className="page-container">
@@ -65,62 +74,48 @@ export default function Faltas() {
         <p>Acompanha as tuas faltas por disciplina. Podes justificar faltas injustificadas.</p>
       </div>
 
-      <div className="stats-grid" style={{ gridTemplateColumns: 'repeat(3, 1fr)', marginBottom: '1.5rem' }}>
-        {[
-          { label: 'Total de faltas',  value: total,          color: 'var(--castanho-medio)' },
-          { label: 'Justificadas',     value: justificadas,   color: 'var(--verde)' },
-          { label: 'Injustificadas',   value: injustificadas, color: 'var(--vermelho)' },
-        ].map((s, i) => (
-          <div key={i} className="stat-card" style={{ borderLeftColor: s.color }}>
-            <div className="stat-number" style={{ color: s.color }}>{s.value}</div>
+      <div className="stats-grid stats-grid--3">
+        {stats.map((s) => (
+          <div key={s.label} className={`stat-card stat-card--${s.tone}`}>
+            <div className="stat-number">{s.value}</div>
             <div className="stat-label">{s.label}</div>
           </div>
         ))}
       </div>
 
       <div className="card">
-        {faltas.length === 0 ? (
-          <div className="empty-state">
-            <CheckCircle size={48} color="var(--verde)" style={{ opacity: 0.6 }} />
-            <h3>Sem faltas registadas</h3>
-            <p>Não tens faltas registadas até ao momento.</p>
-          </div>
+        {loading ? (
+          <LoadingState />
+        ) : faltas.length === 0 ? (
+          <EmptyState
+            icon={<CheckCircle size={48} color="var(--verde)" />}
+            title="Sem faltas registadas"
+            message="Não tens faltas registadas até ao momento."
+          />
         ) : (
           Object.entries(porDisciplina).map(([disc, fs]) => (
-            <div key={disc} style={{ marginBottom: '1.5rem' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: '0.75rem' }}>
+            <div key={disc} className="falta-group">
+              <div className="falta-group-head">
                 <AlertTriangle size={16} color="var(--amarelo)" />
-                <h3 style={{ fontSize: '1rem' }}>{disc}</h3>
-                <span style={{ marginLeft: 'auto', background: 'var(--bege)', borderRadius: 20, padding: '2px 10px', fontSize: '0.8rem', fontWeight: 700, color: 'var(--castanho)' }}>
-                  {fs.length} falta(s)
-                </span>
+                <h3>{disc}</h3>
+                <span className="falta-count">{fs.length} falta(s)</span>
               </div>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+              <div className="falta-list">
                 {fs.map((f, i) => (
-                  <div key={i} style={{
-                    display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                    background: f.justificativa ? '#F0FDF4' : '#FFF1F2',
-                    border: `1px solid ${f.justificativa ? '#BBF7D0' : '#FFE4E6'}`,
-                    borderRadius: 8, padding: '0.6rem 1rem', fontSize: '0.85rem'
-                  }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <div key={i} className={`falta-item${f.justificativa ? ' falta-item--justificada' : ' falta-item--injustificada'}`}>
+                    <div className="falta-date">
                       <Calendar size={14} color="var(--cinza)" />
                       <span>{new Date(f.data_falta).toLocaleDateString('pt-PT')}</span>
-                      {f.justificativa && <span style={{ color: 'var(--cinza)', fontSize: '0.78rem' }}>— {f.justificativa}</span>}
+                      {f.justificativa && <span className="falta-just-text">— {f.justificativa}</span>}
                     </div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                      <span style={{ fontSize: '0.72rem', fontWeight: 700, textTransform: 'uppercase', color: f.justificativa ? 'var(--verde)' : 'var(--vermelho)' }}>
+                    <div className="falta-actions">
+                      <span className={`falta-status${f.justificativa ? ' falta-status--ok' : ''}`}>
                         {f.justificativa ? 'Justificada' : 'Injustificada'}
                       </span>
                       {!f.justificativa && f.id && (
-                        <button
-                          type="button"
-                          className="btn btn-sm btn-outline"
-                          style={{ fontSize: '0.72rem', padding: '2px 8px' }}
-                          onClick={() => abrirJustModal(f)}
-                        >
-                          <Upload size={12} /> Justificar
-                        </button>
+                        <Button variant="outline" size="sm" className="falta-just-btn" icon={<Upload size={12} />} onClick={() => abrirJustModal(f)}>
+                          Justificar
+                        </Button>
                       )}
                     </div>
                   </div>
@@ -131,65 +126,66 @@ export default function Faltas() {
         )}
       </div>
 
-      {/* Modal Justificação */}
-      {justModal && (
-        <div className="modal-overlay" onClick={() => setJustModal(null)}>
-          <div className="modal" style={{ maxWidth: 480 }} onClick={e => e.stopPropagation()}>
-            <div className="modal-header">
-              <h3 className="modal-title">Justificar Falta</h3>
-              <button className="modal-close" onClick={() => setJustModal(null)}><X size={18} /></button>
-            </div>
-            <p style={{ color: 'var(--cinza)', marginBottom: '1.25rem', fontSize: '0.9rem' }}>
+      <Modal
+        open={!!justModal}
+        onClose={() => setJustModal(null)}
+        title="Justificar Falta"
+        size="sm"
+        footer={
+          <>
+            <Button variant="outline" onClick={() => setJustModal(null)} disabled={justSaving}>
+              Cancelar
+            </Button>
+            <Button variant="primary" block loading={justSaving} icon={<Upload size={15} />} onClick={enviarJustificacao}>
+              {justSaving ? 'A enviar...' : 'Enviar Justificação'}
+            </Button>
+          </>
+        }
+      >
+        {justModal && (
+          <>
+            <p className="falta-modal-info">
               Falta de <strong>{new Date(justModal.data_falta).toLocaleDateString('pt-PT')}</strong> — {justModal.disciplina}
             </p>
 
-            {justErro && <div className="alert alert-error" style={{ marginBottom: '1rem' }}>{justErro}</div>}
-            {justOk && <div className="alert alert-success" style={{ marginBottom: '1rem' }}>{justOk}</div>}
+            {justErro && <div className="alert alert-error">{justErro}</div>}
+            {justOk && <div className="alert alert-success">{justOk}</div>}
 
-            <div className="form-group">
-              <label className="form-label">Motivo da ausência *</label>
-              <textarea
-                className="form-control"
+            <FormField label="Motivo da ausência" htmlFor="just-motivo" required>
+              <Textarea
+                id="just-motivo"
                 rows={3}
                 placeholder="Ex: Consulta médica, urgência familiar..."
                 value={justForm.motivo}
-                onChange={e => setJustForm(f => ({ ...f, motivo: e.target.value }))}
+                onChange={(e) => setJustForm((f) => ({ ...f, motivo: e.target.value }))}
               />
-            </div>
+            </FormField>
 
-            <div className="form-group">
-              <label className="form-label">Documento comprovatório (opcional)</label>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                <label className="btn btn-outline btn-sm" style={{ cursor: 'pointer', marginBottom: 0 }}>
+            <FormField label="Documento comprovatório (opcional)" htmlFor="just-doc" hint="Podes anexar um atestado médico, declaração ou outro documento (imagem ou PDF).">
+              <div className="falta-file-row">
+                <label className="btn btn-outline btn-sm falta-file-label">
                   <FileText size={14} /> {justForm.documento ? justForm.documento.name : 'Escolher ficheiro'}
                   <input
+                    id="just-doc"
                     type="file"
                     accept="image/*,.pdf"
                     style={{ display: 'none' }}
-                    onChange={e => setJustForm(f => ({ ...f, documento: e.target.files?.[0] || null }))}
+                    onChange={(e) => setJustForm((f) => ({ ...f, documento: e.target.files?.[0] || null }))}
                   />
                 </label>
                 {justForm.documento && (
-                  <button type="button" className="btn btn-sm" style={{ color: 'var(--vermelho)', background: 'none', border: 'none', cursor: 'pointer' }}
-                    onClick={() => setJustForm(f => ({ ...f, documento: null }))}>
-                    <X size={14} />
-                  </button>
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    icon={<X size={14} />}
+                    onClick={() => setJustForm((f) => ({ ...f, documento: null }))}
+                  />
                 )}
               </div>
-              <p style={{ fontSize: '0.78rem', color: 'var(--cinza)', marginTop: 6 }}>
-                Podes anexar um atestado médico, declaração ou outro documento (imagem ou PDF).
-              </p>
-            </div>
-
-            <div style={{ display: 'flex', gap: 12 }}>
-              <button type="button" className="btn btn-outline" onClick={() => setJustModal(null)}>Cancelar</button>
-              <button type="button" className="btn btn-primary" style={{ flex: 1 }} onClick={enviarJustificacao} disabled={justSaving}>
-                {justSaving ? 'A enviar...' : <><Upload size={15} /> Enviar Justificação</>}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+            </FormField>
+          </>
+        )}
+      </Modal>
     </div>
   );
 }

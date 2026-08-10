@@ -1,0 +1,14 @@
+.page-header-row { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; flex-wrap: wrap; }
+.page-header-row p { color: var(--cinza); }
+
+.aluno-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 1.5rem; }
+.aluno-head { display: flex; justify-content: space-between; margin-bottom: 1rem; gap: 12px; }
+.aluno-ident { display: flex; align-items: center; gap: 12px; }
+.aluno-avatar { width: 48px; height: 48px; border-radius: 50%; background: var(--laranja-suave); display: flex; align-items: center; justify-content: center; color: var(--laranja); font-weight: 700; font-size: 1.2rem; flex-shrink: 0; }
+.aluno-nome { font-weight: 700; color: var(--castanho); }
+.aluno-sub { font-size: 0.85rem; color: var(--cinza); }
+.aluno-acoes { display: flex; gap: 8px; }
+.aluno-dados { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; font-size: 0.85rem; color: var(--cinza); }
+
+.modal-actions { display: flex; gap: 12px; }
+.modal-erro { margin-bottom: 1rem; }

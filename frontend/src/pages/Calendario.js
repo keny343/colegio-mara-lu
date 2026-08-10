@@ -1,7 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { ChevronLeft, ChevronRight, Calendar, Clock, BookOpen } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Calendar, Clock } from 'lucide-react';
 import api from '../services/api';
 import { useAuth } from '../contexts/AuthContext';
+import { LoadingState, EmptyState } from '../components/ui';
+import './Calendario.css';
 
 const MESES = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
 const DIAS_SEMANA = ['Dom','Seg','Ter','Qua','Qui','Sex','Sáb'];
@@ -24,11 +26,11 @@ const EVENTOS_ESCOLARES = [
   { data: '2025-10-02', titulo: 'Fim do Ano Lectivo',      tipo: 'periodo' },
 ];
 
-const tipoStyle = {
-  periodo: { bg: 'var(--azul)',     label: 'Período', color: '#fff' },
-  feriado: { bg: 'var(--verde)',    label: 'Feriado', color: '#fff' },
-  teste:   { bg: 'var(--vermelho)', label: 'Teste/Exame', color: '#fff' },
-  aula:    { bg: 'var(--laranja)',  label: 'Aula', color: '#fff' },
+const TIPOS = {
+  periodo: { label: 'Período',  classe: 'cal-tipo-periodo' },
+  feriado: { label: 'Feriado',  classe: 'cal-tipo-feriado' },
+  teste:   { label: 'Teste/Exame', classe: 'cal-tipo-teste' },
+  aula:    { label: 'Aula',     classe: 'cal-tipo-aula' },
 };
 
 const normalizeDia = (dia) => {
@@ -88,13 +90,10 @@ export default function Calendario() {
   }, {});
 
   // Obter aulas de um dia específico
-  const aulasPorDia = (dia, numSemana) => {
+  const aulasPorDia = (dia) => {
     const data = new Date(ano, mes, dia);
-    const diaSemana = data.getDay();
-    const nomedia = DIAS_SEMANA_FULL[diaSemana];
-    const diaNormalizado = normalizeDia(nomedia);
-    
-    return horariosPerDia[diaNormalizado] || [];
+    const nomedia = DIAS_SEMANA_FULL[data.getDay()];
+    return horariosPerDia[normalizeDia(nomedia)] || [];
   };
 
   // Combinar eventos e aulas de um dia
@@ -107,7 +106,7 @@ export default function Calendario() {
   const celulas = Array(primeiroDia).fill(null).concat(Array.from({ length: diasNoMes }, (_, i) => i+1));
   while (celulas.length % 7 !== 0) celulas.push(null);
 
-  if (loading) return <div className="loading"><div className="spinner" /></div>;
+  if (loading) return <LoadingState />;
 
   const diaAtualStr = diaSelecionado 
     ? `${ano}-${String(mes+1).padStart(2,'0')}-${String(diaSelecionado).padStart(2,'0')}`
@@ -121,24 +120,24 @@ export default function Calendario() {
         <p>Eventos, testes e horários do ano lectivo</p>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 320px', gap: '1.5rem', alignItems: 'start' }}>
+      <div className="cal-layout">
 
         {/* Calendário principal */}
-        <div className="card">
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1.5rem' }}>
-            <button onClick={prev} style={{ background: 'var(--bege)', border: 'none', borderRadius: 8, width: 36, height: 36, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        <div className="card cal-card">
+          <div className="cal-nav">
+            <button className="cal-nav-btn" onClick={prev} aria-label="Mês anterior">
               <ChevronLeft size={18} />
             </button>
-            <h3 style={{ fontSize: '1.2rem' }}>{MESES[mes]} {ano}</h3>
-            <button onClick={next} style={{ background: 'var(--bege)', border: 'none', borderRadius: 8, width: 36, height: 36, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <h3 className="cal-nav-titulo">{MESES[mes]} {ano}</h3>
+            <button className="cal-nav-btn" onClick={next} aria-label="Mês seguinte">
               <ChevronRight size={18} />
             </button>
           </div>
 
           {/* Grid dos dias da semana */}
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 4 }}>
+          <div className="cal-grid">
             {DIAS_SEMANA.map(d => (
-              <div key={d} style={{ textAlign: 'center', fontSize: '0.75rem', fontWeight: 700, color: 'var(--cinza)', padding: '6px 0', textTransform: 'uppercase' }}>{d}</div>
+              <div key={d} className="cal-grid-head">{d}</div>
             ))}
             
             {celulas.map((dia, i) => {
@@ -146,77 +145,47 @@ export default function Calendario() {
               const isHoje = dia && dia === hoje.getDate() && mes === hoje.getMonth() && ano === hoje.getFullYear();
               const isSelecionado = dia === diaSelecionado;
               const temAulas = items.some(it => it.tipo === 'aula');
+              const classeCelula = [
+                'cal-celula',
+                isHoje ? 'cal-celula--hoje' : '',
+                isSelecionado ? 'cal-celula--selecionada' : '',
+                items.length > 0 ? 'cal-celula--com-itens' : '',
+                dia ? '' : 'cal-celula--vazia',
+              ].filter(Boolean).join(' ');
               
               return (
                 <div 
                   key={i}
+                  className={classeCelula}
                   onClick={() => dia && setDiaSelecionado(dia)}
-                  style={{
-                    minHeight: 70,
-                    borderRadius: 8,
-                    padding: '6px',
-                    background: isHoje ? 'var(--laranja)' : isSelecionado ? 'var(--bege-medio)' : items.length > 0 ? 'var(--bege-claro)' : 'transparent',
-                    border: isSelecionado ? '2px solid var(--castanho)' : '1px solid transparent',
-                    cursor: dia ? 'pointer' : 'default',
-                    transition: 'all 0.2s',
-                    position: 'relative',
-                    display: 'flex',
-                    flexDirection: 'column',
-                    overflow: 'hidden',
-                  }}
                 >
                   {dia && (
                     <>
-                      <span style={{ fontSize: '0.85rem', fontWeight: isHoje ? 700 : 400, color: isHoje ? 'white' : 'var(--castanho)', zIndex: 1 }}>{dia}</span>
+                      <span className={isHoje ? 'cal-celula-numero cal-celula-numero--hoje' : 'cal-celula-numero'}>{dia}</span>
                       
                       {/* Indicadores visuais */}
-                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 1.5, marginTop: 2, flex: 1, alignContent: 'flex-start' }}>
+                      <div className="cal-celula-dots">
                         {/* Aulas */}
                         {items.filter(it => it.tipo === 'aula').slice(0, 2).map((a, j) => (
-                          <div 
+                          <span
                             key={`aula-${j}`}
+                            className="cal-dot cal-dot-aula"
                             title={`${a.disciplina} - ${a.hora_inicio?.slice(0,5)}`}
-                            style={{
-                              width: 5,
-                              height: 5,
-                              borderRadius: '50%',
-                              background: tipoStyle.aula.bg,
-                              opacity: 0.8
-                            }}
                           />
                         ))}
                         
                         {/* Eventos escolares */}
                         {items.filter(it => it.tipo !== 'aula').map((e, j) => (
-                          <div 
+                          <span
                             key={`evento-${j}`}
+                            className={`cal-dot ${TIPOS[e.tipo]?.classe}`}
                             title={e.titulo}
-                            style={{
-                              width: 5,
-                              height: 5,
-                              borderRadius: '50%',
-                              background: tipoStyle[e.tipo]?.bg,
-                              opacity: 0.8
-                            }}
                           />
                         ))}
                       </div>
 
                       {/* Badge de aulas */}
-                      {temAulas && (
-                        <div style={{
-                          fontSize: '0.6rem',
-                          background: tipoStyle.aula.bg,
-                          color: 'white',
-                          padding: '1px 4px',
-                          borderRadius: 3,
-                          marginTop: 'auto',
-                          textAlign: 'center',
-                          fontWeight: 700
-                        }}>
-                          AULAS
-                        </div>
-                      )}
+                      {temAulas && <span className="cal-celula-aulas">AULAS</span>}
                     </>
                   )}
                 </div>
@@ -225,10 +194,10 @@ export default function Calendario() {
           </div>
 
           {/* Legenda */}
-          <div style={{ display: 'flex', gap: 12, marginTop: '1.5rem', flexWrap: 'wrap' }}>
-            {Object.entries(tipoStyle).map(([k, v]) => (
-              <div key={k} style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: '0.8rem', color: 'var(--cinza)' }}>
-                <div style={{ width: 10, height: 10, borderRadius: '50%', background: v.bg }} />
+          <div className="cal-legenda">
+            {Object.entries(TIPOS).map(([k, v]) => (
+              <div key={k} className="cal-legenda-item">
+                <span className={`cal-legenda-dot ${v.classe}`} />
                 {v.label}
               </div>
             ))}
@@ -236,32 +205,32 @@ export default function Calendario() {
         </div>
 
         {/* Painel lateral */}
-        <div className="card">
+        <div className="card cal-sidebar">
           {diaSelecionado ? (
             <>
-              <h3 style={{ fontSize: '1rem', marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: 8 }}>
+              <h3 className="cal-sidebar-titulo">
                 <Calendar size={16} color="var(--laranja)" />
                 {diaSelecionado} de {MESES[mes]}
               </h3>
 
               {itemsDiaSelecionado.length === 0 ? (
-                <p style={{ color: 'var(--cinza)', fontSize: '0.85rem' }}>Sem eventos ou aulas este dia.</p>
+                <p className="cal-sidebar-vazio">Sem eventos ou aulas este dia.</p>
               ) : (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                <div className="cal-sidebar-lista">
                   
                   {/* Aulas */}
                   {itemsDiaSelecionado.filter(it => it.tipo === 'aula').length > 0 && (
                     <>
-                      <div style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--castanho)', textTransform: 'uppercase' }}>Aulas do dia</div>
+                      <div className="cal-sidebar-secao">Aulas do dia</div>
                       {itemsDiaSelecionado.filter(it => it.tipo === 'aula').map((a, i) => (
-                        <div key={`aula-detail-${i}`} style={{ display: 'flex', gap: 10, background: 'var(--bege-claro)', borderRadius: 8, padding: '8px 10px', borderLeft: `3px solid ${tipoStyle.aula.bg}` }}>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: 4, color: 'var(--castanho)', fontWeight: 700, fontSize: '0.8rem', minWidth: 60 }}>
+                        <div key={`aula-detail-${i}`} className="cal-item cal-item-aula">
+                          <div className="cal-item-hora">
                             <Clock size={14} />
                             {a.hora_inicio?.slice(0,5)}–{a.hora_fim?.slice(0,5)}
                           </div>
                           <div>
-                            <div style={{ fontSize: '0.9rem', fontWeight: 600 }}>{a.disciplina}</div>
-                            {a.sala && <div style={{ fontSize: '0.75rem', color: 'var(--cinza)' }}>Sala {a.sala}</div>}
+                            <div className="cal-item-titulo">{a.disciplina}</div>
+                            {a.sala && <div className="cal-item-sub">Sala {a.sala}</div>}
                           </div>
                         </div>
                       ))}
@@ -271,12 +240,12 @@ export default function Calendario() {
                   {/* Eventos escolares */}
                   {itemsDiaSelecionado.filter(it => it.tipo !== 'aula').length > 0 && (
                     <>
-                      <div style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--castanho)', textTransform: 'uppercase', marginTop: '0.5rem' }}>Eventos</div>
+                      <div className="cal-sidebar-secao">Eventos</div>
                       {itemsDiaSelecionado.filter(it => it.tipo !== 'aula').map((e, i) => (
-                        <div key={`evento-detail-${i}`} style={{ display: 'flex', gap: 10, background: 'var(--bege-claro)', borderRadius: 8, padding: '8px 10px', borderLeft: `3px solid ${tipoStyle[e.tipo]?.bg}` }}>
+                        <div key={`evento-detail-${i}`} className={`cal-item ${TIPOS[e.tipo]?.classe}`}>
                           <div>
-                            <div style={{ fontSize: '0.9rem', fontWeight: 600 }}>{e.titulo}</div>
-                            <div style={{ fontSize: '0.75rem', color: 'var(--cinza)' }}>{tipoStyle[e.tipo]?.label}</div>
+                            <div className="cal-item-titulo">{e.titulo}</div>
+                            <div className="cal-item-sub">{TIPOS[e.tipo]?.label}</div>
                           </div>
                         </div>
                       ))}
@@ -287,25 +256,25 @@ export default function Calendario() {
             </>
           ) : (
             <>
-              <h3 style={{ fontSize: '1rem', marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: 8 }}>
+              <h3 className="cal-sidebar-titulo">
                 <Calendar size={16} color="var(--laranja)" />
                 Eventos de {MESES[mes]}
               </h3>
               {eventosDoMes.length === 0 ? (
-                <p style={{ color: 'var(--cinza)', fontSize: '0.85rem' }}>Nenhum evento este mês.</p>
+                <p className="cal-sidebar-vazio">Nenhum evento este mês.</p>
               ) : (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                <div className="cal-sidebar-lista">
                   {eventosDoMes.map((e, i) => {
                     const d = new Date(e.data);
                     return (
-                      <div key={i} style={{ display: 'flex', gap: 10, alignItems: 'flex-start' }}>
-                        <div style={{ textAlign: 'center', minWidth: 36 }}>
-                          <div style={{ fontSize: '1.1rem', fontWeight: 700, color: 'var(--castanho)', lineHeight: 1 }}>{d.getDate()}</div>
-                          <div style={{ fontSize: '0.65rem', color: 'var(--cinza)', textTransform: 'uppercase' }}>{DIAS_SEMANA[d.getDay()]}</div>
+                      <div key={i} className="cal-evento">
+                        <div className="cal-evento-data">
+                          <div className="cal-evento-dia">{d.getDate()}</div>
+                          <div className="cal-evento-sema">{DIAS_SEMANA[d.getDay()]}</div>
                         </div>
-                        <div style={{ flex: 1, background: 'var(--bege-claro)', borderRadius: 8, padding: '6px 10px', borderLeft: `3px solid ${tipoStyle[e.tipo]?.bg}` }}>
-                          <div style={{ fontSize: '0.85rem', fontWeight: 600 }}>{e.titulo}</div>
-                          <div style={{ fontSize: '0.75rem', color: 'var(--cinza)', marginTop: 2 }}>{tipoStyle[e.tipo]?.label}</div>
+                        <div className={`cal-evento-corpo ${TIPOS[e.tipo]?.classe}`}>
+                          <div className="cal-item-titulo">{e.titulo}</div>
+                          <div className="cal-item-sub">{TIPOS[e.tipo]?.label}</div>
                         </div>
                       </div>
                     );

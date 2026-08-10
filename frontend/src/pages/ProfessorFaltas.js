@@ -2,6 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { AlertTriangle, Upload } from 'lucide-react';
 import api from '../services/api';
 import { useNotification } from '../contexts/NotificationContext';
+import { Button, EmptyState, FormField, Input, Select, LoadingState } from '../components/ui';
+import './ProfessorFaltas.css';
 
 export default function ProfessorFaltas() {
   const [profDisciplinas, setProfDisciplinas] = useState([]);
@@ -16,17 +18,15 @@ export default function ProfessorFaltas() {
   const [loading, setLoading] = useState(true);
   const { success, error } = useNotification();
 
- useEffect(() => {
-  api.get('/professor/minhas-disciplinas')
-    .then(r => {
-      setProfDisciplinas(r.data || []);
-    })
-    .catch(err => {
-      console.error("ERRO MINHAS DISCIPLINAS:", err);
-      setProfDisciplinas([]);
-    })
-    .finally(() => setLoading(false));
-}, []);
+  useEffect(() => {
+    api.get('/professor/minhas-disciplinas')
+      .then(r => setProfDisciplinas(r.data || []))
+      .catch(err => {
+        console.error("ERRO MINHAS DISCIPLINAS:", err);
+        setProfDisciplinas([]);
+      })
+      .finally(() => setLoading(false));
+  }, []);
 
   const turmasUnicas = profDisciplinas.reduce((acc, item) => {
     if (!acc.some(t => String(t.id) === String(item.turma_id))) {
@@ -42,7 +42,6 @@ export default function ProfessorFaltas() {
     setSelectedTurma(turmaId);
     setSelectedMatricula('');
     setTurmaAlunos([]);
-
     try {
       const r = await api.get(`/professor/alunos/${turmaId}`);
       setTurmaAlunos(r.data || []);
@@ -53,14 +52,11 @@ export default function ProfessorFaltas() {
 
   const registarFalta = async () => {
     setFaltaMsg('');
-
     if (!selectedMatricula || !selectedDisciplina || !dataFalta) {
       setFaltaMsg('Preencha aluno, disciplina e data.');
       return;
     }
-
     setFaltaSaving(true);
-
     try {
       await api.post('/professor/faltas', {
         matricula_id: selectedMatricula,
@@ -68,16 +64,12 @@ export default function ProfessorFaltas() {
         data_falta: dataFalta,
         justificativa: justificativaFalta,
       });
-
       success('Falta registada com sucesso!');
-
       setSelectedMatricula('');
       setSelectedDisciplina('');
       setJustificativaFalta('');
       setDataFalta('');
-
       setTimeout(() => setFaltaMsg(''), 3000);
-
     } catch (err) {
       const message = err.response?.data?.message || 'Erro ao registar falta.';
       setFaltaMsg(message);
@@ -87,86 +79,54 @@ export default function ProfessorFaltas() {
     }
   };
 
-  if (loading) {
-    return (
-      <div className="loading">
-        <div className="spinner" />
-      </div>
-    );
-  }
+  if (loading) return <LoadingState />;
 
   return (
     <div className="page-container">
-
       <div className="page-header">
-        <h2>
-          <AlertTriangle size={24} style={{ marginRight: 8 }} />
+        <h2 className="page-header-title">
+          <AlertTriangle size={24} className="page-header-icon" />
           Registar Faltas
         </h2>
       </div>
 
       <div className="card">
-
         {turmasUnicas.length === 0 ? (
-          <div className="empty-state">
-            <AlertTriangle size={48} style={{ opacity: 0.3 }} />
-            <h3>Sem turmas atribuídas</h3>
-          </div>
+          <EmptyState icon={<AlertTriangle size={48} />} title="Sem turmas atribuídas" />
         ) : (
           <div>
-
-            {/* TURMAS */}
-            <div style={{ display: 'grid', gap: '10px' }}>
+            <div className="turma-grid">
               {turmasUnicas.map(turma => (
-                <button
+                <Button
                   key={turma.id}
-                  className={`btn ${selectedTurma === turma.id ? 'btn-primary' : 'btn-outline'}`}
+                  variant={selectedTurma === turma.id ? 'primary' : 'outline'}
                   onClick={() => abrirTurma(turma.id)}
                 >
                   {turma.nome}
-                </button>
+                </Button>
               ))}
             </div>
 
-            {/* FORMULÁRIO */}
             {selectedTurma && (
-              <div style={{ marginTop: 20 }}>
-
-                {/* ALUNO */}
-                <div className="form-group">
-                  <label>Aluno</label>
-                  <select
-                    className="form-control form-select force-select-visible"
-                    value={selectedMatricula}
-                    onChange={e => setSelectedMatricula(e.target.value)}
-                  >
+              <div className="falta-form">
+                <FormField label="Aluno" htmlFor="pf-aluno">
+                  <Select id="pf-aluno" value={selectedMatricula} onChange={e => setSelectedMatricula(e.target.value)}>
                     <option value="">Selecione aluno</option>
-
                     {turmaAlunos.length === 0 ? (
                       <option disabled>Nenhum aluno encontrado</option>
                     ) : (
                       turmaAlunos.map(a => (
-                        <option
-                          key={a.matricula_id}
-                          value={a.matricula_id}
-                        >
+                        <option key={a.matricula_id} value={a.matricula_id}>
                           {a.aluno_nome || a.nome || a.aluno?.nome}
                         </option>
                       ))
                     )}
-                  </select>
-                </div>
+                  </Select>
+                </FormField>
 
-                {/* DISCIPLINA */}
-                <div className="form-group">
-                  <label>Disciplina</label>
-                  <select
-                    className="form-control form-select"
-                    value={selectedDisciplina}
-                    onChange={e => setSelectedDisciplina(e.target.value)}
-                  >
+                <FormField label="Disciplina" htmlFor="pf-disciplina">
+                  <Select id="pf-disciplina" value={selectedDisciplina} onChange={e => setSelectedDisciplina(e.target.value)}>
                     <option value="">Selecione disciplina</option>
-
                     {profDisciplinas
                       .filter(d => String(d.turma_id) === String(selectedTurma))
                       .map(d => (
@@ -174,52 +134,26 @@ export default function ProfessorFaltas() {
                           {d.disciplina_nome}
                         </option>
                       ))}
-                  </select>
-                </div>
+                  </Select>
+                </FormField>
 
-                {/* DATA */}
-                <div className="form-group">
-                  <label>Data da Falta</label>
-                  <input
-                    type="date"
-                    className="form-control"
-                    value={dataFalta}
-                    onChange={e => setDataFalta(e.target.value)}
-                  />
-                </div>
+                <FormField label="Data da Falta" htmlFor="pf-data">
+                  <Input id="pf-data" type="date" value={dataFalta} onChange={e => setDataFalta(e.target.value)} />
+                </FormField>
 
-                {/* JUSTIFICATIVA */}
-                <div className="form-group">
-                  <label>Justificativa</label>
-                  <input
-                    className="form-control"
-                    value={justificativaFalta}
-                    onChange={e => setJustificativaFalta(e.target.value)}
-                  />
-                </div>
+                <FormField label="Justificativa" htmlFor="pf-justificativa">
+                  <Input id="pf-justificativa" value={justificativaFalta} onChange={e => setJustificativaFalta(e.target.value)} />
+                </FormField>
 
-                {/* BOTÃO */}
-                <button
-                  className="btn btn-primary"
-                  onClick={registarFalta}
-                  disabled={faltaSaving}
-                >
-                  <Upload size={16} />
+                <Button variant="primary" icon={<Upload size={16} />} loading={faltaSaving} onClick={registarFalta}>
                   {faltaSaving ? 'A guardar...' : 'Registar Falta'}
-                </button>
+                </Button>
 
-                {faltaMsg && (
-                  <div className="alert" style={{ marginTop: 10 }}>
-                    {faltaMsg}
-                  </div>
-                )}
-
+                {faltaMsg && <div className="alert falta-msg">{faltaMsg}</div>}
               </div>
             )}
-
           </div>
         )}
-
       </div>
     </div>
   );

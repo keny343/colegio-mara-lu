@@ -1,0 +1,36 @@
+.registro-screen {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(135deg, var(--castanho) 0%, var(--castanho-medio) 100%);
+  padding: 2rem;
+}
+.registro-wrap { width: 100%; max-width: 500px; }
+.registro-head { text-align: center; margin-bottom: 2rem; }
+.registro-logo {
+  width: 64px; height: 64px; background: var(--laranja); border-radius: 16px;
+  display: flex; align-items: center; justify-content: center; margin: 0 auto 1rem;
+}
+.registro-titulo { color: white; font-size: 1.8rem; margin: 0; }
+.registro-subtitulo { color: var(--bege); margin-top: 4px; }
+.registro-card { width: 100%; }
+.registro-card--sucesso { max-width: 420px; width: 100%; text-align: center; }
+.registro-sucesso-icone { margin: 0 auto 1rem; color: var(--verde); }
+.registro-sucesso-titulo { color: var(--castanho); margin-bottom: 0.5rem; }
+.registro-sucesso-texto { color: var(--cinza); margin-bottom: 1.5rem; }
+.registro-section-titulo { margin: 0 0 1.25rem; color: var(--castanho); }
+.registro-acoes { display: flex; gap: 12px; margin-top: 0.5rem; align-items: stretch; }
+.registro-acoes .btn-outline { flex-shrink: 0; }
+.registro-acoes .btn-primary { flex: 1; }
+.registro-footer { text-align: center; margin-top: 1.5rem; padding-top: 1.5rem; border-top: 1px solid var(--bege); }
+.registro-footer p { color: var(--cinza); font-size: 0.9rem; }
+.registro-footer a { color: var(--laranja); font-weight: 600; }
+
+.password-wrap { position: relative; }
+.password-wrap .password-input { padding-right: 44px; }
+.password-toggle {
+  position: absolute; right: 12px; top: 50%; transform: translateY(-50%);
+  background: none; border: none; cursor: pointer; color: var(--cinza);
+  display: flex; align-items: center; padding: 4px;
+}

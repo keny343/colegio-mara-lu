@@ -1,11 +1,13 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useAuth } from '../contexts/AuthContext';
-import { User, Save, CheckCircle, GraduationCap, Shield, Camera, FileText } from 'lucide-react';
+import { User, Save, CheckCircle, GraduationCap, Shield, Camera } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import api from '../services/api';
 import { normalizeSeriesName } from '../utils/serieName';
 import { temEscopoCoordenacao } from '../utils/roles';
 import { urlFoto } from '../utils/userPhoto';
+import { Button, FormField, Input, Select, LoadingState } from '../components/ui';
+import './Perfil.css';
 
 const ROLE_LABELS = {
   admin: 'Administrador',
@@ -154,13 +156,43 @@ export default function Perfil() {
     setSaving(false);
   };
 
-  if (loading) {
-    return (
-      <div className="loading">
-        <div className="spinner" />
-      </div>
-    );
-  }
+  const guardarCredenciais = async () => {
+    setCredSaving(true);
+    setCredMsg('');
+    try {
+      const payload = { email: credEmail };
+      if (newPassword) payload.nova_senha = newPassword;
+      if (newPassword) payload.current_password = currentPassword;
+      const res = await api.put('/auth/credenciais', payload);
+      if (res.data.usuario) updateUser(res.data.usuario);
+      setCredMsg(res.data.message || 'Credenciais actualizadas.');
+      setCurrentPassword('');
+      setNewPassword('');
+    } catch (err) {
+      setCredMsg(err.response?.data?.message || 'Erro ao actualizar credenciais.');
+    } finally {
+      setCredSaving(false);
+    }
+  };
+
+  const registarFalta = async () => {
+    setFaltaSaving(true);
+    setFaltaMsg('');
+    try {
+      if (!selectedMatricula || !selectedDisciplina || !dataFalta) return setFaltaMsg('Preencha turma, aluno, disciplina e data.');
+      await api.post('/professor/faltas', { matricula_id: selectedMatricula, disciplina_id: selectedDisciplina, data_falta: dataFalta, justificativa: justificativaFalta });
+      setFaltaMsg('Falta registada.');
+      setSelectedMatricula('');
+      setJustificativaFalta('');
+      setDataFalta('');
+    } catch (err) {
+      setFaltaMsg(err.response?.data?.message || 'Erro ao registar falta.');
+    } finally {
+      setFaltaSaving(false);
+    }
+  };
+
+  if (loading) return <LoadingState />;
 
   return (
     <div className="page-container">
@@ -169,11 +201,11 @@ export default function Perfil() {
         <p>{subtitulo()}</p>
       </div>
 
-      {erro && <div className="alert alert-error" style={{ marginBottom: '1rem' }}>{erro}</div>}
+      {erro && <div className="alert alert-error perfil-erro">{erro}</div>}
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '1.5rem' }}>
+      <div className="perfil-grid">
         {/* Card avatar */}
-        <div className="card" style={{ textAlign: 'center', padding: '2.5rem 2rem' }}>
+        <div className="card perfil-avatar-card">
           <input
             ref={fotoInputRef}
             type="file"
@@ -183,94 +215,58 @@ export default function Perfil() {
           />
           <button
             type="button"
+            className="perfil-foto-btn"
             onClick={() => fotoInputRef.current?.click()}
             disabled={uploadingFoto}
             title="Clique para escolher a sua fotografia"
-            style={{
-              width: 90, height: 90, borderRadius: '50%',
-              margin: '0 auto 1.25rem', padding: 0, border: '3px solid var(--laranja)',
-              cursor: 'pointer', overflow: 'hidden', position: 'relative', display: 'block',
-              background: foto ? 'transparent' : 'linear-gradient(135deg, var(--castanho), var(--castanho-medio))',
-            }}
+            aria-label="Alterar fotografia"
           >
             {foto ? (
-              <img src={foto} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+              <img src={foto} alt="" className="perfil-foto-img" />
             ) : (
-              <span style={{
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                width: '100%', height: '100%', fontSize: '2rem', color: 'white',
-                fontFamily: 'Playfair Display, serif', fontWeight: 700,
-              }}>
-                {(user?.nome || '?').charAt(0).toUpperCase()}
-              </span>
+              <span className="perfil-foto-inicial">{(user?.nome || '?').charAt(0).toUpperCase()}</span>
             )}
-            <span style={{
-              position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.45)',
-              display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff',
-            }}>
-              <Camera size={22} />
-            </span>
+            <span className="perfil-foto-overlay"><Camera size={22} /></span>
           </button>
           {uploadingFoto && (
-            <p style={{ fontSize: '0.82rem', color: 'var(--cinza)', marginTop: -8, marginBottom: '1rem' }}>
-              A carregar fotografia...
-            </p>
+            <p className="perfil-upload-msg">A carregar fotografia...</p>
           )}
-          <h3 style={{ fontSize: '1.3rem', marginBottom: 4 }}>{user?.nome}</h3>
-          <p style={{ color: 'var(--cinza)', fontSize: '0.9rem', marginBottom: '1rem' }}>{user?.email}</p>
-          <span className="badge" style={{ background: 'var(--laranja-suave)', color: 'var(--laranja)', fontWeight: 700 }}>
-            {roleLabel()}
-          </span>
+          <h3 className="perfil-nome">{user?.nome}</h3>
+          <p className="perfil-email">{user?.email}</p>
+          <span className="badge perfil-role">{roleLabel()}</span>
           {escopo && (
-            <p style={{ marginTop: 12, fontSize: '0.85rem', color: 'var(--castanho-medio)' }}>
-              <Shield size={14} style={{ verticalAlign: 'middle' }} /> Âmbito: {escopo}
-            </p>
+            <p className="perfil-escopo"><Shield size={14} /> Âmbito: {escopo}</p>
           )}
 
-          {/* NOVO: resumo da situação académica no card do avatar (apenas para alunos) */}
           {isAluno && (inscricao || matricula) && (
-            <div style={{ marginTop: '1.5rem', textAlign: 'left', borderTop: '1px solid var(--bege)', paddingTop: '1.25rem' }}>
-              <p style={{ fontSize: '0.75rem', fontWeight: 700, textTransform: 'uppercase', color: 'var(--castanho-medio)', marginBottom: 10, letterSpacing: '0.05em' }}>
-                Situação Académica
-              </p>
+            <div className="perfil-situacao">
+              <p className="perfil-situacao-titulo">Situação Académica</p>
               {inscricao && (
-                <div style={{ fontSize: '0.85rem', marginBottom: 6 }}>
-                  <span style={{ color: 'var(--cinza)' }}>Classe: </span>
-                  <strong>{normalizeSeriesName(inscricao.serie_nome)}</strong>
-                </div>
+                <div className="perfil-situacao-linha"><span>Classe: </span><strong>{normalizeSeriesName(inscricao.serie_nome)}</strong></div>
               )}
               {matricula && (
-                <div style={{ fontSize: '0.85rem', marginBottom: 6 }}>
-                  <span style={{ color: 'var(--cinza)' }}>Turma: </span>
-                  <strong>{matricula.turma_nome}</strong>
-                </div>
+                <div className="perfil-situacao-linha"><span>Turma: </span><strong>{matricula.turma_nome}</strong></div>
               )}
               {matricula && (
-                <div style={{ fontSize: '0.85rem', marginBottom: 6 }}>
-                  <span style={{ color: 'var(--cinza)' }}>Turno: </span>
-                  <strong>{matricula.turno}</strong>
-                </div>
+                <div className="perfil-situacao-linha"><span>Turno: </span><strong>{matricula.turno}</strong></div>
               )}
               {inscricao && (
-                <div style={{ fontSize: '0.85rem' }}>
-                  <span style={{ color: 'var(--cinza)' }}>Ano Letivo: </span>
-                  <strong>{inscricao.inscricao_ano || matricula?.ano_letivo}</strong>
-                </div>
+                <div className="perfil-situacao-linha"><span>Ano Letivo: </span><strong>{inscricao.inscricao_ano || matricula?.ano_letivo}</strong></div>
               )}
             </div>
           )}
         </div>
 
         {/* Card dados */}
-        <div className="card">
-          <h3 style={{ fontSize: '1.1rem', marginBottom: '1.5rem', display: 'flex', alignItems: 'center', gap: 8 }}>
-            {isAluno ? <User size={18} color="var(--laranja)" /> : <GraduationCap size={18} color="var(--laranja)" />}
+        <div className="card perfil-dados-card">
+          <h3 className="perfil-dados-titulo">
+            {isAluno ? <User size={18} /> : <GraduationCap size={18} />}
             {isAluno ? 'Dados do aluno' : 'Dados da conta'}
           </h3>
 
           {isAluno && (
             aluno ? (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+              <div className="perfil-form-col">
                 {[
                   { label: 'Nome completo', name: 'nome', value: formAluno.nome || '' },
                   { label: 'Data de nascimento', name: 'data_nascimento', value: formAluno.data_nascimento?.slice(0, 10) || '', type: 'date' },
@@ -281,101 +277,78 @@ export default function Perfil() {
                   { label: 'Encarregado de educação', name: 'responsavel', value: formAluno.responsavel || '' },
                   { label: 'Telefone de emergência', name: 'telefone_emergencia', value: formAluno.telefone_emergencia || '' },
                 ].map((f, i) => (
-                  <div key={i} className="form-group" style={{ marginBottom: 0 }}>
-                    <label className="form-label">{f.label}</label>
+                  <FormField key={i} label={f.label}>
                     {f.type === 'select' ? (
-                      <select className="form-control form-select" name={f.name} value={f.value} onChange={e => setFormAluno(x => ({ ...x, [e.target.name]: e.target.value }))}>
+                      <Select name={f.name} value={f.value} onChange={e => setFormAluno(x => ({ ...x, [e.target.name]: e.target.value }))}>
                         <option value="">—</option>
                         {f.options.map(o => <option key={o.v} value={o.v}>{o.l}</option>)}
-                      </select>
+                      </Select>
                     ) : (
-                      <input className="form-control" type={f.type || 'text'} name={f.name} value={f.value} onChange={e => setFormAluno(x => ({ ...x, [e.target.name]: e.target.value }))} />
+                      <Input type={f.type || 'text'} name={f.name} value={f.value} onChange={e => setFormAluno(x => ({ ...x, [e.target.name]: e.target.value }))} />
                     )}
-                  </div>
+                  </FormField>
                 ))}
-                <button type="button" className="btn btn-primary btn-full" onClick={handleSaveAluno} disabled={saving}>
-                  {saved ? <><CheckCircle size={16} /> Guardado!</> : <><Save size={16} /> {saving ? 'A guardar...' : 'Guardar alterações'}</>}
-                </button>
+                <Button variant="primary" block icon={saved ? <CheckCircle size={16} /> : <Save size={16} />} loading={saving} onClick={handleSaveAluno}>
+                  {saved ? 'Guardado!' : saving ? 'A guardar...' : 'Guardar alterações'}
+                </Button>
               </div>
             ) : (
-              <p style={{ color: 'var(--cinza)', fontSize: '0.9rem' }}>Ainda não há registo de aluno associado à sua conta.</p>
+              <p className="perfil-sem-dados">Ainda não há registo de aluno associado à sua conta.</p>
             )
           )}
 
-          {/* Quick link para justificar faltas (alunos) */}
           {isAluno && (
-            <div style={{ marginTop: 12 }}>
+            <div className="perfil-quicklink">
               <Link to="/portal/faltas" className="btn btn-outline">Ir para Justificações / Faltas</Link>
             </div>
           )}
 
           {isStaff && staff && (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-              <div className="form-group" style={{ marginBottom: 0 }}>
-                <label className="form-label">Nome completo</label>
-                <input className="form-control" value={formStaff.nome} onChange={e => setFormStaff(f => ({ ...f, nome: e.target.value }))} />
-              </div>
-              <div className="form-group" style={{ marginBottom: 0 }}>
-                <label className="form-label">E-mail (login)</label>
-                <input className="form-control" value={staff.email || ''} disabled />
-              </div>
+            <div className="perfil-form-col">
+              <FormField label="Nome completo">
+                <Input value={formStaff.nome} onChange={e => setFormStaff(f => ({ ...f, nome: e.target.value }))} />
+              </FormField>
+              <FormField label="E-mail (login)">
+                <Input value={staff.email || ''} disabled />
+              </FormField>
               {staff.cpf && (
-                <div className="form-group" style={{ marginBottom: 0 }}>
-                  <label className="form-label">BI / NIF</label>
-                  <input className="form-control" value={staff.cpf} disabled />
-                </div>
+                <FormField label="BI / NIF">
+                  <Input value={staff.cpf} disabled />
+                </FormField>
               )}
-              <div className="form-group" style={{ marginBottom: 0 }}>
-                <label className="form-label">Telefone</label>
-                <input className="form-control" value={formStaff.telefone || ''} onChange={e => setFormStaff(f => ({ ...f, telefone: e.target.value }))} />
-              </div>
-              <div className="form-group" style={{ marginBottom: 0 }}>
-                <label className="form-label">Endereço</label>
-                <input className="form-control" value={formStaff.endereco || ''} onChange={e => setFormStaff(f => ({ ...f, endereco: e.target.value }))} />
-              </div>
-              <button type="button" className="btn btn-primary btn-full" onClick={handleSaveStaff} disabled={saving}>
-                {saved ? <><CheckCircle size={16} /> Guardado!</> : <><Save size={16} /> {saving ? 'A guardar...' : 'Guardar alterações'}</>}
-              </button>
+              <FormField label="Telefone">
+                <Input value={formStaff.telefone || ''} onChange={e => setFormStaff(f => ({ ...f, telefone: e.target.value }))} />
+              </FormField>
+              <FormField label="Endereço">
+                <Input value={formStaff.endereco || ''} onChange={e => setFormStaff(f => ({ ...f, endereco: e.target.value }))} />
+              </FormField>
+              <Button variant="primary" block icon={saved ? <CheckCircle size={16} /> : <Save size={16} />} loading={saving} onClick={handleSaveStaff}>
+                {saved ? 'Guardado!' : saving ? 'A guardar...' : 'Guardar alterações'}
+              </Button>
             </div>
           )}
         </div>
       </div>
 
       {/* Credenciais (email / senha) - todos os perfis */}
-      <div style={{ marginTop: '1.5rem' }}>
+      <div className="perfil-section">
         <div className="card">
-          <h3 style={{ fontSize: '1.1rem', marginBottom: '1rem' }}>Credenciais</h3>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-            <div className="form-group" style={{ marginBottom: 0 }}>
-              <label className="form-label">E-mail</label>
-              <input className="form-control" value={credEmail} onChange={e => setCredEmail(e.target.value)} />
-            </div>
-            <div className="form-group" style={{ marginBottom: 0 }}>
-              <label className="form-label">Senha atual (necessária para alterar senha)</label>
-              <input className="form-control" type="password" value={currentPassword} onChange={e => setCurrentPassword(e.target.value)} />
-            </div>
-            <div className="form-group" style={{ marginBottom: 0 }}>
-              <label className="form-label">Nova senha</label>
-              <input className="form-control" type="password" value={newPassword} onChange={e => setNewPassword(e.target.value)} />
-            </div>
+          <h3 className="perfil-dados-titulo">Credenciais</h3>
+          <div className="perfil-form-col">
+            <FormField label="E-mail" htmlFor="perfil-cred-email">
+              <Input id="perfil-cred-email" value={credEmail} onChange={e => setCredEmail(e.target.value)} />
+            </FormField>
+            <FormField label="Senha atual (necessária para alterar senha)" htmlFor="perfil-cred-atual">
+              <Input id="perfil-cred-atual" type="password" value={currentPassword} onChange={e => setCurrentPassword(e.target.value)} />
+            </FormField>
+            <FormField label="Nova senha" htmlFor="perfil-cred-nova">
+              <Input id="perfil-cred-nova" type="password" value={newPassword} onChange={e => setNewPassword(e.target.value)} />
+            </FormField>
             {credMsg && <div className="alert alert-info">{credMsg}</div>}
-            <div style={{ display: 'flex', gap: 12 }}>
-              <button className="btn btn-primary" onClick={async () => {
-                setCredSaving(true); setCredMsg('');
-                try {
-                  const payload = { email: credEmail };
-                  if (newPassword) payload.nova_senha = newPassword;
-                  if (newPassword) payload.current_password = currentPassword;
-                  const res = await api.put('/auth/credenciais', payload);
-                  if (res.data.usuario) updateUser(res.data.usuario);
-                  setCredMsg(res.data.message || 'Credenciais actualizadas.');
-                  setCurrentPassword(''); setNewPassword('');
-                } catch (err) {
-                  setCredMsg(err.response?.data?.message || 'Erro ao actualizar credenciais.');
-                } finally { setCredSaving(false); }
-              }} disabled={credSaving}>
+            <div className="perfil-acoes">
+              <Button variant="primary" loading={credSaving} onClick={guardarCredenciais}>
                 {credSaving ? 'A processar...' : 'Guardar credenciais'}
-              </button>
+              </Button>
             </div>
           </div>
         </div>
@@ -383,15 +356,17 @@ export default function Perfil() {
 
       {/* Professor: registar falta */}
       {user?.role === 'professor' && (
-        <div style={{ marginTop: '1.5rem' }}>
+        <div className="perfil-section">
           <div className="card">
-            <h3 style={{ fontSize: '1.1rem', marginBottom: '1rem' }}>Registar Falta (rápido)</h3>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+            <h3 className="perfil-dados-titulo">Registar Falta (rápido)</h3>
+            <div className="perfil-form-col">
               <div className="form-row">
-                <div className="form-group">
-                  <label className="form-label">Turma</label>
-                  <select className="form-control form-select" value={selectedTurma} onChange={async (e) => {
-                    const v = e.target.value; setSelectedTurma(v); setSelectedMatricula(''); setTurmaAlunos([]);
+                <FormField label="Turma" htmlFor="perfil-falta-turma">
+                  <Select id="perfil-falta-turma" value={selectedTurma} onChange={async (e) => {
+                    const v = e.target.value;
+                    setSelectedTurma(v);
+                    setSelectedMatricula('');
+                    setTurmaAlunos([]);
                     if (v) {
                       try {
                         const r = await api.get(`/staff/turmas/${v}/alunos`);
@@ -403,49 +378,38 @@ export default function Perfil() {
                     {[...new Map(profDisciplinas.map(d => [d.turma_id, { id: d.turma_id, nome: d.turma_nome }])).values()].map(t => (
                       <option key={t.id} value={t.id}>{t.nome}</option>
                     ))}
-                  </select>
-                </div>
-                <div className="form-group">
-                  <label className="form-label">Aluno</label>
-                  <select className="form-control form-select" value={selectedMatricula} onChange={e => setSelectedMatricula(e.target.value)} disabled={!selectedTurma}>
+                  </Select>
+                </FormField>
+                <FormField label="Aluno" htmlFor="perfil-falta-aluno">
+                  <Select id="perfil-falta-aluno" value={selectedMatricula} onChange={e => setSelectedMatricula(e.target.value)} disabled={!selectedTurma}>
                     <option value="">Selecione aluno</option>
                     {turmaAlunos.map(a => (
                       <option key={a.matricula_id} value={a.matricula_id}>{a.aluno_nome}</option>
                     ))}
-                  </select>
-                </div>
+                  </Select>
+                </FormField>
               </div>
               <div className="form-row">
-                <div className="form-group">
-                  <label className="form-label">Disciplina</label>
-                  <select className="form-control form-select" value={selectedDisciplina} onChange={e => setSelectedDisciplina(e.target.value)}>
+                <FormField label="Disciplina" htmlFor="perfil-falta-disc">
+                  <Select id="perfil-falta-disc" value={selectedDisciplina} onChange={e => setSelectedDisciplina(e.target.value)}>
                     <option value="">Selecione disciplina</option>
                     {profDisciplinas.filter(d => !selectedTurma || String(d.turma_id) === String(selectedTurma)).map(d => (
                       <option key={d.disciplina_id} value={d.disciplina_id}>{d.disciplina_nome} — {d.turma_nome}</option>
                     ))}
-                  </select>
-                </div>
-                <div className="form-group">
-                  <label className="form-label">Data da falta</label>
-                  <input className="form-control" type="date" value={dataFalta} onChange={e => setDataFalta(e.target.value)} />
-                </div>
+                  </Select>
+                </FormField>
+                <FormField label="Data da falta" htmlFor="perfil-falta-data">
+                  <Input id="perfil-falta-data" type="date" value={dataFalta} onChange={e => setDataFalta(e.target.value)} />
+                </FormField>
               </div>
-              <div className="form-group">
-                <label className="form-label">Justificativa / Observação (opcional)</label>
-                <input className="form-control" value={justificativaFalta} onChange={e => setJustificativaFalta(e.target.value)} />
-              </div>
+              <FormField label="Justificativa / Observação (opcional)" htmlFor="perfil-falta-just">
+                <Input id="perfil-falta-just" value={justificativaFalta} onChange={e => setJustificativaFalta(e.target.value)} />
+              </FormField>
               {faltaMsg && <div className="alert alert-info">{faltaMsg}</div>}
-              <div style={{ display: 'flex', gap: 12 }}>
-                <button className="btn btn-primary" onClick={async () => {
-                  setFaltaSaving(true); setFaltaMsg('');
-                  try {
-                    if (!selectedMatricula || !selectedDisciplina || !dataFalta) return setFaltaMsg('Preencha turma, aluno, disciplina e data.');
-                    await api.post('/professor/faltas', { matricula_id: selectedMatricula, disciplina_id: selectedDisciplina, data_falta: dataFalta, justificativa: justificativaFalta });
-                    setFaltaMsg('Falta registada.'); setSelectedMatricula(''); setJustificativaFalta(''); setDataFalta('');
-                  } catch (err) {
-                    setFaltaMsg(err.response?.data?.message || 'Erro ao registar falta.');
-                  } finally { setFaltaSaving(false); }
-                }} disabled={faltaSaving}>{faltaSaving ? 'A processar...' : 'Registar falta'}</button>
+              <div className="perfil-acoes">
+                <Button variant="primary" loading={faltaSaving} onClick={registarFalta}>
+                  {faltaSaving ? 'A processar...' : 'Registar falta'}
+                </Button>
               </div>
             </div>
           </div>

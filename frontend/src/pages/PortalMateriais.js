@@ -1,7 +1,10 @@
-import React, { useEffect, useState } from 'react';
+import React from 'react';
+import { Download, BookOpen, FileText } from 'lucide-react';
 import api from '../services/api';
-import { BookOpen, Download, FileText } from 'lucide-react';
 import { fileUrl } from '../services/fileUrl';
+import { useFetch } from '../hooks/useFetch';
+import { DataTable, EmptyState, LoadingState, ErrorState } from '../components/ui';
+import './PortalMateriais.css';
 
 const tipoIcon = (tipo) => {
   if (tipo === 'pdf') return '📄';
@@ -11,86 +14,60 @@ const tipoIcon = (tipo) => {
 };
 
 export default function PortalMateriais() {
-  const [lista, setLista] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [erro, setErro] = useState('');
+  const { data: lista = [], loading, error, refetch } = useFetch(() => api.get('/materiais/recebidos'), []);
 
-  useEffect(() => {
-    api.get('/materiais/recebidos')
-      .then((r) => {
-        setLista(r.data);
-      })
-      .catch(() => setErro('Não foi possível carregar os materiais.'))
-      .finally(() => setLoading(false));
-  }, []);
-
-  if (loading) return <div className="loading" role="status" aria-label="A carregar materiais"><div className="spinner" /></div>;
+  const columns = [
+    {
+      key: 'tipo', label: 'Tipo', headerWidth: '60px',
+      render: (m) => <span style={{ fontSize: '1.2rem' }}>{tipoIcon(m.tipo)}</span>,
+    },
+    { key: 'titulo', label: 'Título', render: (m) => <strong>{m.titulo}</strong> },
+    { key: 'professor_nome', label: 'Professor', render: (m) => m.professor_nome || '—' },
+    { key: 'disciplina_nome', label: 'Disciplina', render: (m) => m.disciplina_nome || '—' },
+    {
+      key: 'criado_em', label: 'Data',
+      render: (m) => <span className="mat-data">{new Date(m.criado_em).toLocaleDateString('pt-AO')}</span>,
+    },
+    {
+      key: 'abrir', label: 'Abrir',
+      render: (m) => (
+        <a
+          className="btn btn-outline btn-sm"
+          href={fileUrl(m.caminho)}
+          target="_blank"
+          rel="noreferrer"
+          aria-label={`Abrir material ${m.titulo}`}
+        >
+          <Download size={13} /> Abrir
+        </a>
+      ),
+    },
+  ];
 
   return (
     <div className="page-container">
       <div className="page-header">
-        <h2><BookOpen size={22} style={{ verticalAlign: 'middle', marginRight: 8 }} />Materiais didácticos</h2>
-        <p style={{ color: 'var(--cinza)' }}>
-          Consulte os materiais partilhados pelos seus professores (PDF, vídeo ou imagem).
-        </p>
+        <h2><BookOpen size={22} /> Materiais didácticos</h2>
+        <p>Consulte os materiais partilhados pelos seus professores (PDF, vídeo ou imagem).</p>
       </div>
 
-      {erro && (
-        <div className="alert alert-error" role="alert">
-          <span>{erro}</span>
-        </div>
-      )}
-
-      <div className="card" style={{ padding: 0 }}>
-        <div style={{ padding: '1rem 1rem 0.5rem', display: 'flex', alignItems: 'center', gap: 8 }}>
+      <div className="card mat-card">
+        <div className="mat-head">
           <FileText size={18} color="var(--castanho)" />
-          <h3 style={{ margin: 0, fontSize: '1rem' }}>Materiais disponíveis</h3>
-          <span style={{ marginLeft: 'auto', background: 'var(--bege-medio)', borderRadius: 20, padding: '2px 10px', fontSize: '0.8rem', fontWeight: 700, color: 'var(--castanho)' }}>
-            {lista.length}
-          </span>
+          <h3>Materiais disponíveis</h3>
+          <span className="mat-count">{lista.length}</span>
         </div>
-        {lista.length === 0 ? (
-          <div className="empty-state" style={{ padding: '2rem' }}>
-            <BookOpen size={40} style={{ opacity: 0.3 }} />
-            <p style={{ color: 'var(--cinza)' }}>
-              Nenhum material disponível. Os professores publicarão aqui os conteúdos das aulas.
-            </p>
-          </div>
+        {loading ? (
+          <LoadingState />
+        ) : error ? (
+          <ErrorState error={error} onRetry={refetch} />
         ) : (
-          <table className="table">
-            <thead>
-              <tr>
-                <th>Tipo</th>
-                <th>Título</th>
-                <th>Professor</th>
-                <th>Disciplina</th>
-                <th>Data</th>
-                <th>Abrir</th>
-              </tr>
-            </thead>
-            <tbody>
-              {lista.map((m) => (
-                <tr key={m.id}>
-                  <td style={{ textAlign: 'center', fontSize: '1.2rem' }}>{tipoIcon(m.tipo)}</td>
-                  <td><strong>{m.titulo}</strong></td>
-                  <td>{m.professor_nome || '—'}</td>
-                  <td>{m.disciplina_nome || '—'}</td>
-                  <td>{new Date(m.criado_em).toLocaleDateString('pt-AO')}</td>
-                  <td>
-                    <a
-                      className="btn btn-outline btn-sm"
-                      href={fileUrl(m.caminho)}
-                      target="_blank"
-                      rel="noreferrer"
-                      aria-label={`Abrir material ${m.titulo}`}
-                    >
-                      <Download size={13} /> Abrir
-                    </a>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+          <DataTable
+            columns={columns}
+            rows={lista}
+            keyField="id"
+            emptyMessage="Nenhum material disponível. Os professores publicarão aqui os conteúdos das aulas."
+          />
         )}
       </div>
     </div>

@@ -1,0 +1,23 @@
+.page-header-sub { color: var(--cinza); }
+
+.just-section { margin-bottom: 2rem; }
+.just-section-title { font-size: 1rem; margin-bottom: 1rem; color: var(--castanho-medio); display: flex; align-items: center; gap: 6px; }
+.just-list { display: flex; flex-direction: column; gap: 10px; }
+.just-item { padding: 1rem 1.25rem; display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; flex-wrap: wrap; }
+.just-info { flex: 1; min-width: 220px; }
+.just-aluno { font-weight: 700; margin-bottom: 4px; }
+.just-sub { font-size: 0.85rem; color: var(--cinza); margin-bottom: 4px; }
+.just-motivo { font-size: 0.88rem; color: var(--castanho); margin-bottom: 6px; }
+.just-actions { display: flex; gap: 8px; flex-shrink: 0; }
+
+.cell-data { font-size: 0.85rem; }
+.cell-motivo { font-size: 0.85rem; max-width: 180px; display: block; }
+.cell-decisao { font-size: 0.82rem; color: var(--cinza); }
+
+.modal-actions { display: flex; gap: 12px; }
+.modal-info { color: var(--cinza); margin-bottom: 0.5rem; font-size: 0.9rem; }
+.modal-motivo { margin-bottom: 1.25rem; font-size: 0.88rem; }
+.modal-doc { margin-top: 8px; }
+.modal-erro { margin-bottom: 1rem; }
+.decisao-row { display: flex; gap: 10px; }
+.decisao-btn { flex: 1; }

@@ -1,0 +1,17 @@
+.plano-erro { display: flex; justify-content: space-between; align-items: center; }
+.plano-form-card { margin-bottom: 1.5rem; }
+.plano-form { display: flex; flex-direction: column; gap: 1rem; align-items: flex-start; }
+.plano-form .form-group { width: 100%; }
+
+.plano-alert {
+  margin-bottom: 1rem; padding: 12px 16px;
+  background: var(--laranja-suave); border: 1px solid rgba(232, 100, 26, 0.25);
+  color: var(--castanho); border-radius: 10px;
+}
+
+.plano-titulo { display: flex; align-items: center; gap: 8px; }
+.ambito-pill {
+  background: var(--bege); border-radius: 6px; padding: 2px 8px;
+  font-size: 0.8rem; font-weight: 600; white-space: nowrap;
+}
+.mat-data { color: var(--cinza); font-size: 0.85rem; }
