@@ -47,7 +47,7 @@ const minhaMatricula = async (req, res) => {
     });
   } catch (err) {
     if (err.code === 'ER_NO_SUCH_TABLE') return res.json({ matricula: null, aluno: null, inscricao: null });
-    return res.status(500).json({ message: err.message });
+    return res.status(500).json({ message: 'Erro interno do servidor.' });
   }
 };
 
@@ -82,7 +82,7 @@ const minhasDisciplinasAluno = async (req, res) => {
     return res.json(rows);
   } catch (err) {
     if (err.code === 'ER_NO_SUCH_TABLE') return res.json([]);
-    return res.status(500).json({ message: err.message });
+    return res.status(500).json({ message: 'Erro interno do servidor.' });
   }
 };
 
@@ -120,7 +120,7 @@ const meusHorarios = async (req, res) => {
     return res.json(rows);
   } catch (err) {
     if (err.code === 'ER_NO_SUCH_TABLE') return res.json([]);
-    return res.status(500).json({ message: err.message });
+    return res.status(500).json({ message: 'Erro interno do servidor.' });
   }
 };
 
@@ -151,7 +151,7 @@ const minhasNotas = async (req, res) => {
     return res.json(NotasService.respostaPortal(rows, serieClasse));
   } catch (err) {
     if (err.code === 'ER_NO_SUCH_TABLE') return res.json({ notas: [], periodos: PERIODOS_VALIDOS });
-    return res.status(500).json({ message: err.message });
+    return res.status(500).json({ message: 'Erro interno do servidor.' });
   }
 };
 
@@ -179,7 +179,7 @@ const minhasFaltas = async (req, res) => {
     return res.json(rows);
   } catch (err) {
     if (err.code === 'ER_NO_SUCH_TABLE') return res.json([]);
-    return res.status(500).json({ message: err.message });
+    return res.status(500).json({ message: 'Erro interno do servidor.' });
   }
 };
 

@@ -1,6 +1,7 @@
 const { createClient } = require('@supabase/supabase-js');
 const multer = require('multer');
 const path = require('path');
+const { fileFilter } = require('./uploadFilters');
 
 const supabase = createClient(
   process.env.SUPABASE_URL,
@@ -13,6 +14,7 @@ function supabaseUpload(folder, maxSizeMB = 10) {
   const upload = multer({
     storage,
     limits: { fileSize: maxSizeMB * 1024 * 1024 },
+    fileFilter,
   });
 
   // Injeta a lógica de upload no req.file após o multer processar

@@ -16,11 +16,22 @@
   },
   "scripts": {
   "start": "react-scripts start",
-  "build": "CI=false react-scripts build"
+  "build": "cross-env CI=false react-scripts build"
 },
   "proxy": "http://localhost:49152",
   "browserslist": {
-    "production": [">0.2%", "not dead", "not op_mini all"],
-    "development": ["last 1 chrome version", "last 1 firefox version", "last 1 safari version"]
+    "production": [
+      ">0.2%",
+      "not dead",
+      "not op_mini all"
+    ],
+    "development": [
+      "last 1 chrome version",
+      "last 1 firefox version",
+      "last 1 safari version"
+    ]
+  },
+  "devDependencies": {
+    "cross-env": "^10.1.0"
   }
 }

@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { FileText, Download, Upload, CheckCircle, Clock } from 'lucide-react';
 import api from '../services/api';
+import { fileUrl } from '../services/fileUrl';
 import { useNotification } from '../contexts/NotificationContext';
 
 const TIPOS_DOC = [
@@ -64,7 +65,7 @@ setMeusDocs(res.data?.data || res.data || []);    } catch (err) {
   };
 
   const downloadDocumento = (doc) => {
-    const link = `/uploads/${doc.caminho_arquivo}`;
+    const link = fileUrl(doc.caminho_arquivo);
     window.open(link, '_blank');
   };
 

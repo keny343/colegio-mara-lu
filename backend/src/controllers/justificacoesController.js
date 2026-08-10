@@ -1,5 +1,8 @@
 const db = require('../config/database');
 const path = require('path');
+const fs = require('fs');
+
+const UPLOADS_DIR = path.join(__dirname, '..', '..', 'uploads');
 
 // Aluno envia pedido de justificação para uma falta
 const justificarFalta = async (req, res) => {
@@ -52,8 +55,8 @@ const justificarFalta = async (req, res) => {
     if (err.code === 'ER_NO_SUCH_TABLE') {
       return res.status(503).json({ message: 'Tabela de justificações não existe. Execute a migração.' });
     }
-    console.error('[justificarFalta]', err.message);
-    return res.status(500).json({ message: err.message });
+    console.error('[justificarFalta] ERRO:', err.message);
+    return res.status(500).json({ message: 'Erro ao enviar justificação.' });
   }
 };
 
@@ -76,7 +79,42 @@ const listarPedidosJustificacao = async (req, res) => {
     return res.json(rows);
   } catch (err) {
     if (err.code === 'ER_NO_SUCH_TABLE') return res.json([]);
-    return res.status(500).json({ message: err.message });
+    console.error('[listarPedidosJustificacao] ERRO:', err.message);
+    return res.status(500).json({ message: 'Erro ao listar justificações.' });
+  }
+};
+
+// Professor descarrega o documento comprovativo (acesso autenticado e autorizado)
+const baixarDocumentoJustificacao = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const [jrows] = await db.query(
+      `SELECT j.id, j.documento_path, j.documento_nome, f.professor_id
+       FROM justificacoes_falta j
+       JOIN faltas f ON j.falta_id = f.id
+       WHERE j.id = ? LIMIT 1`,
+      [id]
+    );
+    if (jrows.length === 0) return res.status(404).json({ message: 'Justificação não encontrada.' });
+    if (!jrows[0].documento_path) return res.status(404).json({ message: 'Sem documento anexado.' });
+    if (String(jrows[0].professor_id) !== String(req.user.id)) {
+      return res.status(403).json({ message: 'Não tem permissão para aceder a este documento.' });
+    }
+
+    const filePath = path.join(UPLOADS_DIR, path.basename(jrows[0].documento_path));
+    if (!fs.existsSync(filePath)) {
+      return res.status(404).json({ message: 'Documento não encontrado no servidor.' });
+    }
+
+    return res.sendFile(filePath, {
+      headers: {
+        'Content-Disposition': `inline; filename="${encodeURIComponent(jrows[0].documento_nome || 'documento')}"`,
+        'X-Content-Type-Options': 'nosniff',
+      },
+    });
+  } catch (err) {
+    console.error('[baixarDocumentoJustificacao] ERRO:', err.message);
+    return res.status(500).json({ message: 'Erro ao descarregar documento.' });
   }
 };
 
@@ -130,8 +168,9 @@ const decidirJustificacao = async (req, res) => {
 
     return res.json({ message: `Justificação ${status}.` });
   } catch (err) {
-    return res.status(500).json({ message: err.message });
+    console.error('[decidirJustificacao] ERRO:', err.message);
+    return res.status(500).json({ message: 'Erro ao processar decisão.' });
   }
 };
 
-module.exports = { justificarFalta, listarPedidosJustificacao, decidirJustificacao };
+module.exports = { justificarFalta, listarPedidosJustificacao, baixarDocumentoJustificacao, decidirJustificacao };

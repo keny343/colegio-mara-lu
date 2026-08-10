@@ -1,6 +1,7 @@
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const db = require('../config/database');
+const { validarSenha } = require('../utils/passwordPolicy');
 require('dotenv').config();
 
 const supabaseUpload = require('../config/supabaseUpload');
@@ -17,6 +18,14 @@ async function ensureFotoColumn() {
   }
   fotoColumnEnsured = true;
 }
+
+const COOKIE_OPTIONS = {
+  httpOnly: true,
+  sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
+  secure: process.env.NODE_ENV === 'production',
+  path: '/',
+  maxAge: 24 * 60 * 60 * 1000, // 24h
+};
 
 function mapUsuario(row) {
   if (!row) return null;
@@ -41,19 +50,23 @@ const register = async (req, res) => {
   if (!nome || !email || !senha) {
     return res.status(400).json({ message: 'Nome, e-mail e senha são obrigatórios.' });
   }
+  const politica = validarSenha(senha);
+  if (!politica.ok) {
+    return res.status(400).json({ message: politica.message });
+  }
   try {
     const [existing] = await db.query('SELECT id FROM usuarios WHERE email = ?', [email]);
     if (existing.length > 0) {
       return res.status(409).json({ message: 'E-mail já cadastrado.' });
     }
-    const hash = await bcrypt.hash(senha, 10);
+    const hash = await bcrypt.hash(senha, 12);
     const [result] = await db.query(
       'INSERT INTO usuarios (nome, email, senha, telefone, cpf, endereco, ativo) VALUES (?,?,?,?,?,?,?)',
       [nome, email, hash, telefone || null, cpf || null, endereco || null, 1]
     );
     return res.status(201).json({ message: 'Cadastro realizado com sucesso!', id: result.insertId });
   } catch (err) {
-    console.error(err);
+    console.error('[register] ERRO:', err.message);
     return res.status(500).json({ message: 'Erro interno do servidor.' });
   }
 };
@@ -92,11 +105,18 @@ const login = async (req, res) => {
       process.env.JWT_SECRET,
       { expiresIn: '24h' }
     );
-    return res.json({ token, usuario: mapUsuario(usuario) });
+    // Sessão via cookie httpOnly (protege contra roubo de token por XSS)
+    res.cookie('token', token, COOKIE_OPTIONS);
+    return res.json({ usuario: mapUsuario(usuario) });
   } catch (err) {
     console.error('[login] ERRO:', err.message);
     return res.status(500).json({ message: 'Erro interno do servidor.' });
   }
+};
+
+const logout = (req, res) => {
+  res.clearCookie('token', { ...COOKIE_OPTIONS, maxAge: undefined });
+  return res.json({ message: 'Sessão encerrada.' });
 };
 
 const perfil = async (req, res) => {
@@ -109,6 +129,7 @@ const perfil = async (req, res) => {
     if (rows.length === 0) return res.status(404).json({ message: 'Usuário não encontrado.' });
     return res.json(rows[0]);
   } catch (err) {
+    console.error('[perfil] ERRO:', err.message);
     return res.status(500).json({ message: 'Erro interno.' });
   }
 };
@@ -129,6 +150,7 @@ const atualizarPerfil = async (req, res) => {
     );
     return res.json({ message: 'Perfil actualizado.', usuario: rows[0] });
   } catch (err) {
+    console.error('[atualizarPerfil] ERRO:', err.message);
     return res.status(500).json({ message: 'Erro ao actualizar perfil.' });
   }
 };
@@ -141,7 +163,8 @@ const atualizarFotoPerfil = async (req, res) => {
     await db.query('UPDATE usuarios SET foto_url = ? WHERE id = ?', [fotoPath, req.user.id]);
     return res.json({ message: 'Fotografia actualizada.', foto_url: fotoPath });
   } catch (err) {
-    return res.status(500).json({ message: err.message || 'Erro ao guardar fotografia.' });
+    console.error('[atualizarFotoPerfil] ERRO:', err.message);
+    return res.status(500).json({ message: 'Erro ao guardar fotografia.' });
   }
 };
 
@@ -159,9 +182,11 @@ const atualizarCredenciais = async (req, res) => {
 
     if (nova_senha) {
       if (!current_password) return res.status(400).json({ message: 'Senha atual é necessária para alterar a senha.' });
+      const politica = validarSenha(nova_senha);
+      if (!politica.ok) return res.status(400).json({ message: politica.message });
       const ok = await bcrypt.compare(current_password, userRow.senha);
       if (!ok) return res.status(401).json({ message: 'Senha atual inválida.' });
-      const hash = await bcrypt.hash(nova_senha, 10);
+      const hash = await bcrypt.hash(nova_senha, 12);
       await db.query('UPDATE usuarios SET senha = ? WHERE id = ?', [hash, req.user.id]);
     }
 
@@ -179,6 +204,7 @@ const atualizarCredenciais = async (req, res) => {
 module.exports = {
   register,
   login,
+  logout,
   perfil,
   atualizarPerfil,
   uploadAvatar,

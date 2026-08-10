@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import api from '../services/api';
 import { BookOpen, Download, FileText } from 'lucide-react';
+import { fileUrl } from '../services/fileUrl';
 
 const tipoIcon = (tipo) => {
   if (tipo === 'pdf') return '📄';
@@ -78,7 +79,7 @@ export default function PortalMateriais() {
                   <td>
                     <a
                       className="btn btn-outline btn-sm"
-                      href={`/uploads/materiais/${m.caminho}`}
+                      href={fileUrl(m.caminho)}
                       target="_blank"
                       rel="noreferrer"
                       aria-label={`Abrir material ${m.titulo}`}

@@ -2,8 +2,9 @@ import React, { useState, useEffect } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import {
-  Bell, LogOut, GraduationCap, Home, BookOpen, Calendar,
-  MessageCircle, FileText, AlertTriangle, User
+  Bell, LogOut, GraduationCap, Menu, X, Home, BookOpen, Calendar,
+  MessageCircle, FileText, AlertTriangle, User, Users, ClipboardList,
+  School, BookMarked, LayoutDashboard
 } from 'lucide-react';
 import api from '../services/api';
 import { podeEditarNotas, podeAcederInformacaoGeral, podeDesignarCoordenador } from '../utils/roles';
@@ -24,6 +25,11 @@ export default function Navbar() {
   const navigate = useNavigate();
   const location = useLocation();
   const [notifCount, setNotifCount] = useState(0);
+  const [menuOpen, setMenuOpen] = useState(false);
+
+  useEffect(() => {
+    setMenuOpen(false);
+  }, [location.pathname]);
 
   useEffect(() => {
     if (!user) return;
@@ -38,8 +44,78 @@ export default function Navbar() {
     return () => clearInterval(interval);
   }, [user]);
 
-  const handleLogout = () => { logout(); navigate('/'); };
+  const handleLogout = async () => { await logout(); navigate('/'); };
   const isActive = (to) => location.pathname === to;
+
+  const buildLinks = () => {
+    if (!user) {
+      return [
+        { to: '/', label: 'Início', icon: <Home size={16} /> },
+        { to: '/login', label: 'Entrar', icon: <User size={16} /> },
+        { to: '/inscricao', label: 'Inscrever-se', icon: <School size={16} />, primary: true },
+      ];
+    }
+    if (podeAcederInformacaoGeral(user)) {
+      const links = [
+        { to: '/admin', label: 'Dashboard', icon: <LayoutDashboard size={16} /> },
+        { to: '/admin/inscricoes', label: 'Inscrições', icon: <ClipboardList size={16} /> },
+      ];
+      if (podeDesignarCoordenador(user)) {
+        links.push({ to: '/admin/usuarios', label: user.role === 'admin' ? 'Usuários' : 'Equipa', icon: <Users size={16} /> });
+      }
+      if (user.role === 'admin') {
+        links.push({ to: '/admin/series', label: 'Séries', icon: <School size={16} /> });
+      }
+      links.push({ to: '/admin/academico', label: 'Académico', icon: <BookOpen size={16} /> });
+      if (podeEditarNotas(user)) {
+        links.push({ to: '/admin/notas', label: 'Notas', icon: <BookMarked size={16} /> });
+      }
+      links.push({ to: '/admin/perfil', label: 'Perfil', icon: <User size={16} /> });
+      return links;
+    }
+    if (user.role === 'aluno') {
+      return ALUNOLinks.map(l => ({ ...l, badge: l.to === '/portal/mensagens' ? notifCount : 0 }));
+    }
+    if (user.role === 'professor') {
+      const links = [];
+      if (podeEditarNotas(user)) {
+        links.push({ to: '/admin', label: 'Coordenação', icon: <LayoutDashboard size={16} /> });
+        links.push({ to: '/admin/notas', label: 'Notas (coord.)', icon: <BookMarked size={16} /> });
+      }
+      links.push({ to: '/professor', label: 'Painel do Professor', icon: <LayoutDashboard size={16} /> });
+      links.push({ to: '/professor/perfil', label: 'Perfil', icon: <User size={16} /> });
+      return links;
+    }
+    return [
+      { to: '/portal', label: 'Meu Portal', icon: <Home size={16} /> },
+      { to: '/portal/alunos', label: 'Meus Alunos', icon: <Users size={16} /> },
+      { to: '/portal/inscricoes', label: 'Inscrições', icon: <ClipboardList size={16} /> },
+      { to: '/portal/notificacoes', label: 'Notificações', icon: <Bell size={16} />, badge: notifCount },
+    ];
+  };
+
+  const links = buildLinks();
+
+  const NavLinks = ({ mobile = false }) => (
+    <>
+      {links.map(link => (
+        <Link
+          key={link.to}
+          to={link.to}
+          className={`nav-item${isActive(link.to) ? ' nav-item-active' : ''}${link.primary ? ' nav-item-primary' : ''}`}
+        >
+          {link.icon}
+          <span>{link.label}</span>
+          {link.badge > 0 && (
+            <span className="nav-badge">{link.badge > 99 ? '99+' : link.badge}</span>
+          )}
+        </Link>
+      ))}
+      <button onClick={handleLogout} className="nav-item nav-item-logout">
+        <LogOut size={16} /> <span>Sair</span>
+      </button>
+    </>
+  );
 
   return (
     <nav className="navbar">
@@ -49,99 +125,26 @@ export default function Navbar() {
       </Link>
 
       <div className="navbar-links">
-        {!user ? (
-          <>
-            <Link to="/">Início</Link>
-            <Link to="/login">Entrar</Link>
-            <Link to="/inscricao" className="btn-nav-primary">Inscrever-se</Link>
-          </>
-        ) : podeAcederInformacaoGeral(user) ? (
-          <>
-            <Link to="/admin">Dashboard</Link>
-            <Link to="/admin/inscricoes">Inscrições</Link>
-            {podeDesignarCoordenador(user) && <Link to="/admin/usuarios">{user.role === 'admin' ? 'Usuários' : 'Equipa'}</Link>}
-            {user.role === 'admin' && <Link to="/admin/series">Séries</Link>}
-            <Link to="/admin/academico">Académico</Link>
-            {podeEditarNotas(user) && <Link to="/admin/notas">Notas</Link>}
-            <Link to="/admin/perfil">Perfil</Link>
-            <button onClick={handleLogout}><LogOut size={16} /> Sair</button>
-          </>
-        ) : user.role === 'aluno' ? (
-          <>
-            {ALUNOLinks.map(link => (
-              <Link
-                key={link.to}
-                to={link.to}
-                style={{
-                  display: 'flex', alignItems: 'center', gap: 5,
-                  color: isActive(link.to) ? 'var(--laranja-claro)' : 'var(--bege)',
-                  textDecoration: 'none', padding: '8px 12px', borderRadius: 8,
-                  fontSize: '0.88rem', fontWeight: isActive(link.to) ? 600 : 500,
-                  transition: 'all 0.2s',
-                  background: isActive(link.to) ? 'rgba(232,100,26,0.2)' : 'transparent',
-                  position: 'relative'
-                }}
-              >
-                {link.icon}
-                {link.label}
-                {link.to === '/portal/mensagens' && notifCount > 0 && (
-                  <span style={{
-                    position: 'absolute', top: 4, right: 4,
-                    background: 'var(--vermelho)', color: '#fff',
-                    borderRadius: '50%', width: 16, height: 16,
-                    display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    fontSize: 9, fontWeight: 700
-                  }}>{notifCount}</span>
-                )}
-              </Link>
-            ))}
-            <button onClick={handleLogout} style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
-              <LogOut size={16} /> Sair
-            </button>
-          </>
-        ) : user.role === 'professor' ? (
-          <>
-            {podeEditarNotas(user) && (
-              <>
-                <Link to="/admin">Coordenação</Link>
-                <Link to="/admin/notas">Notas (coord.)</Link>
-              </>
-            )}
-            <Link
-              to="/professor"
-              style={{
-                display: 'flex', alignItems: 'center', gap: 5,
-                color: isActive('/professor') ? 'var(--laranja-claro)' : 'var(--bege)',
-                textDecoration: 'none', padding: '8px 12px', borderRadius: 8,
-                fontSize: '0.88rem', fontWeight: isActive('/professor') ? 600 : 500,
-                transition: 'all 0.2s',
-                background: isActive('/professor') ? 'rgba(232,100,26,0.2)' : 'transparent'
-              }}
-            >
-              <BookOpen size={16} /> Painel do Professor
-            </Link>
-            <Link to="/professor/perfil">Perfil</Link>
-            <button onClick={handleLogout} style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
-              <LogOut size={16} /> Sair
-            </button>
-          </>
-        ) : (
-          <>
-            <Link to="/portal">Meu Portal</Link>
-            <Link to="/portal/alunos">Meus Alunos</Link>
-            <Link to="/portal/inscricoes">Inscrições</Link>
-            <Link to="/portal/notificacoes" style={{ position: 'relative' }}>
-              <Bell size={18} />
-              {notifCount > 0 && (
-                <span style={{ position: 'absolute', top: -6, right: -4, background: 'var(--vermelho)', color: '#fff', borderRadius: '50%', width: 18, height: 18, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 10, fontWeight: 700 }}>
-                  {notifCount}
-                </span>
-              )}
-            </Link>
-            <button onClick={handleLogout}><LogOut size={16} /> Sair</button>
-          </>
-        )}
+        <NavLinks />
       </div>
+
+      <button
+        className="navbar-toggle"
+        aria-label={menuOpen ? 'Fechar menu' : 'Abrir menu'}
+        aria-expanded={menuOpen}
+        onClick={() => setMenuOpen(o => !o)}
+      >
+        {menuOpen ? <X size={24} /> : <Menu size={24} />}
+      </button>
+
+      {menuOpen && (
+        <>
+          <div className="navbar-overlay" onClick={() => setMenuOpen(false)} />
+          <div className="navbar-mobile">
+            <NavLinks mobile />
+          </div>
+        </>
+      )}
     </nav>
   );
 }

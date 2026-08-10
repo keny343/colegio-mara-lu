@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import api from '../services/api';
 import { FileUp, Upload, FileText, Download, Trash2 } from 'lucide-react';
 import Toast, { useToast } from '../components/Toast.js';
+import { fileUrl } from '../services/fileUrl';
 
 export default function ProfessorMateriais() {
   const [lista, setLista] = useState([]);
@@ -167,12 +168,12 @@ export default function ProfessorMateriais() {
                   <td>{m.turma_nome || '—'}</td>
                   <td>{m.disciplina_nome || '—'}</td>
                   <td>
-                    
+                    <a
                       className="btn btn-outline btn-sm"
-                      href={`/uploads/materiais/${m.caminho}`}
+                      href={fileUrl(m.caminho)}
                       target="_blank"
                       rel="noreferrer"
-                    <a>
+                    >
                       <Download size={13} /> Abrir
                     </a>
                   </td>

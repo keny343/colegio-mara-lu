@@ -8,47 +8,38 @@ export const AuthProvider = ({ children }) => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const token = localStorage.getItem('token');
     const savedUser = localStorage.getItem('user');
-    if (token && savedUser) {
-      setUser(JSON.parse(savedUser));
-      api.defaults.headers.common['Authorization'] = `Bearer ${token}`;
-      // Verificar se o token ainda é válido
-      api.get('/auth/perfil')
-        .then((res) => {
-          if (res.data) {
-            const saved = JSON.parse(savedUser);
-            const merged = { ...saved, ...res.data, foto_url: res.data.foto_url || saved.foto_url };
-            setUser(merged);
-            localStorage.setItem('user', JSON.stringify(merged));
-          }
-        })
-        .catch(() => {
-          // Token inválido ou expirado
-          logout();
-        })
-        .finally(() => {
-          setLoading(false);
-        });
-    } else {
-      setLoading(false);
-    }
+    // Restaurar sessão a partir do cookie httpOnly (se existir)
+    api.get('/auth/perfil')
+      .then((res) => {
+        const merged = savedUser ? { ...JSON.parse(savedUser), ...res.data } : res.data;
+        setUser(merged);
+        localStorage.setItem('user', JSON.stringify(merged));
+      })
+      .catch(() => {
+        localStorage.removeItem('user');
+        setUser(null);
+      })
+      .finally(() => {
+        setLoading(false);
+      });
   }, []);
 
   const login = async (email, senha) => {
     const res = await api.post('/auth/login', { email: (email || '').trim(), senha });
-    const { token, usuario } = res.data;
-    localStorage.setItem('token', token);
+    const { usuario } = res.data;
     localStorage.setItem('user', JSON.stringify(usuario));
-    api.defaults.headers.common['Authorization'] = `Bearer ${token}`;
     setUser(usuario);
     return usuario;
   };
 
-  const logout = () => {
-    localStorage.removeItem('token');
+  const logout = async () => {
+    try {
+      await api.post('/auth/logout');
+    } catch (e) {
+      // Ignorar falha de rede no logout
+    }
     localStorage.removeItem('user');
-    delete api.defaults.headers.common['Authorization'];
     setUser(null);
   };
 

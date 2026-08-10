@@ -131,7 +131,7 @@ const listarTodas = async (req, res) => {
     return res.json({ data: rows, total: total[0].total, page: parseInt(page), limit: parseInt(limit) });
   } catch (err) {
     console.error('[listarTodas] ERRO:', err.message);
-    return res.status(500).json({ message: 'Erro ao buscar inscrições.', detail: err.message });
+    return res.status(500).json({ message: 'Erro ao buscar inscrições.' });
   }
 };
 
@@ -162,7 +162,7 @@ const detalhesInscricao = async (req, res) => {
     return res.json({ ...rows[0], documentos: docs });
   } catch (err) {
     console.error('[detalhesInscricao] ERRO:', err.message);
-    return res.status(500).json({ message: 'Erro ao buscar inscrição.', detail: err.message });
+    return res.status(500).json({ message: 'Erro ao buscar inscrição.' });
   }
 };
 
@@ -241,7 +241,7 @@ const atualizarStatus = async (req, res) => {
     return res.json({ message: 'Status atualizado com sucesso!' });
   } catch (err) {
     console.error('[atualizarStatus] ERRO:', err.message);
-    return res.status(500).json({ message: 'Erro ao atualizar status.', detail: err.message });
+    return res.status(500).json({ message: 'Erro ao atualizar status.' });
   }
 };
 
@@ -289,7 +289,7 @@ const [totalAlunos]   = await db.query('SELECT COUNT(*) as total FROM alunos');
     });
   } catch (err) {
     console.error('[dashboardStats] ERRO:', err.message);
-    return res.status(500).json({ message: 'Erro ao buscar estatísticas.', detail: err.message });
+    return res.status(500).json({ message: 'Erro ao buscar estatísticas.' });
   }
 };
 

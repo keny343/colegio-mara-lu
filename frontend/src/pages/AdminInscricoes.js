@@ -3,6 +3,7 @@ import { useSearchParams } from 'react-router-dom';
 import { Eye, CheckCircle, FileText, X } from 'lucide-react';
 import api from '../services/api';
 import { normalizeSeriesName } from '../utils/serieName';
+import { fileUrl } from '../services/fileUrl';
 import Toast, { useToast } from '../components/Toast';
 
 function StatusBadge({ status }) {
@@ -87,26 +88,7 @@ export default function AdminInscricoes() {
 
   const totalPages = Math.ceil(total / 15);
 
-  const docUrl = (caminho) => {
-    if (!caminho) return null;
-    // Cloudinary URLs (https://...)
-    if (caminho.startsWith('http')) {
-      // PDFs enviados via resource_type:'auto' ficaram como /image/upload/ no Cloudinary
-      // mas devem ser servidos como /raw/upload/ para abrir no browser
-      if (caminho.includes('/image/upload/') && caminho.endsWith('.pdf')) {
-        return caminho.replace('/image/upload/', '/raw/upload/');
-      }
-      return caminho;
-    }
-    // Arquivos locais existentes no banco (apenas nome do arquivo)
-    // Em produção, usar URL completa do backend via variável de ambiente
-    // Em desenvolvimento, usar proxy
-    if (process.env.REACT_APP_API_URL) {
-      return `${process.env.REACT_APP_API_URL}/uploads/${caminho}`;
-    }
-    // Fallback para desenvolvimento com proxy
-    return `/uploads/${caminho}`;
-  };
+  const docUrl = (caminho) => fileUrl(caminho);
 
   return (
     <div className="page-container">

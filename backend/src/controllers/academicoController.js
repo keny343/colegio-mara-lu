@@ -55,7 +55,7 @@ const handleDb = (res, err) => {
       detail: err.message,
     });
   }
-  return res.status(500).json({ message: err.message || 'Erro no servidor.' });
+  return res.status(500).json({ message: 'Erro no servidor.' });
 };
 
 // ===== CURSOS =====
@@ -317,7 +317,7 @@ const minhasDisciplinas = async (req, res) => {
     return res.json(rows);
   } catch (err) {
     if (err.code === 'ER_NO_SUCH_TABLE') return res.json([]);
-    return res.status(500).json({ message: err.message });
+    return res.status(500).json({ message: 'Erro interno do servidor.' });
   }
 };
 
@@ -348,7 +348,7 @@ const alunosDaTurma = async (req, res) => {
     return res.json(rows);
   } catch (err) {
     if (err.code === 'ER_NO_SUCH_TABLE') return res.json([]);
-    return res.status(500).json({ message: err.message });
+    return res.status(500).json({ message: 'Erro interno do servidor.' });
   }
 };
 
@@ -442,7 +442,7 @@ const lancarNota = async (req, res) => {
       periodos: PERIODOS_VALIDOS,
     });
   } catch (err) {
-    return res.status(500).json({ message: err.message });
+    return res.status(500).json({ message: 'Erro interno do servidor.' });
   }
 };
 
@@ -477,7 +477,7 @@ const lancarFalta = async (req, res) => {
     }
     return res.json({ message: 'Falta registada.' });
   } catch (err) {
-    return res.status(500).json({ message: err.message });
+    return res.status(500).json({ message: 'Erro interno do servidor.' });
   }
 };
 
@@ -513,7 +513,7 @@ const listarTodosHorarios = async (req, res) => {
     return res.json(rows);
   } catch (err) {
     if (err.code === 'ER_NO_SUCH_TABLE') return res.json([]);
-    return res.status(500).json({ message: err.message });
+    return res.status(500).json({ message: 'Erro interno do servidor.' });
   }
 };
 
@@ -547,7 +547,7 @@ const listarHorariosTurma = async (req, res) => {
     return res.json(rows);
   } catch (err) {
     if (err.code === 'ER_NO_SUCH_TABLE') return res.json([]);
-    return res.status(500).json({ message: err.message });
+    return res.status(500).json({ message: 'Erro interno do servidor.' });
   }
 };
 
@@ -563,7 +563,7 @@ const criarHorario = async (req, res) => {
     );
     return res.status(201).json({ id: r.insertId, message: 'Horário criado.' });
   } catch (err) {
-    return res.status(500).json({ message: err.message });
+    return res.status(500).json({ message: 'Erro interno do servidor.' });
   }
 };
 
@@ -572,7 +572,7 @@ const removerHorario = async (req, res) => {
     await db.query('DELETE FROM horarios WHERE id = ?', [req.params.id]);
     return res.json({ message: 'Horário removido.' });
   } catch (err) {
-    return res.status(500).json({ message: err.message });
+    return res.status(500).json({ message: 'Erro interno do servidor.' });
   }
 };
 
@@ -601,7 +601,7 @@ const alunosDaTurmaStaff = async (req, res) => {
     return res.json(rows);
   } catch (err) {
     if (err.code === 'ER_NO_SUCH_TABLE') return res.json([]);
-    return res.status(500).json({ message: err.message });
+    return res.status(500).json({ message: 'Erro interno do servidor.' });
   }
 };
 
@@ -682,7 +682,7 @@ const criarMatricula = async (req, res) => {
     if (err.code === 'ER_NO_SUCH_TABLE') {
       return res.status(503).json({ message: 'Tabelas académicas em falta. Execute: node backend/scripts/migrate-academico.js' });
     }
-    return res.status(500).json({ message: err.message });
+    return res.status(500).json({ message: 'Erro interno do servidor.' });
   }
 };
 
@@ -709,7 +709,7 @@ const listarAlunosParaMatricula = async (req, res) => {
     return res.json(rows);
   } catch (err) {
     if (err.code === 'ER_NO_SUCH_TABLE') return res.json([]);
-    return res.status(500).json({ message: err.message });
+    return res.status(500).json({ message: 'Erro interno do servidor.' });
   }
 };
 
@@ -793,7 +793,7 @@ const notasDaTurma = async (req, res) => {
     });
   } catch (err) {
     if (err.code === 'ER_NO_SUCH_TABLE') return res.json({ alunos: [], periodos: PERIODOS_VALIDOS });
-    return res.status(500).json({ message: err.message });
+    return res.status(500).json({ message: 'Erro interno do servidor.' });
   }
 };
 
@@ -939,7 +939,7 @@ const pautaFinalTurma = async (req, res) => {
     });
   } catch (err) {
     if (err.code === 'ER_NO_SUCH_TABLE') return res.json({ turma: null, disciplinas: [], alunos: [] });
-    return res.status(500).json({ message: err.message });
+    return res.status(500).json({ message: 'Erro interno do servidor.' });
   }
 };
 
@@ -984,7 +984,7 @@ const lancarNotaRecurso = async (req, res) => {
     }
     return res.json({ message: 'Nota de recurso lançada.' });
   } catch (err) {
-    return res.status(500).json({ message: err.message });
+    return res.status(500).json({ message: 'Erro interno do servidor.' });
   }
 };
 
@@ -1000,7 +1000,7 @@ const listarConfigAvaliacao = async (req, res) => {
     );
     return res.json(rows);
   } catch (err) {
-    return res.status(500).json({ message: err.message });
+    return res.status(500).json({ message: 'Erro interno do servidor.' });
   }
 };
 
@@ -1034,7 +1034,7 @@ const salvarConfigAvaliacao = async (req, res) => {
     }
     return res.json({ message: 'Configuração guardada. Aplicada automaticamente a todas as turmas desta classe/curso.' });
   } catch (err) {
-    return res.status(500).json({ message: err.message });
+    return res.status(500).json({ message: 'Erro interno do servidor.' });
   }
 };
 
@@ -1100,7 +1100,7 @@ const lancarNotaExameDefesa = async (req, res) => {
     }
     return res.json({ message: config.exame_nacional ? 'Nota do Exame Nacional lançada.' : 'Nota da Defesa Final lançada.' });
   } catch (err) {
-    return res.status(500).json({ message: err.message });
+    return res.status(500).json({ message: 'Erro interno do servidor.' });
   }
 };
 
@@ -1166,7 +1166,7 @@ const lancarNotaChamada2 = async (req, res) => {
     }
     return res.json({ message: 'Nota da 2ª chamada lançada.' });
   } catch (err) {
-    return res.status(500).json({ message: err.message });
+    return res.status(500).json({ message: 'Erro interno do servidor.' });
   }
 };
 

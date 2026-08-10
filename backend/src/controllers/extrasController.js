@@ -12,7 +12,7 @@ const listarSeries = async (req, res) => {
     return res.json(rows);
   } catch (err) {
     console.error('listarSeries:', err.message);
-    return res.status(500).json({ message: err.message || 'Erro ao buscar séries.' });
+    return res.status(500).json({ message: 'Erro ao buscar séries.' });
   }
 };
 
@@ -26,7 +26,7 @@ const criarSerie = async (req, res) => {
     return res.status(201).json({ message: 'Série criada!', id: result.insertId });
   } catch (err) {
     console.error('[criarSerie] ERRO:', err.message);
-    return res.status(500).json({ message: 'Erro ao criar série.', detail: err.message });
+    return res.status(500).json({ message: 'Erro ao criar série.' });
   }
 };
 
@@ -46,7 +46,7 @@ const atualizarSerie = async (req, res) => {
     return res.json({ message: 'Série atualizada!' });
   } catch (err) {
     console.error('[atualizarSerie] ERRO:', err.message);
-    return res.status(500).json({ message: 'Erro ao atualizar série.', detail: err.message });
+    return res.status(500).json({ message: 'Erro ao atualizar série.' });
   }
 };
 
@@ -57,7 +57,7 @@ const deletarSerie = async (req, res) => {
     return res.json({ message: 'Série desativada.' });
   } catch (err) {
     console.error('[deletarSerie] ERRO:', err.message);
-    return res.status(500).json({ message: 'Erro ao deletar série.', detail: err.message });
+    return res.status(500).json({ message: 'Erro ao deletar série.' });
   }
 };
 
@@ -85,7 +85,7 @@ const enviarDocumento = async (req, res) => {
     return res.status(201).json({ message: 'Documento enviado com sucesso!' });
   } catch (err) {
     console.error('[enviarDocumento] ERRO:', err.message);
-    return res.status(500).json({ message: 'Erro ao salvar documento.', detail: err.message });
+    return res.status(500).json({ message: 'Erro ao salvar documento.' });
   }
 };
 
@@ -101,7 +101,7 @@ const atualizarDocumento = async (req, res) => {
     return res.json({ message: 'Documento atualizado.' });
   } catch (err) {
     console.error('[atualizarDocumento] ERRO:', err.message);
-    return res.status(500).json({ message: 'Erro ao atualizar documento.', detail: err.message });
+    return res.status(500).json({ message: 'Erro ao atualizar documento.' });
   }
 };
 
@@ -119,7 +119,7 @@ const listarUsuarios = async (req, res) => {
     return res.json(rows);
   } catch (err) {
     console.error('listarUsuarios:', err.message);
-    return res.status(500).json({ message: err.message || 'Erro ao buscar usuários.' });
+    return res.status(500).json({ message: 'Erro ao buscar usuários.' });
   }
 };
 
@@ -152,7 +152,7 @@ const listarEquipaCoordenador = async (req, res) => {
     return res.json(equipa);
   } catch (err) {
     console.error('listarEquipaCoordenador:', err.message);
-    return res.status(500).json({ message: err.message || 'Erro ao buscar equipa.' });
+    return res.status(500).json({ message: 'Erro ao buscar equipa.' });
   }
 };
 
@@ -180,7 +180,7 @@ const sincronizarVagasSeries = async (req, res) => {
     return res.json({ message: `Vagas sincronizadas em ${atualizadas} classe(s).`, atualizadas });
   } catch (err) {
     console.error('sincronizarVagasSeries:', err.message);
-    return res.status(500).json({ message: err.message || 'Erro ao sincronizar vagas.' });
+    return res.status(500).json({ message: 'Erro ao sincronizar vagas.' });
   }
 };
 
@@ -377,7 +377,7 @@ const minhasNotificacoes = async (req, res) => {
     return res.json(rows);
   } catch (err) {
     console.error('[minhasNotificacoes] ERRO:', err.message);
-    return res.status(500).json({ message: 'Erro ao buscar notificações.', detail: err.message });
+    return res.status(500).json({ message: 'Erro ao buscar notificações.' });
   }
 };
 

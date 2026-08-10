@@ -48,7 +48,7 @@ const listarMateriaisProfessor = async (req, res) => {
     );
     return res.json(rows);
   } catch (err) {
-    return res.status(500).json({ message: err.message });
+    return res.status(500).json({ message: 'Erro interno do servidor.' });
   }
 };
 
@@ -107,7 +107,7 @@ const enviarMaterial = async (req, res) => {
 
     return res.status(201).json({ id: r.insertId, message: 'Material publicado.' });
   } catch (err) {
-    return res.status(500).json({ message: err.message });
+    return res.status(500).json({ message: 'Erro interno do servidor.' });
   }
 };
 
@@ -141,7 +141,7 @@ const listarMateriaisRecebidos = async (req, res) => {
     );
     return res.json(filtered);
   } catch (err) {
-    return res.status(500).json({ message: err.message });
+    return res.status(500).json({ message: 'Erro interno do servidor.' });
   }
 };
 
@@ -211,7 +211,7 @@ const enviarPlanoCurricular = async (req, res) => {
 
     return res.status(201).json({ id: r.insertId, message: 'Plano curricular publicado.' });
   } catch (err) {
-    return res.status(500).json({ message: err.message });
+    return res.status(500).json({ message: 'Erro interno do servidor.' });
   }
 };
 
@@ -238,7 +238,7 @@ const listarPlanosCurriculares = async (req, res) => {
     });
     return res.json(filtered);
   } catch (err) {
-    return res.status(500).json({ message: err.message });
+    return res.status(500).json({ message: 'Erro interno do servidor.' });
   }
 };
 
@@ -304,7 +304,7 @@ const professorPainelResumo = async (req, res) => {
     });
   } catch (err) {
     if (err.code === 'ER_NO_SUCH_TABLE') return res.json({ disciplinas: [], alunos: [] });
-    return res.status(500).json({ message: err.message });
+    return res.status(500).json({ message: 'Erro interno do servidor.' });
   }
 };
 

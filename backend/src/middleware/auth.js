@@ -1,10 +1,20 @@
 const jwt = require('jsonwebtoken');
 require('dotenv').config();
 
-const authMiddleware = (req, res, next) => {
-  const authHeader = req.headers['authorization'];
-  const token = authHeader && authHeader.split(' ')[1];
+// Lê o token JWT do cookie httpOnly ou do header Authorization
+function getToken(req) {
+  const cookieToken = req.cookies && req.cookies.token;
+  if (cookieToken) return cookieToken;
 
+  const authHeader = req.headers['authorization'];
+  if (authHeader && authHeader.startsWith('Bearer ')) {
+    return authHeader.split(' ')[1];
+  }
+  return null;
+}
+
+const authMiddleware = (req, res, next) => {
+  const token = getToken(req);
   if (!token) return res.status(401).json({ message: 'Token não fornecido.' });
 
   try {

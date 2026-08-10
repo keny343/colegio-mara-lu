@@ -54,6 +54,7 @@ export default function ProfessorJustificacoes() {
   };
 
   const apiBase = process.env.REACT_APP_API_URL || '';
+const docUrl = (p) => `${apiBase}/api/professor/justificacoes/${p.id}/documento`;
 
   if (loading) return <div className="loading"><div className="spinner" /></div>;
 
@@ -96,7 +97,7 @@ export default function ProfessorJustificacoes() {
                       </div>
                       {p.documento_path && (
                         <a
-                          href={`${apiBase}/uploads/${p.documento_path}`}
+                          href={docUrl(p)}
                           target="_blank"
                           rel="noopener noreferrer"
                           className="btn btn-sm btn-outline"
@@ -145,7 +146,7 @@ export default function ProfessorJustificacoes() {
                           <td style={{ fontSize: '0.85rem', maxWidth: 180 }}>{p.motivo}</td>
                           <td>
                             {p.documento_path ? (
-                              <a href={`${apiBase}/uploads/${p.documento_path}`} target="_blank" rel="noopener noreferrer" className="btn btn-sm btn-outline" style={{ fontSize: '0.75rem' }}>
+                              <a href={docUrl(p)} target="_blank" rel="noopener noreferrer" className="btn btn-sm btn-outline" style={{ fontSize: '0.75rem' }}>
                                 <FileText size={12} />
                               </a>
                             ) : '—'}
@@ -181,7 +182,7 @@ export default function ProfessorJustificacoes() {
               <strong>Motivo do aluno:</strong> {modal.motivo}
               {modal.documento_path && (
                 <div style={{ marginTop: 8 }}>
-                  <a href={`${apiBase}/uploads/${modal.documento_path}`} target="_blank" rel="noopener noreferrer" className="btn btn-sm btn-outline" style={{ fontSize: '0.78rem' }}>
+                  <a href={docUrl(modal)} target="_blank" rel="noopener noreferrer" className="btn btn-sm btn-outline" style={{ fontSize: '0.78rem' }}>
                     <FileText size={13} /> Ver documento comprovativo
                   </a>
                 </div>

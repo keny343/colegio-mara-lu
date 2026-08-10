@@ -3,6 +3,7 @@ import api from '../services/api';
 import { useAuth } from '../contexts/AuthContext';
 import { FileText, Upload, Download, Eye } from 'lucide-react';
 import Toast, { useToast } from '../components/Toast';
+import { fileUrl } from '../services/fileUrl';
 
 export default function PlanoCurricular() {
   const { user } = useAuth();
@@ -158,7 +159,7 @@ export default function PlanoCurricular() {
                   <td>
                     <a
                       className="btn btn-outline btn-sm"
-                      href={`/uploads/planos/${p.caminho}`}
+                      href={fileUrl(p.caminho)}
                       target="_blank"
                       rel="noreferrer"
                     >
