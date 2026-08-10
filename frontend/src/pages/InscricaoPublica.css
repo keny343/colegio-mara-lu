@@ -31,3 +31,8 @@
 .insc-footer { text-align: center; margin-top: 1.5rem; padding-top: 1.5rem; border-top: 1px solid var(--bege); }
 .insc-footer p { color: var(--cinza); font-size: 0.9rem; }
 .insc-footer a { color: var(--laranja); font-weight: 600; }
+
+@media (max-width: 640px) {
+  .insc-screen, .insc-success-screen { padding: 1rem; }
+  .insc-header h2 { font-size: 1.4rem; }
+}

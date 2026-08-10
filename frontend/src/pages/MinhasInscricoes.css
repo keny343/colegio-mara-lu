@@ -13,3 +13,11 @@
 
 .nova-card { max-width: 600px; }
 .nova-actions { display: flex; gap: 12px; }
+
+@media (max-width: 640px) {
+  .insc-item { gap: 1rem; }
+  .insc-main { min-width: 100%; }
+  .insc-status { width: 100%; }
+  .nova-actions { flex-wrap: wrap; }
+  .nova-actions .btn { flex: 1; }
+}

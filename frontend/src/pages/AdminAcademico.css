@@ -30,3 +30,11 @@
 .modal-actions { display: flex; gap: 12px; }
 .modal-erro { margin-bottom: 1rem; }
 .modal-info { color: var(--cinza); font-size: 0.9rem; margin-bottom: 1rem; }
+
+@media (max-width: 768px) {
+  .acad-header { flex-direction: column; }
+  .acad-tabs { flex-wrap: nowrap; overflow-x: auto; padding-bottom: 4px; -webkit-overflow-scrolling: touch; scrollbar-width: none; }
+  .acad-tabs::-webkit-scrollbar { display: none; }
+  .card-table-head { padding: 1rem 1rem 0; }
+  .horario-card, .horario-list { margin: 0.75rem; }
+}

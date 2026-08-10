@@ -108,3 +108,14 @@
 .msg-item-data { font-size: 0.75rem; color: var(--cinza); }
 .msg-item-lida-hint { font-size: 0.75rem; color: var(--laranja); font-weight: 600; }
 .msg-item-responder { margin-left: auto; display: flex; align-items: center; gap: 4px; }
+
+@media (max-width: 640px) {
+  .msg-enviar-hint { display: none; }
+  .msg-item { padding: 0.8rem; gap: 10px; }
+  .msg-item-avatar { width: 36px; height: 36px; }
+  .msg-item-avatar svg { width: 16px; height: 16px; }
+  .msg-item-responder { margin-left: 0; }
+  .chat-bubble-wrap { max-width: 88%; }
+  .msg-dropdown { max-height: 220px; }
+  .msg-header-row { flex-direction: column; align-items: flex-start; }
+}

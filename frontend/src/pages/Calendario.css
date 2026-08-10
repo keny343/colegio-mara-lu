@@ -85,3 +85,15 @@
 @media (max-width: 900px) {
   .cal-layout { grid-template-columns: 1fr; }
 }
+@media (max-width: 640px) {
+  .cal-grid { gap: 2px; }
+  .cal-grid-head { font-size: 0.68rem; padding: 4px 0; }
+  .cal-celula { min-height: 52px; padding: 4px; }
+  .cal-celula-numero { font-size: 0.78rem; }
+  .cal-celula-aulas { font-size: 0.52rem; padding: 1px 3px; }
+  .cal-celula-dots { gap: 1px; }
+  .cal-dot { width: 4px; height: 4px; }
+  .cal-nav-titulo { font-size: 1rem; }
+  .cal-legenda { gap: 8px; }
+  .cal-legenda-item { font-size: 0.72rem; }
+}

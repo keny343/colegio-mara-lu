@@ -77,7 +77,7 @@ export default function AdminSidebar() {
       </nav>
 
       <div className="admin-sidebar-footer">
-        <button type="button" className="admin-sidebar-logout" onClick={sair}>
+        <button type="button" className="admin-sidebar-logout" onClick={sair} aria-label="Sair">
           <LogOut size={16} /> Sair
         </button>
       </div>

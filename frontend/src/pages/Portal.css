@@ -67,3 +67,17 @@
 .portal-media-badge {
   display: inline-block; font-weight: 700; padding: 3px 10px; border-radius: 20px; font-size: 0.85rem;
 }
+
+@media (max-width: 640px) {
+  .portal-hero { padding: 1.25rem; margin-bottom: 1.25rem; }
+  .portal-hero-titulo { font-size: 1.25rem; }
+  .portal-avatar { width: 44px; height: 44px; }
+  .portal-avatar svg { width: 22px; height: 22px; }
+  .portal-chips { gap: 8px; }
+  .portal-chip { font-size: 0.78rem; padding: 0.35rem 0.75rem; }
+  .portal-grid { gap: 1.25rem; }
+  .portal-section-titulo { font-size: 1rem; }
+  .portal-icone { padding: 6px; }
+  .portal-icone svg { width: 18px; height: 18px; }
+  .portal-trimestre-titulo { font-size: 0.95rem; }
+}

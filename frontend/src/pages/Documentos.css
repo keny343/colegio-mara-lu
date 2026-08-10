@@ -24,3 +24,9 @@
   font-size: 0.82rem; color: var(--cinza); line-height: 1.6;
 }
 .doc-nota strong { color: var(--castanho-medio); }
+
+@media (max-width: 640px) {
+  .docs-grid { grid-template-columns: 1fr; gap: 1rem; }
+  .doc-item { flex-wrap: wrap; }
+  .doc-actions { margin-left: auto; }
+}

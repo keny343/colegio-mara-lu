@@ -12,3 +12,9 @@
 
 .modal-actions { display: flex; gap: 12px; }
 .modal-erro { margin-bottom: 1rem; }
+
+@media (max-width: 640px) {
+  .aluno-grid { grid-template-columns: 1fr; }
+  .aluno-dados { grid-template-columns: 1fr; }
+  .aluno-head { flex-direction: column; align-items: flex-start; }
+}

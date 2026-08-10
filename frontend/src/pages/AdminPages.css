@@ -35,3 +35,10 @@
 .ap-ocupacao-barra { height: 8px; background: #F0E4D7; border-radius: 4px; overflow: hidden; }
 .ap-ocupacao-preenchida { height: 100%; border-radius: 4px; transition: width 0.3s; }
 .ap-ocupacao-status { font-size: 0.85rem; font-weight: 600; }
+
+@media (max-width: 640px) {
+  .ap-serie-grid { grid-template-columns: 1fr; }
+  .ap-acoes { flex-wrap: wrap; }
+  .ap-modal-acoes { flex-wrap: wrap; }
+  .ap-modal-acoes .btn-outline { flex: 1; }
+}
