@@ -19,13 +19,29 @@ async function ensureFotoColumn() {
   fotoColumnEnsured = true;
 }
 
-const COOKIE_OPTIONS = {
-  httpOnly: true,
-  sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
-  secure: process.env.NODE_ENV === 'production',
-  path: '/',
-  maxAge: 24 * 60 * 60 * 1000, // 24h
-};
+// Cookie adaptativo: se o frontend estiver na MESMA origem (proxy /api ou localhost),
+// usa SameSite=Lax e a sessão é "first-party" (guarda em qualquer browser mobile).
+// Se o frontend chamar a API diretamente cross-origin, usa SameSite=None (requer HTTPS).
+function getCookieOptions(req) {
+  let sameSite = 'none';
+  const origin = req.headers.origin;
+  if (origin) {
+    try {
+      if (new URL(origin).hostname === req.hostname) sameSite = 'lax';
+    } catch (err) {
+      // origem inválida → tratar como cross-site
+    }
+  } else {
+    sameSite = 'lax';
+  }
+  return {
+    httpOnly: true,
+    sameSite,
+    secure: req.secure, // honra X-Forwarded-Proto (trust proxy 1)
+    path: '/',
+    maxAge: 24 * 60 * 60 * 1000, // 24h
+  };
+}
 
 function mapUsuario(row) {
   if (!row) return null;
@@ -106,7 +122,7 @@ const login = async (req, res) => {
       { expiresIn: '24h' }
     );
     // Sessão via cookie httpOnly (protege contra roubo de token por XSS)
-    res.cookie('token', token, COOKIE_OPTIONS);
+    res.cookie('token', token, getCookieOptions(req));
     return res.json({ usuario: mapUsuario(usuario) });
   } catch (err) {
     console.error('[login] ERRO:', err.message);
@@ -115,7 +131,7 @@ const login = async (req, res) => {
 };
 
 const logout = (req, res) => {
-  res.clearCookie('token', { ...COOKIE_OPTIONS, maxAge: undefined });
+  res.clearCookie('token', getCookieOptions(req));
   return res.json({ message: 'Sessão encerrada.' });
 };
 

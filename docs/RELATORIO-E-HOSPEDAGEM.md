@@ -49,8 +49,16 @@ NODE_ENV=production
 **Frontend (Vercel):**
 
 ```env
-REACT_APP_API_URL=https://colegio-api.onrender.com/api
+# NÃO definir REACT_APP_API_URL em produção.
+# O frontend usa /api relativo e o proxy em `frontend/vercel.json` redireciona
+# para a API no MESMO domínio → cookie first-party → sessão persiste no mobile.
 ```
+
+> **Importante (login mobile):** se `REACT_APP_API_URL` apontar diretamente para
+> `https://...onrender.com`, o cookie `SameSite=None` é um *cookie de terceiros* e o
+> Safari/Chrome no telemóvel **bloqueia-o** (o login entra mas a sessão é perdida e
+> aparece erro ao carregar dados). O proxy em `vercel.json` resolve isto.
+> O backend já usa flags de cookie adaptativas (SameSite=Lax quando same-origin).
 
 ### 1.2 CORS
 
@@ -120,7 +128,7 @@ Para MVP: disco Render + backup manual periódico da pasta `uploads`.
 2. **Root directory:** `frontend`  
 3. **Build command:** `npm run build`  
 4. **Output:** `build`  
-5. Variável `REACT_APP_API_URL` = URL da API + `/api`  
+5. **Não definir** `REACT_APP_API_URL` (o `vercel.json` com rewrites `/api/*` → Render já está no repositório e torna o cookie first-party).
 6. Deploy.
 
 ---
