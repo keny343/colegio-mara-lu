@@ -415,9 +415,9 @@ export default function AdminAcademico() {
               <tbody>
                 {cursos.map(c => (
                   <tr key={c.id}>
-                    <td><strong>{c.nome}</strong></td>
-                    <td className="text-cinza">{c.descricao || '—'}</td>
-                    <td>
+                    <td data-label="Nome"><strong>{c.nome}</strong></td>
+                    <td className="text-cinza" data-label="Descrição">{c.descricao || '—'}</td>
+                    <td className="td-actions" data-label="Ações">
                       <div className="acoes-row">
                         <Button variant="outline" size="sm" icon={<Pencil size={14} />} onClick={() => abrirModal('curso', c)}>Editar</Button>
                         <Button variant="danger" size="sm" icon={<Trash2 size={14} />} onClick={() => apagarCurso(c)} disabled={saving}>Apagar</Button>
@@ -450,10 +450,10 @@ export default function AdminAcademico() {
               <tbody>
                 {disciplinas.map(d => (
                   <tr key={d.id}>
-                    <td><strong>{d.nome}</strong></td>
-                    <td>{d.curso_nome || 'Geral'}</td>
-                    <td className="text-cinza">{d.serie_min || '—'} até {d.serie_max || '—'}</td>
-                    <td style={{ textAlign: 'center' }}>
+                    <td data-label="Disciplina"><strong>{d.nome}</strong></td>
+                    <td data-label="Curso">{d.curso_nome || 'Geral'}</td>
+                    <td className="text-cinza" data-label="Classe">{d.serie_min || '—'} até {d.serie_max || '—'}</td>
+                    <td style={{ textAlign: 'center' }} data-label="Chave">
                       <button
                         type="button"
                         className={`chave-pill${d.disciplina_chave ? ' chave-pill--on' : ''}`}
@@ -502,12 +502,12 @@ export default function AdminAcademico() {
               <tbody>
                 {turmas.map(t => (
                   <tr key={t.id}>
-                    <td><strong>{t.nome}</strong></td>
-                    <td>{t.ano_letivo}</td>
-                    <td>{t.serie_classe}ª</td>
-                    <td>{t.curso_nome || '—'}</td>
-                    <td>{t.turno}</td>
-                    <td>
+                    <td data-label="Turma"><strong>{t.nome}</strong></td>
+                    <td data-label="Ano">{t.ano_letivo}</td>
+                    <td data-label="Classe">{t.serie_classe}ª</td>
+                    <td data-label="Curso">{t.curso_nome || '—'}</td>
+                    <td data-label="Turno">{t.turno}</td>
+                    <td className="td-actions" data-label="Ações">
                       <div className="acoes-row acoes-wrap">
                         <Button variant="outline" size="sm" onClick={() => abrirAlunosTurma(t)}>Ver alunos</Button>
                         {isAdmin && (
@@ -587,12 +587,12 @@ export default function AdminAcademico() {
               <tbody>
                 {horarios.map(h => (
                   <tr key={h.id}>
-                    <td>{h.dia_semana}</td>
-                    <td>{h.hora_inicio} — {h.hora_fim}</td>
-                    <td>{h.turma_nome} — {h.serie_classe}ª</td>
-                    <td>{h.disciplina_nome}</td>
-                    <td>{h.sala || '—'}</td>
-                    <td>
+                    <td data-label="Dia">{h.dia_semana}</td>
+                    <td data-label="Horário">{h.hora_inicio} — {h.hora_fim}</td>
+                    <td data-label="Turma">{h.turma_nome} — {h.serie_classe}ª</td>
+                    <td data-label="Disciplina">{h.disciplina_nome}</td>
+                    <td data-label="Sala">{h.sala || '—'}</td>
+                    <td className="td-actions" data-label="Ações">
                       <Button variant="danger" size="sm" onClick={() => apagarHorario(h)} disabled={saving}>Remover</Button>
                     </td>
                   </tr>
@@ -729,10 +729,10 @@ export default function AdminAcademico() {
                   <tr><td colSpan={4} className="text-cinza">Nenhuma classe configurada ainda — por omissão, nenhuma classe usa exame nacional nem defesa final.</td></tr>
                 ) : configAvaliacao.map(cfg => (
                   <tr key={cfg.id}>
-                    <td><strong>{cfg.serie_classe}ª classe</strong></td>
-                    <td>{cfg.curso_nome || 'Toda a classe'}</td>
-                    <td style={{ textAlign: 'center' }}>{cfg.exame_nacional ? '✓' : '—'}</td>
-                    <td style={{ textAlign: 'center' }}>{cfg.defesa_final ? '✓' : '—'}</td>
+                    <td data-label="Classe"><strong>{cfg.serie_classe}ª classe</strong></td>
+                    <td data-label="Curso">{cfg.curso_nome || 'Toda a classe'}</td>
+                    <td style={{ textAlign: 'center' }} data-label="Exame Nacional">{cfg.exame_nacional ? '✓' : '—'}</td>
+                    <td style={{ textAlign: 'center' }} data-label="Defesa Final">{cfg.defesa_final ? '✓' : '—'}</td>
                   </tr>
                 ))}
               </tbody>
@@ -796,9 +796,9 @@ export default function AdminAcademico() {
               <tbody>
                 {alunosModal.alunos.map(a => (
                   <tr key={a.aluno_id}>
-                    <td>{a.aluno_nome}</td>
-                    <td>{a.cpf || '—'}</td>
-                    <td>{a.status}</td>
+                    <td data-label="Aluno">{a.aluno_nome}</td>
+                    <td data-label="BI">{a.cpf || '—'}</td>
+                    <td data-label="Status">{a.status}</td>
                   </tr>
                 ))}
               </tbody>

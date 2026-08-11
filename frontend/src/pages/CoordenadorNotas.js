@@ -394,8 +394,8 @@ export default function CoordenadorNotas({ modoProfessor = false }) {
                   const aguardaChamada2 = (a.disciplinas || []).filter(d => d.avaliacao_status === 'pendente_2a_chamada');
                   return (
                     <tr key={a.matricula_id}>
-                      <td><strong>{a.aluno_nome}</strong></td>
-                      <td>
+                      <td data-label="Aluno"><strong>{a.aluno_nome}</strong></td>
+                      <td data-label="Resultado">
                         <StatusPill status={a.resultado} fallback={badges[a.resultado] || 'Notas incompletas'} />
                         {aguardaExameDefesa.length > 0 && (
                           <div className="pauta-aviso">Aguarda {pauta.config_avaliacao?.exame_nacional ? 'Exame Nacional' : 'Defesa Final'}</div>
@@ -404,11 +404,11 @@ export default function CoordenadorNotas({ modoProfessor = false }) {
                           <div className="pauta-aviso">Aguarda 2ª chamada</div>
                         )}
                       </td>
-                      <td className="cell-motivo">
+                      <td className="cell-motivo" data-label="Disciplinas em negativa">
                         {a.negativas.length === 0 ? '—' : a.negativas.map(n => n.nome).join(', ')}
                       </td>
                       {podeLancarRecurso && (
-                        <td>
+                        <td data-label="Pendências / Acção">
                           {a.resultado === 'recurso' && a.negativas.map((n) => {
                             const key = `${a.matricula_id}-${n.disciplina_id}`;
                             return (
@@ -502,11 +502,11 @@ export default function CoordenadorNotas({ modoProfessor = false }) {
                     ];
                     return (
                       <tr key={a.matricula_id}>
-                        <td><strong>{a.aluno_nome}</strong></td>
+                        <td data-label="Aluno"><strong>{a.aluno_nome}</strong></td>
                         {celulas.map((per) => {
                           const editavel = podeEditarCelula(a.matricula_id, per.key);
                           return (
-                            <td key={per.key} className="td-center td-cell-nota">
+                            <td key={per.key} className="td-center td-cell-nota" data-label={per.label}>
                               <div className="nota-celula">
                                 <input
                                   type="number"
@@ -534,7 +534,7 @@ export default function CoordenadorNotas({ modoProfessor = false }) {
                             </td>
                           );
                         })}
-                        <td className="td-center td-media">{mediaTri ?? '—'}</td>
+                        <td className="td-center td-media" data-label="Média do trimestre">{mediaTri ?? '—'}</td>
                       </tr>
                     );
                   })}
@@ -556,9 +556,9 @@ export default function CoordenadorNotas({ modoProfessor = false }) {
                 <tbody>
                   {alunos.map((a) => (
                     <tr key={a.matricula_id}>
-                      <td>{a.aluno_nome}</td>
-                      <td className="td-center td-media">{mediaAluno(a.matricula_id) ?? '—'}</td>
-                      <td className="td-center">
+                      <td data-label="Aluno">{a.aluno_nome}</td>
+                      <td className="td-center td-media" data-label="Média anual">{mediaAluno(a.matricula_id) ?? '—'}</td>
+                      <td className="td-center" data-label="Situação">
                         {a.situacao === 'aprovado' && <StatusPill status="aprovado" fallback="Aprovado" />}
                         {a.situacao === 'reprovado' && <StatusPill status="reprovado" fallback="Reprovado" />}
                         {!a.situacao && <span className="text-cinza">Notas incompletas</span>}
@@ -598,9 +598,9 @@ export default function CoordenadorNotas({ modoProfessor = false }) {
                       const jaTemNotaFinal = configDisciplina.exame_nacional ? a.periodos?.EXN != null : a.periodos?.DEF != null;
                       return (
                         <tr key={a.matricula_id}>
-                          <td><strong>{a.aluno_nome}</strong></td>
-                          <td className="td-center">{av.media_escola ?? '—'}</td>
-                          <td className="td-center">
+                          <td data-label="Aluno"><strong>{a.aluno_nome}</strong></td>
+                          <td className="td-center" data-label="Média da Escola">{av.media_escola ?? '—'}</td>
+                          <td className="td-center" data-label={configDisciplina.exame_nacional ? 'Exame Nacional' : 'Defesa Final'}>
                             {jaTemNotaFinal || !podeAlterarCoord ? (
                               (configDisciplina.exame_nacional ? a.periodos?.EXN : a.periodos?.DEF) ?? '—'
                             ) : (
@@ -614,12 +614,12 @@ export default function CoordenadorNotas({ modoProfessor = false }) {
                               </div>
                             )}
                           </td>
-                          <td className="td-center td-media">{av.media_final ?? '—'}</td>
-                          <td className="td-center">
+                          <td className="td-center td-media" data-label="Média Final">{av.media_final ?? '—'}</td>
+                          <td className="td-center" data-label="Situação">
                             <StatusPill status={av.status} fallback={statusBadges[av.status] || 'Notas incompletas'} />
                           </td>
                           {podeAlterarCoord && (
-                            <td className="td-center">
+                            <td className="td-center" data-label="2ª Chamada">
                               {av.status === 'pendente_2a_chamada' && (
                                 <div className="nota-celula">
                                   <input

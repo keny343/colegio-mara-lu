@@ -1,7 +1,6 @@
 .perfil-erro { margin-bottom: 1rem; }
 
-.perfil-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 1.5rem; }
-.perfil-avatar-card { text-align: center; padding: 2.5rem 2rem; }
+.perfil-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(300px, 100%), 1fr)); gap: 1.5rem; }.perfil-avatar-card { text-align: center; padding: 2.5rem 2rem; }
 
 .perfil-foto-btn {
   width: 90px; height: 90px; border-radius: 50%;

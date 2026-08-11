@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 
 export function useFetch(fetcher, deps = []) {
-  const [data, setData] = useState(null);
+  const [data, setData] = useState(undefined);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const fetcherRef = useRef(fetcher);
@@ -16,7 +16,7 @@ export function useFetch(fetcher, deps = []) {
       return result;
     } catch (err) {
       setError(err);
-      setData(null);
+      setData(undefined);
       throw err;
     } finally {
       setLoading(false);
@@ -37,7 +37,7 @@ export function useFetch(fetcher, deps = []) {
       } catch (err) {
         if (active) {
           setError(err);
-          setData(null);
+          setData(undefined);
         }
       } finally {
         if (active && !cancelled) setLoading(false);

@@ -215,22 +215,22 @@ export function AdminUsuarios() {
             <tbody>
               {usuarios.map(u => (
                 <tr key={u.id}>
-                  <td className="ap-id">#{u.id}</td>
-                  <td><strong>{u.nome}</strong></td>
-                  <td>{u.email}</td>
-                  <td>{u.telefone || '—'}</td>
-                  <td>{u.cpf || '—'}</td>
-                  <td>
+                  <td className="ap-id" data-label="#">#{u.id}</td>
+                  <td data-label="Nome"><strong>{u.nome}</strong></td>
+                  <td data-label="E-mail">{u.email}</td>
+                  <td data-label="Telefone">{u.telefone || '—'}</td>
+                  <td data-label="BI">{u.cpf || '—'}</td>
+                  <td data-label="Tipo">
                     {roleBadge(u.role)}
                     {(u.curso_coordenado || u.nivel_coordenado) && (
                       <div className="ap-coord-info">{u.nivel_coordenado || u.curso_coordenado}</div>
                     )}
                   </td>
-                  <td className="ap-data">{new Date(u.criado_em).toLocaleDateString('pt-BR')}</td>
-                  <td>
+                  <td className="ap-data" data-label="Cadastro">{new Date(u.criado_em).toLocaleDateString('pt-BR')}</td>
+                  <td data-label="Status">
                     <Badge tone={u.ativo ? 'green' : 'red'}>{u.ativo ? 'Ativo' : 'Inativo'}</Badge>
                   </td>
-                  <td>
+                  <td className="td-actions" data-label="Ações">
                     <div className="ap-acoes">
                       {isAdmin && (
                         <Button variant="outline" size="sm" icon={<Edit2 size={14} />} onClick={() => abrirEditar(u)} aria-label="Editar" />

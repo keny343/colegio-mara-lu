@@ -33,7 +33,7 @@
 
 @media (max-width: 768px) {
   .acad-header { flex-direction: column; }
-  .acad-tabs { flex-wrap: nowrap; overflow-x: auto; padding-bottom: 4px; -webkit-overflow-scrolling: touch; scrollbar-width: none; }
+  .acad-tabs { flex-wrap: nowrap; overflow-x: auto; padding-bottom: 4px; -webkit-overflow-scrolling: touch; scrollbar-width: none; min-width: 0; max-width: 100%; }
   .acad-tabs::-webkit-scrollbar { display: none; }
   .card-table-head { padding: 1rem 1rem 0; }
   .horario-card, .horario-list { margin: 0.75rem; }

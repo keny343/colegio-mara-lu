@@ -138,18 +138,22 @@ export default function ProfessorJustificacoes() {
           </div>
         }
       >
-        <p className="modal-info">Aluno: <strong>{modal.aluno_nome}</strong></p>
-        <p className="modal-info">Falta: <strong>{modal.disciplina}</strong> — {new Date(modal.data_falta).toLocaleDateString('pt-PT')}</p>
-        <div className="alert alert-info modal-motivo">
-          <strong>Motivo do aluno:</strong> {modal.motivo}
-          {modal.documento_path && (
-            <div className="modal-doc">
-              <a href={docUrl(modal)} target="_blank" rel="noopener noreferrer" className="btn btn-outline btn-sm">
-                <FileText size={13} /> Ver documento comprovativo
-              </a>
+        {modal && (
+          <>
+            <p className="modal-info">Aluno: <strong>{modal.aluno_nome}</strong></p>
+            <p className="modal-info">Falta: <strong>{modal.disciplina}</strong> — {new Date(modal.data_falta).toLocaleDateString('pt-PT')}</p>
+            <div className="alert alert-info modal-motivo">
+              <strong>Motivo do aluno:</strong> {modal.motivo}
+              {modal.documento_path && (
+                <div className="modal-doc">
+                  <a href={docUrl(modal)} target="_blank" rel="noopener noreferrer" className="btn btn-outline btn-sm">
+                    <FileText size={13} /> Ver documento comprovativo
+                  </a>
+                </div>
+              )}
             </div>
-          )}
-        </div>
+          </>
+        )}
         {erro && <div className="alert alert-error modal-erro">{erro}</div>}
         <FormField label="Decisão">
           <div className="decisao-row">

@@ -104,7 +104,7 @@ export function DataTable({
           {sortedRows.map((row, rowIndex) => (
             <tr key={row?.[keyField] ?? rowIndex} className={row.rowClassName}>
               {columns.map((column) => (
-                <td key={column.key} className={column.cellClassName || ''}>
+                <td key={column.key} className={column.cellClassName || ''} data-label={column.label}>
                   {column.render ? column.render(row) : row[column.key]}
                 </td>
               ))}
