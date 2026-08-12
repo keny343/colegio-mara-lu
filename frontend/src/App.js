@@ -1,31 +1,47 @@
-import React from 'react';
+import React, { lazy, Suspense } from 'react';
 import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom';
-import { AuthProvider, useAuth } from './contexts/AuthContext';
+import { AuthProvider, useAuth, SESSION_STATUS } from './contexts/AuthContext';
 import { NotificationProvider } from './contexts/NotificationContext';
 import { ConfirmProvider } from './contexts/ConfirmContext';
 import './index.css';
 
 import Navbar from './components/Navbar';
+import ErrorBoundary from './components/ErrorBoundary';
+import SessionErrorScreen from './components/SessionErrorScreen';
 import Home from './pages/Home';
 import Login from './pages/Login';
-import Registro from './pages/Registro';
 import InscricaoPublica from './pages/InscricaoPublica';
-import Portal from './pages/Portal';
-import MeusAlunos from './pages/MeusAlunos';
-import MinhasInscricoes from './pages/MinhasInscricoes';
-import Notificacoes from './pages/Notificacoes';
-import PortalMateriais from './pages/PortalMateriais';
-import AdminDashboard from './pages/AdminDashboard';
-import AdminInscricoes from './pages/AdminInscricoes';
-import { AdminUsuarios, AdminSeries } from './pages/AdminPages';
 import AdminLayout from './layouts/AdminLayout';
 import ProfessorLayout from './layouts/ProfessorLayout';
-import ProfessorDashboard from './pages/ProfessorDashboard';
-import ProfessorMateriais from './pages/ProfessorMateriais';
-import PlanoCurricular from './pages/PlanoCurricular';
-import AdminAcademico from './pages/AdminAcademico';
-import CoordenadorNotas from './pages/CoordenadorNotas';
-import { podeAcederNotas, podeEditarNotas, podeAcederInformacaoGeral } from './utils/roles';
+import { podeAcederNotas, podeAcederInformacaoGeral } from './utils/roles';
+
+// Carregamento preguiçoso: cada página é baixada apenas quando é navegada.
+// As páginas públicas (Home, Login, Inscrição) ficam no bundle inicial para arranque rápido.
+const Portal = lazy(() => import('./pages/Portal'));
+const MeusAlunos = lazy(() => import('./pages/MeusAlunos'));
+const MinhasInscricoes = lazy(() => import('./pages/MinhasInscricoes'));
+const Notificacoes = lazy(() => import('./pages/Notificacoes'));
+const PortalMateriais = lazy(() => import('./pages/PortalMateriais'));
+const PlanoCurricular = lazy(() => import('./pages/PlanoCurricular'));
+const Perfil = lazy(() => import('./pages/Perfil'));
+const Calendario = lazy(() => import('./pages/Calendario'));
+const Mensagens = lazy(() => import('./pages/Mensagens'));
+const Documentos = lazy(() => import('./pages/Documentos'));
+const Faltas = lazy(() => import('./pages/Faltas'));
+const ProfessorFaltas = lazy(() => import('./pages/ProfessorFaltas'));
+const ProfessorJustificacoes = lazy(() => import('./pages/ProfessorJustificacoes'));
+const AdminDashboard = lazy(() => import('./pages/AdminDashboard'));
+const AdminInscricoes = lazy(() => import('./pages/AdminInscricoes'));
+const AdminUsuarios = lazy(() => import('./pages/AdminPages').then((m) => ({ default: m.AdminUsuarios })));
+const AdminSeries = lazy(() => import('./pages/AdminPages').then((m) => ({ default: m.AdminSeries })));
+const AdminAcademico = lazy(() => import('./pages/AdminAcademico'));
+const CoordenadorNotas = lazy(() => import('./pages/CoordenadorNotas'));
+const ProfessorDashboard = lazy(() => import('./pages/ProfessorDashboard'));
+const ProfessorMateriais = lazy(() => import('./pages/ProfessorMateriais'));
+
+function PageLoader() {
+  return <div className="loading"><div className="spinner" /></div>;
+}
 
 function PerfilPortal() {
   const { user } = useAuth();
@@ -39,17 +55,10 @@ function PerfilPortal() {
   return <Perfil />;
 }
 
-import Perfil from './pages/Perfil';
-import Calendario from './pages/Calendario';
-import Mensagens from './pages/Mensagens';
-import Documentos from './pages/Documentos';
-import Faltas from './pages/Faltas';
-import ProfessorFaltas from './pages/ProfessorFaltas';
-import ProfessorJustificacoes from './pages/ProfessorJustificacoes';
-
 const PrivateRoute = ({ children, adminOnly = false, staffOnly = false, professorOnly = false, notasOnly = false }) => {
-  const { user, loading } = useAuth();
-  if (loading) return <div className="loading"><div className="spinner" /></div>;
+  const { user, status, loading } = useAuth();
+  if (loading || status === SESSION_STATUS.CHECKING) return <div className="loading"><div className="spinner" /></div>;
+  if (status === SESSION_STATUS.ERROR) return <SessionErrorScreen />;
   if (!user) return <Navigate to="/login" />;
   if (notasOnly && !podeAcederNotas(user)) return <Navigate to="/portal" />;
   if (staffOnly && !podeAcederInformacaoGeral(user)) return <Navigate to="/portal" />;
@@ -59,8 +68,9 @@ const PrivateRoute = ({ children, adminOnly = false, staffOnly = false, professo
 };
 
 const PublicRoute = ({ children }) => {
-  const { user, loading } = useAuth();
-  if (loading) return <div className="loading"><div className="spinner" /></div>;
+  const { user, status, loading } = useAuth();
+  if (loading || status === SESSION_STATUS.CHECKING) return <div className="loading"><div className="spinner" /></div>;
+  if (status === SESSION_STATUS.ERROR) return <SessionErrorScreen />;
   if (user) {
     const destino = user.role === 'admin' || user.role === 'coordenador'
       ? '/admin'
@@ -78,7 +88,8 @@ function AppRoutes() {
   return (
     <>
       <NavbarConditional />
-      <Routes>
+      <Suspense fallback={<PageLoader />}>
+        <Routes>
         <Route path="/" element={<Home />} />
         <Route path="/login" element={<PublicRoute><Login /></PublicRoute>} />
         <Route path="/inscricao" element={<InscricaoPublica />} />
@@ -118,7 +129,8 @@ function AppRoutes() {
         <Route path="/professor/plano-curricular" element={<PrivateRoute professorOnly><ProfessorLayout><PlanoCurricular /></ProfessorLayout></PrivateRoute>} />
         <Route path="/professor/mensagens" element={<PrivateRoute professorOnly><ProfessorLayout><Mensagens /></ProfessorLayout></PrivateRoute>} />
         <Route path="*" element={<Navigate to="/" />} />
-      </Routes>
+        </Routes>
+      </Suspense>
     </>
   );
 }
@@ -135,14 +147,16 @@ function NavbarConditional() {
 
 export default function App() {
   return (
-    <BrowserRouter>
-      <AuthProvider>
-        <NotificationProvider>
-          <ConfirmProvider>
-            <AppRoutes />
-          </ConfirmProvider>
-        </NotificationProvider>
-      </AuthProvider>
-    </BrowserRouter>
+    <ErrorBoundary>
+      <BrowserRouter>
+        <AuthProvider>
+          <NotificationProvider>
+            <ConfirmProvider>
+              <AppRoutes />
+            </ConfirmProvider>
+          </NotificationProvider>
+        </AuthProvider>
+      </BrowserRouter>
+    </ErrorBoundary>
   );
 }

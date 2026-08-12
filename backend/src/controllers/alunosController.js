@@ -35,16 +35,35 @@ const criarAluno = async (req, res) => {
 };
 
 // Atualizar aluno
+const CAMPOS_ALUNO_PERMITIDOS = [
+  'nome', 'data_nascimento', 'cpf', 'rg', 'sexo', 'nacionalidade',
+  'nome_mae', 'nome_pai', 'responsavel', 'telefone_emergencia', 'necessidades_especiais',
+];
+
 const atualizarAluno = async (req, res) => {
   const { id } = req.params;
-  const campos = req.body;
+  const { updated_at: versaoCliente } = req.body;
+  const campos = {};
+  for (const k of CAMPOS_ALUNO_PERMITIDOS) {
+    if (req.body[k] !== undefined) campos[k] = req.body[k];
+  }
+  if (Object.keys(campos).length === 0) {
+    return res.status(400).json({ message: 'Nada para atualizar.' });
+  }
 
   try {
-    const [check] = await db.query('SELECT id FROM alunos WHERE id = ? AND usuario_id = ?', [id, req.user.id]);
+    const [check] = await db.query('SELECT id, updated_at FROM alunos WHERE id = ? AND usuario_id = ?', [id, req.user.id]);
     if (check.length === 0) return res.status(404).json({ message: 'Aluno não encontrado.' });
 
+    const { conflitoDeVersao } = require('../utils/concurrency');
+    if (versaoCliente != null && conflitoDeVersao(versaoCliente, check[0].updated_at)) {
+      return res.status(409).json({
+        message: 'Este aluno foi alterado em outro dispositivo. Recarregue e tente novamente.',
+      });
+    }
+
     const sets = Object.keys(campos).map(k => `${k} = ?`).join(', ');
-    await db.query(`UPDATE alunos SET ${sets} WHERE id = ?`, [...Object.values(campos), id]);
+    await db.query(`UPDATE alunos SET ${sets} WHERE id = ? AND usuario_id = ?`, [...Object.values(campos), id, req.user.id]);
 
     return res.json({ message: 'Aluno atualizado com sucesso!' });
   } catch (err) {

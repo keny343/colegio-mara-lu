@@ -1,63 +1,86 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import api from '../services/api';
 
 const AuthContext = createContext(null);
 
+export const SESSION_STATUS = {
+  CHECKING: 'CHECKING_SESSION',
+  AUTHENTICATED: 'AUTHENTICATED',
+  UNAUTHENTICATED: 'UNAUTHENTICATED',
+  ERROR: 'ERROR',
+};
+
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
-  const [loading, setLoading] = useState(true);
+  const [status, setStatus] = useState(SESSION_STATUS.CHECKING);
+  const [sessionError, setSessionError] = useState(null);
+
+  const checkSession = useCallback(async () => {
+    setStatus(SESSION_STATUS.CHECKING);
+    setSessionError(null);
+    try {
+      const res = await api.get('/auth/perfil');
+      setUser(res.data);
+      setStatus(SESSION_STATUS.AUTHENTICATED);
+      return res.data;
+    } catch (err) {
+      const isInvalidSession = err.response && err.response.status === 401;
+      setUser(null);
+      if (isInvalidSession) {
+        setStatus(SESSION_STATUS.UNAUTHENTICATED);
+      } else {
+        setSessionError(err);
+        setStatus(SESSION_STATUS.ERROR);
+      }
+      return null;
+    }
+  }, []);
 
   useEffect(() => {
-    const savedUser = localStorage.getItem('user');
-    // Restaurar sessão a partir do cookie httpOnly (se existir)
-    api.get('/auth/perfil')
-      .then((res) => {
-        const merged = savedUser ? { ...JSON.parse(savedUser), ...res.data } : res.data;
-        setUser(merged);
-        localStorage.setItem('user', JSON.stringify(merged));
-      })
-      .catch(() => {
-        localStorage.removeItem('user');
-        setUser(null);
-      })
-      .finally(() => {
-        setLoading(false);
-      });
+    checkSession();
+  }, [checkSession]);
+
+  // Um 401 real em endpoint protegido → sessão inválida → limpar identidade
+  useEffect(() => {
+    const handleExpired = () => {
+      setUser(null);
+      setStatus(SESSION_STATUS.UNAUTHENTICATED);
+    };
+    window.addEventListener('auth:session-expired', handleExpired);
+    return () => window.removeEventListener('auth:session-expired', handleExpired);
   }, []);
 
   const login = async (email, senha) => {
     const res = await api.post('/auth/login', { email: (email || '').trim(), senha });
     const { usuario } = res.data;
-    localStorage.setItem('user', JSON.stringify(usuario));
-    setUser(usuario);
-    return usuario;
+
+    // Só considera o login concluído depois de confirmar a sessão com o servidor
+    const confirmado = await api.get('/auth/perfil');
+    setUser(confirmado.data);
+    setStatus(SESSION_STATUS.AUTHENTICATED);
+    return confirmado.data || usuario;
   };
 
   const logout = async () => {
     try {
       await api.post('/auth/logout');
     } catch (e) {
-      // Ignorar falha de rede no logout
+      // Sem rede: mesmo assim limpa o estado local
     }
-    localStorage.removeItem('user');
     setUser(null);
-  };
-
-  const register = async (data) => {
-    const res = await api.post('/auth/register', data);
-    return res.data;
+    setStatus(SESSION_STATUS.UNAUTHENTICATED);
   };
 
   const updateUser = (dados) => {
-    setUser((prev) => {
-      const next = { ...prev, ...dados };
-      localStorage.setItem('user', JSON.stringify(next));
-      return next;
-    });
+    setUser((prev) => ({ ...prev, ...dados }));
   };
 
+  const loading = status === SESSION_STATUS.CHECKING;
+
   return (
-    <AuthContext.Provider value={{ user, login, logout, register, updateUser, loading }}>
+    <AuthContext.Provider
+      value={{ user, status, loading, sessionError, checkSession, login, logout, updateUser }}
+    >
       {children}
     </AuthContext.Provider>
   );

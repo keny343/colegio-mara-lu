@@ -3,6 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { GraduationCap, Eye, EyeOff } from 'lucide-react';
 import { Button, Input, FormField } from '../components/ui';
+import { getErrorMessage } from '../services/errors';
 import './LoginLamp.css';
 
 export default function Login() {
@@ -18,18 +19,13 @@ export default function Login() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!lampOn) return;
     setError('');
     setLoading(true);
     try {
       const u = await login(form.email, form.senha);
       navigate(['admin', 'coordenador'].includes(u.role) ? '/admin' : u.role === 'professor' ? '/professor' : '/portal');
     } catch (err) {
-      setError(
-        err.response?.data?.message ||
-        (err.request ? 'Não foi possível conectar ao servidor. Verifique se o backend está ligado.' : err.message) ||
-        'Credenciais inválidas.'
-      );
+      setError(getErrorMessage(err, 'Não foi possível iniciar sessão. Tente novamente.'));
     } finally {
       setLoading(false);
     }
@@ -44,7 +40,7 @@ export default function Login() {
           className="lamp-fixture"
           onClick={() => setLampOn((v) => !v)}
           aria-pressed={lampOn}
-          aria-label={lampOn ? 'Apagar candeeiro e ocultar o formulário' : 'Acender candeeiro e mostrar o formulário'}
+          aria-label={lampOn ? 'Apagar luz de decoração' : 'Acender luz de decoração'}
         >
           <svg viewBox="0 0 160 140" className="lamp-svg">
             <polygon points="50,10 110,10 140,70 20,70" className="lamp-shade" />
@@ -54,10 +50,10 @@ export default function Login() {
           <span className="pull-cord"><span className="pull-knob"></span></span>
         </button>
         <div className="light-cone" aria-hidden="true"></div>
-        <p className="lamp-hint">{lampOn ? 'Toca no candeeiro para apagar' : 'Toca no candeeiro para acender'}</p>
+        <p className="lamp-hint">{lampOn ? 'Luz decorativa ligada' : 'Luz decorativa apagada'}</p>
       </div>
 
-      <div className="login-card-wrap" aria-hidden={!lampOn}>
+      <div className="login-card-wrap">
         <div className="card login-card">
           <div className="login-header">
             <div className="login-icon">
@@ -78,7 +74,6 @@ export default function Login() {
                 placeholder="seu@email.com ou nº do BI"
                 value={form.email}
                 onChange={handleChange}
-                tabIndex={lampOn ? 0 : -1}
                 autoComplete="username"
                 required
               />
@@ -93,7 +88,6 @@ export default function Login() {
                   placeholder="••••••••"
                   value={form.senha}
                   onChange={handleChange}
-                  tabIndex={lampOn ? 0 : -1}
                   autoComplete="current-password"
                   required
                 />
@@ -101,7 +95,6 @@ export default function Login() {
                   type="button"
                   className="password-toggle"
                   onClick={() => setShowPass((v) => !v)}
-                  tabIndex={lampOn ? 0 : -1}
                   aria-label={showPass ? 'Ocultar senha' : 'Mostrar senha'}
                   aria-pressed={showPass}
                 >
@@ -110,14 +103,14 @@ export default function Login() {
               </div>
             </FormField>
 
-            <Button type="submit" variant="primary" block loading={loading} tabIndex={lampOn ? 0 : -1}>
+            <Button type="submit" variant="primary" block loading={loading}>
               {loading ? 'Entrando...' : 'Entrar'}
             </Button>
           </form>
 
           <div className="login-footer">
             <p>
-              Ainda não se inscreveu? <Link to="/inscricao" tabIndex={lampOn ? 0 : -1}>Fazer inscrição</Link>
+              Ainda não se inscreveu? <Link to="/inscricao">Fazer inscrição</Link>
             </p>
           </div>
         </div>

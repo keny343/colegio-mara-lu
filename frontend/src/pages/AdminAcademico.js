@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import api from '../services/api';
 import { normalizeSeriesName } from '../utils/serieName';
 import { useAuth } from '../contexts/AuthContext';
-import { Plus, X, Save, Pencil, Trash2, User } from 'lucide-react';
+import { Plus, Save, Pencil, Trash2, User } from 'lucide-react';
 import Toast, { useToast } from '../components/Toast';
 import { useConfirm } from '../contexts/ConfirmContext';
 import { Button, EmptyState, FormField, Input, Modal, Select, Textarea, LoadingState } from '../components/ui';
@@ -25,7 +25,6 @@ export default function AdminAcademico() {
   const [cursos, setCursos] = useState([]);
   const [disciplinas, setDisciplinas] = useState([]);
   const [turmas, setTurmas] = useState([]);
-  const [series, setSeries] = useState([]);
   const [usuarios, setUsuarios] = useState([]);
   const [loading, setLoading] = useState(true);
 
@@ -53,7 +52,6 @@ export default function AdminAcademico() {
   const [matriculaAlunoId, setMatriculaAlunoId] = useState('');
   const [configAvaliacao, setConfigAvaliacao] = useState([]);
   const [configForm, setConfigForm] = useState({});
-  const [savingConfig, setSavingConfig] = useState({});
   const [horarioForm, setHorarioForm] = useState({ turma_id: '', disciplina_id: '', dia_semana: 'segunda', hora_inicio: '07:30', hora_fim: '08:30', sala: '' });
   const normalizarNome = (nome) =>
     String(nome || '')
@@ -75,19 +73,6 @@ export default function AdminAcademico() {
     }
     return [...map.values()].sort((a, b) => String(a.nome).localeCompare(String(b.nome), 'pt'));
   }, [cursos]);
-
-  const classeNumero = (nome) => {
-    if (!nome) return null;
-    const lower = String(nome).toLowerCase();
-    if (lower.includes('pré') || lower.includes('maternal') || lower.includes('jardim')) return 0;
-    const mClasse = lower.match(/(\d{1,2})\s*[ªº]?\s*classe/);
-    if (mClasse) return Number(mClasse[1]);
-    const mAno = lower.match(/(\d{1,2})\s*[ªº]?\s*ano/);
-    if (mAno) return Number(mAno[1]);
-    const mSerie = lower.match(/(\d{1,2})\s*[ªº]?\s*s[ée]rie/);
-    if (mSerie) return 9 + Number(mSerie[1]);
-    return null;
-  };
 
   const CLASSES_PADRAO = useMemo(() => ([
     { value: 0, label: 'Pré-escolar / Jardim' },
@@ -146,7 +131,7 @@ export default function AdminAcademico() {
     if (c.status === 'fulfilled') setCursos(c.value.data); else errors.push(labels[0]);
     if (d.status === 'fulfilled') setDisciplinas(d.value.data); else errors.push(labels[1]);
     if (t.status === 'fulfilled') setTurmas(t.value.data); else errors.push(labels[2]);
-    if (s.status === 'fulfilled') setSeries(s.value.data); else errors.push(labels[3]);
+    if (s.status === 'rejected') errors.push(labels[3]);
     if (u.status === 'fulfilled') setUsuarios(u.value.data); else errors.push(labels[4]);
     if (h.status === 'fulfilled') setHorarios(h.value.data); else errors.push(labels[5]);
     if (ca.status === 'fulfilled') setConfigAvaliacao(ca.value.data); else errors.push(labels[6]);

@@ -57,6 +57,19 @@ const enviarMaterial = async (req, res) => {
     await ensureTables();
     if (!req.file) return res.status(400).json({ message: 'Ficheiro obrigatório.' });
     const { titulo, turma_id, disciplina_id } = req.body;
+    if (turma_id) {
+      let sql = 'SELECT id FROM turma_professores WHERE professor_id = ? AND turma_id = ?';
+      const params = [req.user.id, turma_id];
+      if (disciplina_id) {
+        sql += ' AND disciplina_id = ?';
+        params.push(disciplina_id);
+      }
+      sql += ' LIMIT 1';
+      const [leciona] = await db.query(sql, params);
+      if (leciona.length === 0) {
+        return res.status(403).json({ message: 'Só pode publicar materiais para as turmas/disciplinas que lecciona.' });
+      }
+    }
     const ext = path.extname(req.file.originalname).toLowerCase();
     let tipo = 'outro';
     if (['.pdf'].includes(ext)) tipo = 'pdf';

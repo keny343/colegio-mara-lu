@@ -557,6 +557,15 @@ const criarHorario = async (req, res) => {
     if (!turma_id || !disciplina_id || !dia_semana || !hora_inicio || !hora_fim) {
       return res.status(400).json({ message: 'Todos os campos são obrigatórios.' });
     }
+    if (req.user.role !== 'admin') {
+      const [[turma]] = await db.query(
+        `SELECT t.*, c.nome as curso_nome FROM turmas t LEFT JOIN cursos c ON t.curso_id = c.id WHERE t.id = ? LIMIT 1`,
+        [turma_id]
+      );
+      if (!turma || !coordenadorPodeGerirTurma(req.user, turma)) {
+        return res.status(403).json({ message: 'Só pode criar horários em turmas do seu ciclo ou curso.' });
+      }
+    }
     const [r] = await db.query(
       'INSERT INTO horarios (turma_id, disciplina_id, dia_semana, hora_inicio, hora_fim, sala) VALUES (?,?,?,?,?,?)',
       [turma_id, disciplina_id, dia_semana, hora_inicio, hora_fim, sala || null]
@@ -569,6 +578,19 @@ const criarHorario = async (req, res) => {
 
 const removerHorario = async (req, res) => {
   try {
+    if (req.user.role !== 'admin') {
+      const [[h]] = await db.query(
+        `SELECT h.id, t.serie_classe, c.nome as curso_nome
+         FROM horarios h
+         JOIN turmas t ON h.turma_id = t.id
+         LEFT JOIN cursos c ON t.curso_id = c.id
+         WHERE h.id = ? LIMIT 1`,
+        [req.params.id]
+      );
+      if (!h || !coordenadorPodeGerirTurma(req.user, h)) {
+        return res.status(403).json({ message: 'Só pode remover horários em turmas do seu ciclo ou curso.' });
+      }
+    }
     await db.query('DELETE FROM horarios WHERE id = ?', [req.params.id]);
     return res.json({ message: 'Horário removido.' });
   } catch (err) {

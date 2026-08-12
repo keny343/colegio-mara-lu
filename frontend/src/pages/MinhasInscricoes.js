@@ -6,7 +6,7 @@ import { normalizeSeriesName } from '../utils/serieName';
 import { useConfirm } from '../contexts/ConfirmContext';
 import { useNotification } from '../contexts/NotificationContext';
 import { useFetch } from '../hooks/useFetch';
-import { Badge, Button, FormField, Select, Input, Modal, LoadingState, EmptyState } from '../components/ui';
+import { Badge, Button, FormField, Select, Input, Modal, LoadingState, EmptyState, ErrorState } from '../components/ui';
 import './MinhasInscricoes.css';
 
 const STATUS_META = {
@@ -29,6 +29,7 @@ function StatusBadge({ status }) {
 export default function MinhasInscricoes() {
   const [inscricoes, setInscricoes] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [erroCarregar, setErroCarregar] = useState(null);
   const [docModal, setDocModal] = useState(null);
   const [docSerieNome, setDocSerieNome] = useState('');
   const [docFile, setDocFile] = useState(null);
@@ -40,7 +41,11 @@ export default function MinhasInscricoes() {
   const { error: notifyError } = useNotification();
 
   const carregar = () => {
-    api.get('/inscricoes/minhas').then(r => setInscricoes(r.data)).finally(() => setLoading(false));
+    setErroCarregar(null);
+    api.get('/inscricoes/minhas')
+      .then(r => setInscricoes(r.data))
+      .catch(err => setErroCarregar(err))
+      .finally(() => setLoading(false));
   };
   useEffect(() => { carregar(); }, []);
 
@@ -71,8 +76,14 @@ export default function MinhasInscricoes() {
     fd.append('arquivo', docFile);
     fd.append('inscricao_id', docModal);
     fd.append('tipo', docTipo);
-    await api.post('/documentos', fd).catch(() => {});
-    setUploading(false); setDocModal(null); setDocSerieNome(''); setDocFile(null); setDocTipo('');
+    try {
+      await api.post('/documentos', fd);
+      setDocModal(null); setDocSerieNome(''); setDocFile(null); setDocTipo('');
+    } catch (err) {
+      notifyError(err.response?.data?.message || 'Erro ao enviar documento.');
+    } finally {
+      setUploading(false);
+    }
   };
 
   const classeNumeroDaSerie = (nome) => {
@@ -94,6 +105,8 @@ export default function MinhasInscricoes() {
   if (isNova) return <NovaInscricao onSuccess={carregar} />;
 
   if (loading) return <LoadingState />;
+
+  if (erroCarregar) return <ErrorState error={erroCarregar} onRetry={carregar} />;
 
   return (
     <div className="page-container">

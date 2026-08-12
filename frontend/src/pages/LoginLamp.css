@@ -93,10 +93,8 @@
 .login-card-wrap {
   position: relative; z-index: 3; margin-top: 24px;
   width: 100%; max-width: 420px;
-  opacity: 0; transform: translateY(24px) scale(0.96); filter: blur(4px);
-  transition: opacity 0.55s ease 0.15s, transform 0.55s cubic-bezier(0.22, 1, 0.36, 1) 0.15s, filter 0.55s ease 0.15s;
+  opacity: 1; transform: translateY(0) scale(1); filter: blur(0);
 }
-.is-on .login-card-wrap { opacity: 1; transform: translateY(0) scale(1); filter: blur(0); }
 
 .login-card { box-shadow: var(--sombra-lg); }
 

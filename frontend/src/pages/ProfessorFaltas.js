@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { AlertTriangle, Upload } from 'lucide-react';
 import api from '../services/api';
 import { useNotification } from '../contexts/NotificationContext';
-import { Button, EmptyState, FormField, Input, Select, LoadingState } from '../components/ui';
+import { Button, EmptyState, ErrorState, FormField, Input, Select, LoadingState } from '../components/ui';
 import './ProfessorFaltas.css';
 
 export default function ProfessorFaltas() {
@@ -16,17 +16,19 @@ export default function ProfessorFaltas() {
   const [faltaSaving, setFaltaSaving] = useState(false);
   const [faltaMsg, setFaltaMsg] = useState('');
   const [loading, setLoading] = useState(true);
+  const [erroCarregar, setErroCarregar] = useState(null);
   const { success, error } = useNotification();
 
-  useEffect(() => {
+  const carregar = () => {
+    setLoading(true);
+    setErroCarregar(null);
     api.get('/professor/minhas-disciplinas')
       .then(r => setProfDisciplinas(r.data || []))
-      .catch(err => {
-        console.error("ERRO MINHAS DISCIPLINAS:", err);
-        setProfDisciplinas([]);
-      })
+      .catch(err => setErroCarregar(err))
       .finally(() => setLoading(false));
-  }, []);
+  };
+
+  useEffect(() => { carregar(); }, []);
 
   const turmasUnicas = profDisciplinas.reduce((acc, item) => {
     if (!acc.some(t => String(t.id) === String(item.turma_id))) {
@@ -80,6 +82,8 @@ export default function ProfessorFaltas() {
   };
 
   if (loading) return <LoadingState />;
+
+  if (erroCarregar) return <ErrorState error={erroCarregar} onRetry={carregar} />;
 
   return (
     <div className="page-container">

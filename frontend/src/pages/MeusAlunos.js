@@ -3,7 +3,7 @@ import { Plus, Edit2, Trash2, User } from 'lucide-react';
 import api from '../services/api';
 import { useConfirm } from '../contexts/ConfirmContext';
 import { useNotification } from '../contexts/NotificationContext';
-import { Button, EmptyState, FormField, Input, Modal, Select, Textarea, LoadingState } from '../components/ui';
+import { Button, EmptyState, ErrorState, FormField, Input, Modal, Select, Textarea, LoadingState } from '../components/ui';
 import './MeusAlunos.css';
 
 const formVazio = { nome: '', data_nascimento: '', cpf: '', rg: '', sexo: '', nacionalidade: '', nome_mae: '', nome_pai: '', responsavel: '', telefone_emergencia: '', necessidades_especiais: '' };
@@ -11,6 +11,7 @@ const formVazio = { nome: '', data_nascimento: '', cpf: '', rg: '', sexo: '', na
 export default function MeusAlunos() {
   const [alunos, setAlunos] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [erroCarregar, setErroCarregar] = useState(null);
   const [modal, setModal] = useState(false);
   const [editando, setEditando] = useState(null);
   const [form, setForm] = useState(formVazio);
@@ -20,7 +21,12 @@ export default function MeusAlunos() {
   const { error: notifyError } = useNotification();
 
   const carregar = () => {
-    api.get('/alunos').then(r => setAlunos(r.data)).finally(() => setLoading(false));
+    setLoading(true);
+    setErroCarregar(null);
+    api.get('/alunos')
+      .then(r => setAlunos(r.data))
+      .catch(err => setErroCarregar(err))
+      .finally(() => setLoading(false));
   };
   useEffect(() => { carregar(); }, []);
 
@@ -33,10 +39,17 @@ export default function MeusAlunos() {
     if (!form.nome || !form.data_nascimento) return setErro('Nome e data de nascimento são obrigatórios.');
     setSaving(true); setErro('');
     try {
-      if (editando) { await api.put(`/alunos/${editando}`, form); }
+      if (editando) {
+        const payload = { ...form };
+        delete payload.id;
+        await api.put(`/alunos/${editando}`, payload);
+      }
       else { await api.post('/alunos', form); }
       fechar(); carregar();
-    } catch (err) { setErro(err.response?.data?.message || 'Erro ao salvar.'); }
+    } catch (err) {
+      setErro(err.response?.data?.message || 'Erro ao salvar.');
+      if (err.response?.status === 409) carregar();
+    }
     finally { setSaving(false); }
   };
 
@@ -66,6 +79,7 @@ export default function MeusAlunos() {
   };
 
   if (loading) return <LoadingState />;
+  if (erroCarregar) return <ErrorState error={erroCarregar} onRetry={carregar} />;
 
   return (
     <div className="page-container">

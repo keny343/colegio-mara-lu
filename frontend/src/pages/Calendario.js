@@ -1,8 +1,8 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { ChevronLeft, ChevronRight, Calendar, Clock } from 'lucide-react';
 import api from '../services/api';
 import { useAuth } from '../contexts/AuthContext';
-import { LoadingState, EmptyState } from '../components/ui';
+import { LoadingState } from '../components/ui';
 import './Calendario.css';
 
 const MESES = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
@@ -49,19 +49,24 @@ export default function Calendario() {
   const [ano, setAno] = useState(hoje.getFullYear());
   const [horarios, setHorarios] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [erroHorarios, setErroHorarios] = useState(null);
   const [diaSelecionado, setDiaSelecionado] = useState(null);
 
   // Buscar horários do aluno
-  useEffect(() => {
-    if (user?.role === 'aluno') {
-      api.get('/aluno/horarios')
-        .then(res => setHorarios(res.data || []))
-        .catch(err => console.error('Erro ao buscar horários:', err))
-        .finally(() => setLoading(false));
-    } else {
+  const carregarHorarios = useCallback(() => {
+    if (user?.role !== 'aluno') {
       setLoading(false);
+      return;
     }
+    setLoading(true);
+    setErroHorarios(null);
+    api.get('/aluno/horarios')
+      .then(res => setHorarios(res.data || []))
+      .catch(err => setErroHorarios(err))
+      .finally(() => setLoading(false));
   }, [user]);
+
+  useEffect(() => { carregarHorarios(); }, [carregarHorarios]);
 
   const primeiroDia = new Date(ano, mes, 1).getDay();
   const diasNoMes  = new Date(ano, mes + 1, 0).getDate();
@@ -119,6 +124,13 @@ export default function Calendario() {
         <h2>Calendário Escolar</h2>
         <p>Eventos, testes e horários do ano lectivo</p>
       </div>
+
+      {erroHorarios && (
+        <div className="alert alert-error cal-erro" role="alert">
+          Não foi possível carregar o teu horário de aulas.{' '}
+          <button className="alert-close" onClick={carregarHorarios}>Tentar novamente</button>
+        </div>
+      )}
 
       <div className="cal-layout">
 

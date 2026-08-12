@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { CheckCircle, XCircle, FileText, Clock } from 'lucide-react';
 import api from '../services/api';
-import { Badge, Button, DataTable, EmptyState, FormField, Modal, Textarea, LoadingState } from '../components/ui';
+import { Badge, Button, DataTable, EmptyState, ErrorState, FormField, Modal, Textarea, LoadingState } from '../components/ui';
 import './ProfessorJustificacoes.css';
 
 function StatusBadge({ status }) {
@@ -13,6 +13,7 @@ function StatusBadge({ status }) {
 export default function ProfessorJustificacoes() {
   const [pedidos, setPedidos] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [erroCarregar, setErroCarregar] = useState(null);
   const [modal, setModal] = useState(null);
   const [decisao, setDecisao] = useState({ status: 'aprovada', decisao_motivo: '' });
   const [saving, setSaving] = useState(false);
@@ -20,9 +21,10 @@ export default function ProfessorJustificacoes() {
 
   const carregar = () => {
     setLoading(true);
+    setErroCarregar(null);
     api.get('/professor/justificacoes')
       .then(r => setPedidos(r.data || []))
-      .catch(() => setPedidos([]))
+      .catch(err => setErroCarregar(err))
       .finally(() => setLoading(false));
   };
 
@@ -52,6 +54,8 @@ export default function ProfessorJustificacoes() {
   const docUrl = (p) => `${apiBase}/api/professor/justificacoes/${p.id}/documento`;
 
   if (loading) return <LoadingState />;
+
+  if (erroCarregar) return <ErrorState error={erroCarregar} onRetry={carregar} />;
 
   const pendentes = pedidos.filter(p => p.status === 'pendente');
   const processados = pedidos.filter(p => p.status !== 'pendente');

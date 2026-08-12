@@ -24,7 +24,7 @@ router.get('/arquivos/:arquivo(*)', authMiddleware, (req, res) => {
   }
 });
 
-const { register, login, logout, perfil, atualizarPerfil, uploadAvatar, atualizarFotoPerfil, atualizarCredenciais } = require('../controllers/authController');
+const { login, logout, perfil, atualizarPerfil, uploadAvatar, atualizarFotoPerfil, atualizarCredenciais } = require('../controllers/authController');
 const { inscreverAluno, uploadPublicInscricao } = require('../controllers/publicController');
 const { listarAlunos, criarAluno, atualizarAluno, removerAluno } = require('../controllers/alunosController');
 const { minhasInscricoes, criarInscricao, cancelarInscricao, listarTodas, detalhesInscricao, atualizarStatus, dashboardStats } = require('../controllers/inscricoesController');
@@ -49,7 +49,8 @@ const {
 } = require('../controllers/materiaisController');
 
 // AUTH
-router.post('/auth/register', register);
+// (sem /auth/register: a criação de conta é feita pela inscrição pública, que nasce INATIVA
+//  e só é ativada após aprovação do colégio — registo direto ativo seria um bypass de aprovação)
 router.post('/auth/login', login);
 router.post('/auth/logout', logout);
 router.get('/auth/perfil', authMiddleware, perfil);

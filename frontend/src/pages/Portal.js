@@ -6,7 +6,7 @@ import {
 } from 'lucide-react';
 import api from '../services/api';
 import { TRIMESTRES, normalizarPeriodos, mediaTrimestre, mediaAnual } from '../utils/notasPeriodos';
-import { Badge, LoadingState, EmptyState } from '../components/ui';
+import { Badge, LoadingState, EmptyState, ErrorState } from '../components/ui';
 import './Portal.css';
 
 const normalizeDia = (dia) => {
@@ -35,38 +35,52 @@ export default function Portal() {
   const [notasMeta, setNotasMeta] = useState({ limites: { min: 0, max: 20 }, serie_classe: null });
   const [notifs, setNotifs] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [erroCarregar, setErroCarregar] = useState(null);
   const [openSection, setOpenSection] = useState({ notas: true, horarios: false });
 
-  useEffect(() => {
-    Promise.all([
-      api.get('/aluno/matricula').catch(() => ({ data: {} })),
-      api.get('/aluno/disciplinas').catch(() => ({ data: [] })),
-      api.get('/aluno/horarios').catch(() => ({ data: [] })),
-      api.get('/aluno/notas').catch(() => ({ data: [] })),
-      api.get('/notificacoes').catch(() => ({ data: [] })),
+  const carregar = () => {
+    setLoading(true);
+    setErroCarregar(null);
+    Promise.allSettled([
+      api.get('/aluno/matricula'),
+      api.get('/aluno/disciplinas'),
+      api.get('/aluno/horarios'),
+      api.get('/aluno/notas'),
+      api.get('/notificacoes'),
     ]).then(([matRes, discRes, horRes, notasRes, notifRes]) => {
-      setMatricula(matRes.data.matricula || null);
-      setAluno(matRes.data.aluno || null);
-      setDisciplinas(discRes.data);
-      setHorarios(horRes.data);
-      const nd = notasRes.data;
-      if (Array.isArray(nd)) {
-        setNotas(nd);
-      } else {
-        setNotas(nd.notas || []);
-        setNotasMeta({
-          limites: nd.limites || { min: 0, max: 20 },
-          serie_classe: nd.serie_classe,
-          media_geral: nd.media_geral,
-        });
+      const falhas = [matRes, discRes, horRes, notasRes, notifRes].filter(r => r.status === 'rejected').length;
+      if (matRes.status === 'fulfilled') {
+        setMatricula(matRes.value.data.matricula || null);
+        setAluno(matRes.value.data.aluno || null);
       }
-      setNotifs(notifRes.data.filter(n => !n.lida).slice(0, 3));
+      if (discRes.status === 'fulfilled') setDisciplinas(discRes.value.data);
+      if (horRes.status === 'fulfilled') setHorarios(horRes.value.data);
+      if (notasRes.status === 'fulfilled') {
+        const nd = notasRes.value.data;
+        if (Array.isArray(nd)) {
+          setNotas(nd);
+        } else {
+          setNotas(nd.notas || []);
+          setNotasMeta({
+            limites: nd.limites || { min: 0, max: 20 },
+            serie_classe: nd.serie_classe,
+            media_geral: nd.media_geral,
+          });
+        }
+      }
+      if (notifRes.status === 'fulfilled') setNotifs(notifRes.value.data.filter(n => !n.lida).slice(0, 3));
+      if (falhas > 0 && falhas === 5) setErroCarregar({ total: true });
+      else if (falhas > 0) setErroCarregar({ parcial: falhas });
     }).finally(() => setLoading(false));
-  }, []);
+  };
+
+  useEffect(() => { carregar(); }, []);
 
   const toggle = (key) => setOpenSection(s => ({ ...s, [key]: !s[key] }));
 
   if (loading) return <LoadingState />;
+
+  if (erroCarregar?.total) return <ErrorState error={new Error('Não foi possível carregar o portal.')} onRetry={carregar} />;
 
   const primeiroNome = (user?.nome || aluno?.nome || '').split(' ')[0];
   const notaMax = notasMeta.limites?.max ?? (notasMeta.serie_classe != null && notasMeta.serie_classe <= 6 ? 10 : 20);
@@ -121,6 +135,13 @@ export default function Portal() {
           </div>
         )}
       </div>
+
+      {erroCarregar?.parcial && (
+        <div className="alert alert-error" role="alert">
+          Não foi possível carregar {erroCarregar.parcial} de 5 secções.{' '}
+          <button type="button" className="alert-close" onClick={carregar}>Tentar novamente</button>
+        </div>
+      )}
 
       {/* Notificações não lidas */}
       {notifs.length > 0 && (

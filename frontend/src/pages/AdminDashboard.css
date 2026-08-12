@@ -29,3 +29,11 @@
 @media (max-width: 768px) {
   .dash-charts { grid-template-columns: 1fr; }
 }
+
+/* Mobile — prioridade: pendências/ações rápidas → métricas → dados secundários.
+   Os gráficos são dados secundários e ficam ocultos no telemóvel. */
+@media (max-width: 768px) {
+  .dash-page.dash-page { display: flex; flex-direction: column; }
+  .dash-page .dash-actions { order: -1; }
+  .dash-page .dash-charts { display: none; }
+}

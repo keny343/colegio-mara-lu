@@ -169,7 +169,7 @@ const detalhesInscricao = async (req, res) => {
 // Atualizar status da inscrição
 const atualizarStatus = async (req, res) => {
   const { id } = req.params;
-  const { status, observacao_admin, motivo_rejeicao, turma_id } = req.body;
+  const { status, observacao_admin, motivo_rejeicao, turma_id, updated_at: versaoCliente } = req.body;
 
   const statusValidos = ['pendente', 'em_analise', 'aprovada', 'rejeitada', 'cancelada'];
   if (!statusValidos.includes(status)) {
@@ -191,6 +191,13 @@ const atualizarStatus = async (req, res) => {
       if (!inscricaoNoAmbitoCoordenador(req.user, inscricao[0])) {
         return res.status(403).json({ message: 'Inscrição fora do seu âmbito de coordenação.' });
       }
+    }
+
+    const { conflitoDeVersao } = require('../utils/concurrency');
+    if (versaoCliente != null && conflitoDeVersao(versaoCliente, inscricao[0].updated_at)) {
+      return res.status(409).json({
+        message: 'Esta inscrição foi alterada por outro utilizador. Recarregue a lista e tente novamente.',
+      });
     }
 
     await db.query(
@@ -262,7 +269,7 @@ const dashboardStats = async (req, res) => {
 
     const filtro = filtroSqlSeriesCoordenador(req.user);
     const [porSerie] = await db.query(`
-      SELECT s.id, s.nome, s.nivel, s.ordem, s.curso, s.ano_letivo,
+      SELECT s.id, s.nome, s.nivel, s.ordem, s.curso, s.ano_letivo, s.updated_at,
              COALESCE(COUNT(i.id), 0) as total_inscricoes,
              COALESCE(SUM(i.status = 'aprovada'), 0) as aprovadas,
              s.vagas_total, s.vagas_disponiveis,

@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { User, Save, CheckCircle, GraduationCap, Shield, Camera } from 'lucide-react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import api from '../services/api';
 import { normalizeSeriesName } from '../utils/serieName';
 import { temEscopoCoordenacao } from '../utils/roles';
@@ -17,7 +17,8 @@ const ROLE_LABELS = {
 };
 
 export default function Perfil() {
-  const { user, updateUser } = useAuth();
+  const { user, updateUser, logout } = useAuth();
+  const navigate = useNavigate();
   const fotoInputRef = useRef(null);
   const [uploadingFoto, setUploadingFoto] = useState(false);
   const [aluno, setAluno] = useState(null);
@@ -60,7 +61,7 @@ export default function Perfil() {
           if (res.data.matricula) setMatricula(res.data.matricula);
           if (res.data.inscricao) setInscricao(res.data.inscricao);
         })
-        .catch(() => {})
+        .catch(() => setErro('Erro ao carregar perfil.'))
         .finally(() => setLoading(false));
     } else if (isStaff) {
       api.get('/auth/perfil')
@@ -164,6 +165,14 @@ export default function Perfil() {
       if (newPassword) payload.nova_senha = newPassword;
       if (newPassword) payload.current_password = currentPassword;
       const res = await api.put('/auth/credenciais', payload);
+      if (res.data.sessao_invalidada) {
+        setCredMsg(res.data.message || 'Senha alterada. Faça login novamente.');
+        setCurrentPassword('');
+        setNewPassword('');
+        await logout();
+        navigate('/login');
+        return;
+      }
       if (res.data.usuario) updateUser(res.data.usuario);
       setCredMsg(res.data.message || 'Credenciais actualizadas.');
       setCurrentPassword('');

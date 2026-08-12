@@ -6,7 +6,7 @@ import { normalizeSeriesName } from '../utils/serieName';
 import { fileUrl } from '../services/fileUrl';
 import Toast, { useToast } from '../components/Toast';
 import {
-  Badge, Button, FormField, Select, Textarea, Modal,
+  Badge, Button, ErrorState, FormField, Select, Textarea, Modal,
   DataTable, Pagination, LoadingState,
 } from '../components/ui';
 import './AdminInscricoes.css';
@@ -51,6 +51,7 @@ export default function AdminInscricoes() {
   const [inscricoes, setInscricoes] = useState([]);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
+  const [erroCarregar, setErroCarregar] = useState(null);
   const [filtros, setFiltros] = useState({ status: searchParams.get('status') || '', ano_letivo: '', busca: '', page: 1 });
   const [detalhe, setDetalhe] = useState(null);
   const [statusModal, setStatusModal] = useState(null);
@@ -61,6 +62,7 @@ export default function AdminInscricoes() {
 
   const carregar = useCallback(() => {
     setLoading(true);
+    setErroCarregar(null);
     const params = new URLSearchParams();
     if (filtros.status) params.set('status', filtros.status);
     if (filtros.ano_letivo) params.set('ano_letivo', filtros.ano_letivo);
@@ -69,7 +71,7 @@ export default function AdminInscricoes() {
     api.get(`/admin/inscricoes?${params}`).then(r => {
       setInscricoes(r.data.data);
       setTotal(r.data.total);
-    }).finally(() => setLoading(false));
+    }).catch(err => setErroCarregar(err)).finally(() => setLoading(false));
   }, [filtros]);
 
   useEffect(() => { carregar(); }, [carregar]);
@@ -94,7 +96,7 @@ export default function AdminInscricoes() {
   const salvarStatus = async () => {
     setSalvando(true);
     try {
-      await api.patch(`/admin/inscricoes/${statusModal.id}/status`, novoStatus);
+      await api.patch(`/admin/inscricoes/${statusModal.id}/status`, { ...novoStatus, updated_at: statusModal.updated_at });
       const statusLabel = novoStatus.status === 'aprovada' ? 'aprovada' : novoStatus.status === 'rejeitada' ? 'rejeitada' : 'actualizada';
       showToast(`Inscrição ${statusLabel} com sucesso!`, novoStatus.status === 'aprovada' ? 'success' : novoStatus.status === 'rejeitada' ? 'error' : 'info');
       setStatusModal(null);
@@ -102,6 +104,10 @@ export default function AdminInscricoes() {
     } catch (err) {
       const msg = err.response?.data?.message || 'Erro ao atualizar.';
       showToast(msg, 'error');
+      if (err.response?.status === 409) {
+        setStatusModal(null);
+        carregar();
+      }
     } finally { setSalvando(false); }
   };
 
@@ -176,6 +182,8 @@ export default function AdminInscricoes() {
       <div className="card list-card">
         {loading ? (
           <LoadingState />
+        ) : erroCarregar ? (
+          <ErrorState error={erroCarregar} onRetry={carregar} />
         ) : (
           <DataTable
             columns={columns}

@@ -1,4 +1,5 @@
 const jwt = require('jsonwebtoken');
+const db = require('../config/database');
 require('dotenv').config();
 
 // Lê o token JWT do cookie httpOnly ou do header Authorization
@@ -13,16 +14,49 @@ function getToken(req) {
   return null;
 }
 
-const authMiddleware = (req, res, next) => {
+const authMiddleware = async (req, res, next) => {
   const token = getToken(req);
-  if (!token) return res.status(401).json({ message: 'Token não fornecido.' });
+  if (!token) return res.status(401).json({ message: 'Sessão não iniciada.' });
+
+  let decoded;
+  try {
+    decoded = jwt.verify(token, process.env.JWT_SECRET);
+  } catch (err) {
+    return res.status(401).json({ message: 'Sessão inválida ou expirada.' });
+  }
 
   try {
-    const decoded = jwt.verify(token, process.env.JWT_SECRET);
-    req.user = decoded;
+    const [rows] = await db.query(
+      `SELECT id, role, curso_coordenado, nivel_coordenado, token_version, ativo
+       FROM usuarios WHERE id = ? LIMIT 1`,
+      [decoded.id]
+    );
+    if (rows.length === 0) {
+      return res.status(401).json({ message: 'Sessão inválida ou expirada.' });
+    }
+    const row = rows[0];
+    if (row.ativo !== 1) {
+      return res.status(401).json({ message: 'Conta desactivada. Contacte a administração.' });
+    }
+    // Se a senha foi alterada, a versão do token foi incrementada → todas as sessões antigas morrem.
+    const versaoBD = row.token_version == null ? 1 : Number(row.token_version);
+    const versaoToken = decoded.v == null ? 1 : Number(decoded.v);
+    if (versaoToken !== versaoBD) {
+      return res.status(401).json({ message: 'Sessão expirada. Faça login novamente.' });
+    }
+    // Preenche o user com dados FRESCOS do banco (role/âmbito mudam se forem editados)
+    req.user = {
+      id: row.id,
+      role: row.role,
+      nome: decoded.nome || null,
+      email: decoded.email || null,
+      curso_coordenado: row.curso_coordenado || null,
+      nivel_coordenado: row.nivel_coordenado || null,
+    };
     next();
   } catch (err) {
-    return res.status(403).json({ message: 'Token inválido ou expirado.' });
+    console.error('[auth] ERRO ao validar sessão:', err.message);
+    return res.status(500).json({ message: 'Erro interno do servidor.' });
   }
 };
 

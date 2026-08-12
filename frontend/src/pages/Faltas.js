@@ -1,12 +1,13 @@
 import React, { useEffect, useState } from 'react';
 import { AlertTriangle, CheckCircle, Calendar, Upload, X, FileText } from 'lucide-react';
 import api from '../services/api';
-import { Modal, FormField, Textarea, Button, LoadingState, EmptyState } from '../components/ui';
+import { Modal, FormField, Textarea, Button, LoadingState, EmptyState, ErrorState } from '../components/ui';
 import './Faltas.css';
 
 export default function Faltas() {
   const [faltas, setFaltas] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [erroCarregar, setErroCarregar] = useState(null);
   const [justModal, setJustModal] = useState(null); // falta selecionada
   const [justForm, setJustForm] = useState({ motivo: '', documento: null });
   const [justSaving, setJustSaving] = useState(false);
@@ -15,9 +16,11 @@ export default function Faltas() {
 
   const carregar = () => {
     setLoading(true);
-    api.get('/aluno/faltas').catch(() => ({ data: [] })).then(res => {
-      setFaltas(res.data || []);
-    }).finally(() => setLoading(false));
+    setErroCarregar(null);
+    api.get('/aluno/faltas')
+      .then(res => setFaltas(res.data || []))
+      .catch(err => setErroCarregar(err))
+      .finally(() => setLoading(false));
   };
 
   useEffect(() => { carregar(); }, []);
@@ -86,6 +89,8 @@ export default function Faltas() {
       <div className="card">
         {loading ? (
           <LoadingState />
+        ) : erroCarregar ? (
+          <ErrorState error={erroCarregar} onRetry={carregar} />
         ) : faltas.length === 0 ? (
           <EmptyState
             icon={<CheckCircle size={48} color="var(--verde)" />}

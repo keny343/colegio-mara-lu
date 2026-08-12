@@ -1,10 +1,10 @@
 import React, { useEffect, useState } from 'react';
-import { Users, BookOpen, Plus, Edit2, Trash2, X, Save, ToggleLeft, ToggleRight } from 'lucide-react';
+import { BookOpen, Plus, Edit2, Trash2, Save, ToggleLeft, ToggleRight } from 'lucide-react';
 import api from '../services/api';
 import { useAuth } from '../contexts/AuthContext';
 import { useConfirm } from '../contexts/ConfirmContext';
 import { useNotification } from '../contexts/NotificationContext';
-import { Badge, Button, FormField, Input, LoadingState, Modal, Select } from '../components/ui';
+import { Badge, Button, ErrorState, FormField, Input, LoadingState, Modal, Select } from '../components/ui';
 import './AdminPages.css';
 
 // ===== USUÁRIOS =====
@@ -21,18 +21,23 @@ export function AdminUsuarios() {
   const [coordForm, setCoordForm] = useState({ tipo: '1_ciclo', curso_id: '', manter_professor: true });
   const [cursos, setCursos] = useState([]);
   const [erro, setErro] = useState('');
+  const [erroCarregar, setErroCarregar] = useState(null);
   const [saving, setSaving] = useState(false);
-  const confirm = useConfirm();
   const { error: notifyError } = useNotification();
 
   const carregar = () => {
     const url = isAdmin ? '/admin/usuarios' : '/staff/equipa';
-    api.get(url).then(r => setUsuarios(r.data || []))
+    setLoading(true);
+    setErroCarregar(null);
+    api.get(url)
+      .then(r => setUsuarios(r.data || []))
+      .catch(err => setErroCarregar(err))
       .finally(() => setLoading(false));
   };
   useEffect(() => {
     carregar();
     api.get('/staff/cursos').then(r => setCursos(r.data)).catch(() => {});
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isAdmin]);
 
   const abrirNovo = () => {
@@ -172,6 +177,7 @@ export function AdminUsuarios() {
   };
 
   if (loading) return <LoadingState />;
+  if (erroCarregar) return <ErrorState error={erroCarregar} onRetry={carregar} />;
 
   const roleBadge = (r) => (
     r === 'admin' ? <Badge tone="red">🔑 Admin</Badge> :
@@ -402,17 +408,23 @@ export function AdminSeries() {
   const [editando, setEditando] = useState(null);
   const [form, setForm] = useState(formSerieVazio);
   const [erro, setErro] = useState('');
+  const [erroCarregar, setErroCarregar] = useState(null);
   const [saving, setSaving] = useState(false);
   const confirm = useConfirm();
   const { error: notifyError } = useNotification();
 
   const carregar = () => {
-    api.get('/series').then(r => setSeries(r.data)).finally(() => setLoading(false));
+    setLoading(true);
+    setErroCarregar(null);
+    api.get('/series')
+      .then(r => setSeries(r.data))
+      .catch(err => setErroCarregar(err))
+      .finally(() => setLoading(false));
   };
   useEffect(() => { carregar(); }, []);
 
   const abrirNovo = () => { setEditando(null); setForm(formSerieVazio); setErro(''); setModal(true); };
-  const abrirEditar = (s) => { setEditando(s.id); setForm({ nome: s.nome, nivel: s.nivel, vagas_total: s.vagas_total, ano_letivo: s.ano_letivo }); setErro(''); setModal(true); };
+  const abrirEditar = (s) => { setEditando(s.id); setForm({ nome: s.nome, nivel: s.nivel, vagas_total: s.vagas_total, ano_letivo: s.ano_letivo, updated_at: s.updated_at }); setErro(''); setModal(true); };
 
   const salvar = async e => {
     e.preventDefault();
@@ -422,7 +434,10 @@ export function AdminSeries() {
       if (editando) await api.put(`/admin/series/${editando}`, form);
       else await api.post('/admin/series', form);
       setModal(false); carregar();
-    } catch (err) { setErro(err.response?.data?.message || 'Erro ao salvar.'); }
+    } catch (err) {
+      setErro(err.response?.data?.message || 'Erro ao salvar.');
+      if (err.response?.status === 409) { setModal(false); carregar(); }
+    }
     finally { setSaving(false); }
   };
 
@@ -444,6 +459,7 @@ export function AdminSeries() {
   };
 
   if (loading) return <LoadingState />;
+  if (erroCarregar) return <ErrorState error={erroCarregar} onRetry={carregar} />;
 
   const niveis = [...new Set(series.map(s => s.nivel))];
 

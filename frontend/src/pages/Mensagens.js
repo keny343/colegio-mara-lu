@@ -30,16 +30,18 @@ function ChatArea({ destinatarioId, destinatarioNome, currentUserId, onSent, onO
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
   const [erroEnvio, setErroEnvio] = useState('');
+  const [erroCarregar, setErroCarregar] = useState(false);
   const bottomRef = useRef(null);
 
   const carregar = () => {
     setLoading(true);
+    setErroCarregar(false);
     api.get(`/mensagens/conversa/${destinatarioId}`)
       .then(res => {
         setMsgs(res.data);
         onOpened && onOpened(destinatarioId);
       })
-      .catch(() => setMsgs([]))
+      .catch(() => setErroCarregar(true))
       .finally(() => setLoading(false));
   };
 
@@ -69,6 +71,11 @@ function ChatArea({ destinatarioId, destinatarioNome, currentUserId, onSent, onO
       <div className="chat-scroll">
         {loading ? (
           <p className="chat-vazio">A carregar conversa...</p>
+        ) : erroCarregar ? (
+          <p className="chat-vazio">
+            Não foi possível carregar a conversa.{' '}
+            <button type="button" className="alert-close" onClick={carregar}>Tentar novamente</button>
+          </p>
         ) : msgs.length === 0 ? (
           <p className="chat-vazio">Ainda não há mensagens. Escreva a primeira.</p>
         ) : msgs.map(m => {
@@ -110,6 +117,8 @@ export default function Mensagens() {
   const [dropdownAberto, setDropdownAberto] = useState(false);
   const [chatTurmaFiltro, setChatTurmaFiltro] = useState('');
   const [erro, setErro] = useState('');
+  const [erroNotifs, setErroNotifs] = useState(false);
+  const [erroContatos, setErroContatos] = useState(false);
   const [sending, setSending] = useState(false);
   const [respondendoPara, setRespondendoPara] = useState(null); // { id, nome }
   const { toast, showToast, clearToast } = useToast();
@@ -117,8 +126,8 @@ export default function Mensagens() {
 
   const carregarNotifs = () =>
     api.get('/notificacoes')
-      .then(res => setNotifs(res.data))
-      .catch(() => {})
+      .then(res => { setNotifs(res.data); setErroNotifs(false); })
+      .catch(() => setErroNotifs(true))
       .finally(() => setLoading(false));
 
   useEffect(() => { carregarNotifs(); }, []);
@@ -126,8 +135,8 @@ export default function Mensagens() {
   useEffect(() => {
     if (!user) return;
     api.get('/mensagens/contactos')
-      .then(res => setContatos(res.data))
-      .catch(() => setContatos([]));
+      .then(res => { setContatos(res.data); setErroContatos(false); })
+      .catch(() => setErroContatos(true));
   }, [user]);
 
   useEffect(() => {
@@ -259,7 +268,9 @@ export default function Mensagens() {
           <div>
             <h2>Mensagens e Notificações</h2>
             <p>
-              {naoLidas > 0
+              {erroNotifs ? (
+                <span className="msg-naolidas">Não foi possível carregar as mensagens. <button type="button" className="alert-close" onClick={carregarNotifs}>Tentar novamente</button></span>
+              ) : naoLidas > 0
                 ? <span className="msg-naolidas">{naoLidas} mensagem(ns) não lida(s)</span>
                 : 'Todas as mensagens lidas ✓'}
             </p>
@@ -354,9 +365,11 @@ export default function Mensagens() {
                       <div className="msg-dropdown">
                         {contatosFiltrados.length === 0 ? (
                           <p className="msg-dropdown-vazio">
-                            {contatos.length === 0
-                              ? 'Ainda não tens contactos disponíveis para mensagem directa.'
-                              : 'Nenhum contacto corresponde à busca/filtro.'}
+                            {erroContatos
+                              ? <>Não foi possível carregar os contactos. <button type="button" className="alert-close" onClick={() => { setErroContatos(false); api.get('/mensagens/contactos').then(res => setContatos(res.data)).catch(() => setErroContatos(true)); }}>Tentar novamente</button></>
+                              : contatos.length === 0
+                                ? 'Ainda não tens contactos disponíveis para mensagem directa.'
+                                : 'Nenhum contacto corresponde à busca/filtro.'}
                           </p>
                         ) : (
                           ['admin', 'coordenador', 'professor', 'aluno'].map(r => {

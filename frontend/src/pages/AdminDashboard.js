@@ -33,11 +33,13 @@ export default function AdminDashboard() {
       await api.put(`/admin/series/${serie.id}`, {
         vagas_total: Number(serie.vagas_total),
         vagas_disponiveis: Number(serie.vagas_disponiveis),
+        updated_at: serie.updated_at,
       });
       await refetch();
       notifySuccess('Vagas actualizadas.');
     } catch (e) {
       notifyError(e.response?.data?.message || 'Erro ao guardar vagas.');
+      if (e.response?.status === 409) await refetch();
     } finally {
       setSavingVaga(null);
     }
@@ -74,11 +76,11 @@ export default function AdminDashboard() {
   }));
 
   const stats = [
-    { label: 'Total Inscrições', value: Number(inscricoes.total) || 0, icon: <FileText size={22} />, tone: 'laranja' },
     { label: 'Pendentes', value: Number(inscricoes.pendentes) || 0, icon: <Clock size={22} />, tone: 'amarelo' },
     { label: 'Em Análise', value: Number(inscricoes.em_analise) || 0, icon: <AlertCircle size={22} />, tone: 'azul' },
     { label: 'Aprovadas', value: Number(inscricoes.aprovadas) || 0, icon: <CheckCircle size={22} />, tone: 'verde' },
     { label: 'Rejeitadas', value: Number(inscricoes.rejeitadas) || 0, icon: <XCircle size={22} />, tone: 'vermelho' },
+    { label: 'Total Inscrições', value: Number(inscricoes.total) || 0, icon: <FileText size={22} />, tone: 'laranja' },
     { label: 'Responsáveis', value: total_usuarios, icon: <Users size={22} />, tone: 'castanho-medio' },
     { label: 'Alunos', value: total_alunos, icon: <BookOpen size={22} />, tone: 'castanho' },
   ];
@@ -124,7 +126,7 @@ export default function AdminDashboard() {
   ];
 
   return (
-    <div className="page-container">
+    <div className="page-container dash-page">
       <div className="page-header">
         <h2>{isCoordenador ? 'Dashboard do Coordenador' : 'Dashboard Administrativo'}</h2>
         <p className="page-header-sub">

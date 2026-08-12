@@ -32,8 +32,11 @@ const criarSerie = async (req, res) => {
 
 const CAMPOS_SERIE_PERMITIDOS = ['nome', 'nivel', 'vagas_total', 'ano_letivo', 'ordem', 'curso', 'ativo'];
 
+const { conflitoDeVersao } = require('../utils/concurrency');
+
 const atualizarSerie = async (req, res) => {
   const { id } = req.params;
+  const { updated_at: versaoCliente } = req.body;
   const campos = {};
   for (const k of CAMPOS_SERIE_PERMITIDOS) {
     if (req.body[k] !== undefined) campos[k] = req.body[k];
@@ -41,9 +44,18 @@ const atualizarSerie = async (req, res) => {
   const keys = Object.keys(campos);
   if (keys.length === 0) return res.status(400).json({ message: 'Nada para atualizar.' });
   try {
+    if (versaoCliente != null) {
+      const [[atual]] = await db.query('SELECT updated_at FROM series WHERE id = ?', [id]);
+      if (atual && conflitoDeVersao(versaoCliente, atual.updated_at)) {
+        return res.status(409).json({
+          message: 'Esta classe foi alterada por outro utilizador. Recarregue para ver as alterações e tente novamente.',
+        });
+      }
+    }
     const sets = keys.map(k => `${k} = ?`).join(', ');
     await db.query(`UPDATE series SET ${sets} WHERE id = ?`, [...keys.map(k => campos[k]), id]);
-    return res.json({ message: 'Série atualizada!' });
+    const [[serie]] = await db.query('SELECT updated_at FROM series WHERE id = ?', [id]);
+    return res.json({ message: 'Série atualizada!', updated_at: serie ? serie.updated_at : null });
   } catch (err) {
     console.error('[atualizarSerie] ERRO:', err.message);
     return res.status(500).json({ message: 'Erro ao atualizar série.' });
@@ -430,7 +442,6 @@ const obterContatosPermitidos = async (user) => {
   }
 
   if (user.role === 'professor') {
-    console.log('[DEBUG contactos-professor] user recebido:', { id: user.id, role: user.role, curso_coordenado: user.curso_coordenado, nivel_coordenado: user.nivel_coordenado });
     const [turmasEnsino] = await db.query(
       `SELECT DISTINCT t.id, t.nome, t.serie_classe, c.nome AS curso_nome FROM turma_professores tp
        JOIN turmas t ON tp.turma_id = t.id
