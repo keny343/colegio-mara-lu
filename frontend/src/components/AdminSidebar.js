@@ -1,28 +1,20 @@
-import React, { useState, useEffect } from 'react';
+import React from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
 import { LayoutDashboard, FileText, Users, BookOpen, School, ClipboardList, FileUp, LogOut, MessageCircle } from 'lucide-react';
 import { podeEditarNotas } from '../utils/roles';
 import { useAuth } from '../contexts/AuthContext';
+import { useNotification } from '../contexts/NotificationContext';
 import SidebarUserBlock from './SidebarUserBlock';
 import MobileDrawer from './MobileDrawer';
-import api from '../services/api';
 
 export default function AdminSidebar() {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
+  const { unreadCount: notifCount } = useNotification();
 
   const isAdmin = user?.role === 'admin';
   const isCoordenador = user?.role === 'coordenador';
   const isProfessorCoord = user?.role === 'professor' && (user?.curso_coordenado || user?.nivel_coordenado);
-
-  const [notifCount, setNotifCount] = useState(0);
-  useEffect(() => {
-    if (!user) return;
-    const fetch = () => api.get('/notificacoes').then(r => setNotifCount(r.data.filter(n => !n.lida).length)).catch(() => {});
-    fetch();
-    const t = setInterval(fetch, 30000);
-    return () => clearInterval(t);
-  }, [user]);
 
   const sair = () => {
     logout();

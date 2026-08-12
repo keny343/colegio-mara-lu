@@ -14,7 +14,7 @@ const tipoIcon = (tipo) => {
 };
 
 export default function PortalMateriais() {
-  const { data: lista = [], loading, error, refetch } = useFetch(() => api.get('/materiais/recebidos'), []);
+  const { data: lista = [], loading, error, refetch } = useFetch((signal) => api.get('/materiais/recebidos', { signal }), []);
 
   const columns = [
     {

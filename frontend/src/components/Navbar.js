@@ -1,12 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
+import { useNotification } from '../contexts/NotificationContext';
 import {
   Bell, LogOut, GraduationCap, Menu, X, Home, BookOpen, Calendar,
   MessageCircle, FileText, AlertTriangle, User, Users, ClipboardList,
   School, BookMarked, LayoutDashboard
 } from 'lucide-react';
-import api from '../services/api';
 import { podeEditarNotas, podeAcederInformacaoGeral, podeDesignarCoordenador } from '../utils/roles';
 
 const ALUNOLinks = [
@@ -24,25 +24,12 @@ export default function Navbar() {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
-  const [notifCount, setNotifCount] = useState(0);
+  const { unreadCount: notifCount } = useNotification();
   const [menuOpen, setMenuOpen] = useState(false);
 
   useEffect(() => {
     setMenuOpen(false);
   }, [location.pathname]);
-
-  useEffect(() => {
-    if (!user) return;
-    const fetchCount = () => {
-      api.get('/notificacoes').then(res => {
-        setNotifCount(res.data.filter(n => !n.lida).length);
-      }).catch(() => {});
-    };
-    fetchCount();
-    // Poll a cada 30 segundos para actualizar o badge
-    const interval = setInterval(fetchCount, 30000);
-    return () => clearInterval(interval);
-  }, [user]);
 
   const handleLogout = async () => { await logout(); navigate('/'); };
   const isActive = (to) => location.pathname === to;

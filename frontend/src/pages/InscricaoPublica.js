@@ -15,7 +15,7 @@ export default function InscricaoPublica() {
   const [historicoFile, setHistoricoFile] = useState(null);
 
   const { data: series = [], loading: loadingSeries, error: seriesError, refetch: reloadSeries } = useFetch(
-    () => api.get('/series'),
+    (signal) => api.get('/series', { signal }),
     []
   );
 

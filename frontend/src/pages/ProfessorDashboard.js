@@ -9,7 +9,7 @@ import './ProfessorDashboard.css';
 
 export default function ProfessorDashboard() {
   const { user } = useAuth();
-  const { data: painel, loading, error, refetch } = useFetch(() => api.get('/professor/painel'), []);
+  const { data: painel, loading, error, refetch } = useFetch((signal) => api.get('/professor/painel', { signal }), []);
 
   if (loading) return <LoadingState />;
   if (error || !painel) return <ErrorState error={error || new Error('Erro ao carregar o painel.')} onRetry={refetch} />;

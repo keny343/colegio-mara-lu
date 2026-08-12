@@ -24,7 +24,7 @@ export default function AdminDashboard() {
   const [savingVaga, setSavingVaga] = useState(null);
   const { error: notifyError, success: notifySuccess } = useNotification();
 
-  const { data, loading, error, refetch, setData } = useFetch(() => api.get('/admin/dashboard'), []);
+  const { data, loading, error, refetch, setData } = useFetch((signal) => api.get('/admin/dashboard', { signal }), []);
   const dados = data;
 
   const guardarVagas = async (serie) => {

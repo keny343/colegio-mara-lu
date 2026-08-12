@@ -19,7 +19,7 @@ const classeTipo = (titulo) => {
 };
 
 export default function Notificacoes() {
-  const { data: notifs = [], loading, error, refetch } = useFetch(() => api.get('/notificacoes'), []);
+  const { data: notifs = [], loading, error, refetch } = useFetch((signal) => api.get('/notificacoes', { signal }), []);
 
   return (
     <div className="page-container">

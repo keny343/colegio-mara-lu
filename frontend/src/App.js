@@ -8,6 +8,7 @@ import './index.css';
 import Navbar from './components/Navbar';
 import ErrorBoundary from './components/ErrorBoundary';
 import SessionErrorScreen from './components/SessionErrorScreen';
+import AppLoader from './components/AppLoader';
 import Home from './pages/Home';
 import Login from './pages/Login';
 import InscricaoPublica from './pages/InscricaoPublica';
@@ -40,7 +41,7 @@ const ProfessorDashboard = lazy(() => import('./pages/ProfessorDashboard'));
 const ProfessorMateriais = lazy(() => import('./pages/ProfessorMateriais'));
 
 function PageLoader() {
-  return <div className="loading"><div className="spinner" /></div>;
+  return <AppLoader />;
 }
 
 function PerfilPortal() {
@@ -57,7 +58,7 @@ function PerfilPortal() {
 
 const PrivateRoute = ({ children, adminOnly = false, staffOnly = false, professorOnly = false, notasOnly = false }) => {
   const { user, status, loading } = useAuth();
-  if (loading || status === SESSION_STATUS.CHECKING) return <div className="loading"><div className="spinner" /></div>;
+  if (loading || status === SESSION_STATUS.CHECKING) return <AppLoader />;
   if (status === SESSION_STATUS.ERROR) return <SessionErrorScreen />;
   if (!user) return <Navigate to="/login" />;
   if (notasOnly && !podeAcederNotas(user)) return <Navigate to="/portal" />;
@@ -69,7 +70,7 @@ const PrivateRoute = ({ children, adminOnly = false, staffOnly = false, professo
 
 const PublicRoute = ({ children }) => {
   const { user, status, loading } = useAuth();
-  if (loading || status === SESSION_STATUS.CHECKING) return <div className="loading"><div className="spinner" /></div>;
+  if (loading || status === SESSION_STATUS.CHECKING) return <AppLoader />;
   if (status === SESSION_STATUS.ERROR) return <SessionErrorScreen />;
   if (user) {
     const destino = user.role === 'admin' || user.role === 'coordenador'

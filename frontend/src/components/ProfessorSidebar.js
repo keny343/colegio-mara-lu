@@ -1,25 +1,17 @@
-import React, { useState, useEffect } from 'react';
+import React from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
 import { LayoutDashboard, ClipboardList, BookOpen, FileUp, LogOut, FileCheck, AlertTriangle, MessageCircle } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
+import { useNotification } from '../contexts/NotificationContext';
 import { podeEditarNotas } from '../utils/roles';
 import SidebarUserBlock from './SidebarUserBlock';
 import MobileDrawer from './MobileDrawer';
-import api from '../services/api';
 
 export default function ProfessorSidebar() {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
+  const { unreadCount: notifCount } = useNotification();
   const isProfessorCoord = user?.role === 'professor' && (user?.curso_coordenado || user?.nivel_coordenado);
-
-  const [notifCount, setNotifCount] = useState(0);
-  useEffect(() => {
-    if (!user) return;
-    const fetch = () => api.get('/notificacoes').then(r => setNotifCount(r.data.filter(n => !n.lida).length)).catch(() => {});
-    fetch();
-    const t = setInterval(fetch, 30000);
-    return () => clearInterval(t);
-  }, [user]);
 
   const sair = () => { logout(); navigate('/'); };
 

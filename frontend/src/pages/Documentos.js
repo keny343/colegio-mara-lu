@@ -34,7 +34,7 @@ export default function Documentos() {
   const [tipo, setTipo] = useState('declaracao_matricula');
   const [ficheiro, setFicheiro] = useState(null);
 
-  const { data, loading: carregando, error: carregarErro, refetch } = useFetch(() => api.get('/documentos'), []);
+  const { data, loading: carregando, error: carregarErro, refetch } = useFetch((signal) => api.get('/documentos', { signal }), []);
   const meusDocs = Array.isArray(data) ? data : data?.data || [];
 
   const handleUpload = async (e) => {

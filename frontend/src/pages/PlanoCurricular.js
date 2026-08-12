@@ -21,7 +21,7 @@ export default function PlanoCurricular() {
   const [saving, setSaving] = useState(false);
   const { toast, showToast, clearToast } = useToast();
 
-  const { data: planos = [], loading, error, refetch } = useFetch(() => api.get('/planos-curriculares'), []);
+  const { data: planos = [], loading, error, refetch } = useFetch((signal) => api.get('/planos-curriculares', { signal }), []);
 
   const enviar = async (e) => {
     e.preventDefault();

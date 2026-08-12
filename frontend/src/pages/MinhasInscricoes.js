@@ -201,8 +201,11 @@ function NovaInscricao({ onSuccess }) {
   const [sucesso, setSucesso] = useState(false);
   const navigate = useNavigate();
 
-  const { data, loading, error, refetch } = useFetch(async () => {
-    const [a, s] = await Promise.all([api.get('/alunos'), api.get('/series')]);
+  const { data, loading, error, refetch } = useFetch(async (signal) => {
+    const [a, s] = await Promise.all([
+      api.get('/alunos', { signal }),
+      api.get('/series', { signal }),
+    ]);
     return { alunos: a.data, series: s.data };
   }, []);
   const alunos = data?.alunos || [];
