@@ -64,7 +64,7 @@ export function Modal({ open, onClose, title, size = 'md', children, footer, clo
         className="modal"
         role="dialog"
         aria-modal="true"
-        aria-label={title}
+        aria-label={title || 'Janela de diálogo'}
         style={SIZES[size]}
         onClick={(e) => e.stopPropagation()}
       >

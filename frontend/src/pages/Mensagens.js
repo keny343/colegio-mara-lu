@@ -333,7 +333,7 @@ export default function Mensagens() {
               )}
 
               <div className="form-group msg-contato-grupo">
-                <label className="form-label">Pessoa específica *</label>
+                <label className="form-label" htmlFor="msg-busca-contato">Pessoa específica *</label>
 
                 {destinatarioSelecionado ? (
                   <div className="msg-contato-chip">
@@ -352,17 +352,30 @@ export default function Mensagens() {
                     <div className="msg-busca">
                       <Search size={15} className="msg-busca-icon" />
                       <Input
+                        id="msg-busca-contato"
                         className="msg-busca-input"
                         placeholder="Escreva o nome ou email..."
                         value={buscaContato}
                         onChange={e => setBuscaContato(e.target.value)}
                         onFocus={() => setDropdownAberto(true)}
                         onBlur={() => setTimeout(() => setDropdownAberto(false), 150)}
+                        role="combobox"
+                        aria-expanded={dropdownAberto}
+                        aria-haspopup="listbox"
+                        aria-controls="msg-contatos-listbox"
+                        aria-autocomplete="list"
+                        onKeyDown={e => {
+                          if (e.key === 'Escape') setDropdownAberto(false);
+                          if (e.key === 'ArrowDown' && dropdownAberto) {
+                            e.preventDefault();
+                            document.querySelector('#msg-contatos-listbox .msg-contato-item')?.focus();
+                          }
+                        }}
                       />
                     </div>
 
                     {dropdownAberto && (
-                      <div className="msg-dropdown">
+                      <div className="msg-dropdown" id="msg-contatos-listbox" role="listbox" aria-label="Contactos">
                         {contatosFiltrados.length === 0 ? (
                           <p className="msg-dropdown-vazio">
                             {erroContatos
@@ -379,10 +392,19 @@ export default function Mensagens() {
                               <div key={r}>
                                 <div className="msg-dropdown-grupo">{roleLabel(r)}</div>
                                 {grupo.map(c => (
-                                  <div
+                                  <button
                                     key={c.id}
+                                    type="button"
+                                    role="option"
+                                    aria-selected="false"
                                     className="msg-contato-item"
                                     onMouseDown={() => { setForm({ ...form, destinatario_id: String(c.id) }); setDropdownAberto(false); }}
+                                    onClick={() => { setForm({ ...form, destinatario_id: String(c.id) }); setDropdownAberto(false); }}
+                                    onKeyDown={e => {
+                                      if (e.key === 'ArrowDown') { e.preventDefault(); e.currentTarget.nextElementSibling?.focus?.(); }
+                                      if (e.key === 'ArrowUp') { e.preventDefault(); e.currentTarget.previousElementSibling?.focus?.(); }
+                                      if (e.key === 'Escape') setDropdownAberto(false);
+                                    }}
                                   >
                                     <span className="msg-contato-nome">
                                       <span className="msg-contato-nome-forte">{c.nome}</span>
@@ -391,7 +413,7 @@ export default function Mensagens() {
                                     {c.nao_lidas > 0 && (
                                       <span className="msg-naolidas-pill">{c.nao_lidas}</span>
                                     )}
-                                  </div>
+                                  </button>
                                 ))}
                               </div>
                             );

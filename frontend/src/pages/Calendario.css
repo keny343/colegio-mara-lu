@@ -67,17 +67,18 @@
   display: flex; align-items: center; gap: 4px; color: var(--castanho);
   font-weight: 700; font-size: 0.8rem; min-width: 60px;
 }
-.cal-item-titulo { font-size: 0.9rem; font-weight: 600; }
-.cal-item-sub { font-size: 0.75rem; color: var(--cinza); }
+.cal-item-titulo { font-size: 0.9rem; font-weight: 600; min-width: 0; overflow-wrap: break-word; }
+.cal-item-sub { font-size: 0.75rem; color: var(--cinza); overflow-wrap: break-word; }
 
 .cal-evento { display: flex; gap: 10px; align-items: flex-start; }
 .cal-evento-data { text-align: center; min-width: 36px; }
 .cal-evento-dia { font-size: 1.1rem; font-weight: 700; color: var(--castanho); line-height: 1; }
 .cal-evento-sema { font-size: 0.65rem; color: var(--cinza); text-transform: uppercase; }
 .cal-evento-corpo {
-  flex: 1; background: var(--bege-claro); border-radius: 8px;
+  flex: 1; min-width: 0; background: var(--bege-claro); border-radius: 8px;
   padding: 6px 10px; border-left: 3px solid var(--bege-medio);
 }
+.cal-evento-corpo p { overflow-wrap: break-word; }
 .cal-evento-corpo.cal-tipo-periodo { border-left-color: var(--azul); }
 .cal-evento-corpo.cal-tipo-feriado { border-left-color: var(--verde); }
 .cal-evento-corpo.cal-tipo-teste { border-left-color: var(--vermelho); }

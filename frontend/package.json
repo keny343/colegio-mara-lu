@@ -18,6 +18,7 @@
     "start": "react-scripts start",
     "build": "cross-env CI=false react-scripts build",
     "test": "react-scripts test --watchAll=false",
+    "test:e2e": "playwright test -c e2e/playwright.config.js",
     "lint": "eslint src",
     "format": "prettier --write \"src/**/*.{js,jsx}\""
   },
@@ -35,7 +36,9 @@
     ]
   },
   "devDependencies": {
+    "@playwright/test": "^1.48.0",
     "cross-env": "^10.1.0",
+    "dotenv": "^16.4.5",
     "eslint": "^8.57.1",
     "eslint-config-react-app": "^7.0.1",
     "prettier": "^3.2.5"

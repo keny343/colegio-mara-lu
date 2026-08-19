@@ -43,8 +43,8 @@
   display: flex; align-items: center; justify-content: space-between;
   background: var(--bege-claro); border-radius: 8px; padding: 0.6rem 0.9rem;
 }
-.portal-lista-nome { font-weight: 600; font-size: 0.9rem; }
-.portal-lista-professor { font-size: 0.78rem; color: var(--cinza); max-width: 130px; text-align: right; }
+.portal-lista-nome { font-weight: 600; font-size: 0.9rem; min-width: 0; overflow-wrap: break-word; }
+.portal-lista-professor { font-size: 0.78rem; color: var(--cinza); max-width: 130px; text-align: right; overflow-wrap: break-word; }
 
 .portal-horarios { display: flex; flex-direction: column; gap: 6px; }
 .portal-dia { font-size: 0.75rem; font-weight: 700; color: var(--castanho); text-transform: uppercase; letter-spacing: 1px; padding: 4px 0 2px; }
@@ -52,8 +52,8 @@
   display: flex; justify-content: space-between; align-items: center;
   background: var(--bege-claro); border-radius: 7px; padding: 0.45rem 0.8rem; margin-bottom: 4px; font-size: 0.85rem;
 }
-.portal-aula-nome { font-weight: 600; }
-.portal-aula-hora { color: var(--cinza); font-size: 0.78rem; }
+.portal-aula-nome { font-weight: 600; min-width: 0; overflow-wrap: break-word; }
+.portal-aula-hora { color: var(--cinza); font-size: 0.78rem; flex-shrink: 0; }
 
 .portal-notas { margin-top: 1.5rem; }
 .portal-media-geral { margin: 0 0 1rem; font-size: 0.95rem; }

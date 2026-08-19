@@ -1,3 +1,5 @@
+import api, { isAuthUrl } from './api';
+
 jest.mock('axios', () => {
   const handlers = {};
   const instance = {
@@ -13,8 +15,6 @@ jest.mock('axios', () => {
   instance.__handlers = handlers;
   return { __esModule: true, default: { create: () => instance } };
 });
-
-import api, { isAuthUrl } from './api';
 
 function responseErrorHandler() {
   return api.__handlers.responseErr;

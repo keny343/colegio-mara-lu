@@ -69,19 +69,26 @@ const PrivateRoute = ({ children, adminOnly = false, staffOnly = false, professo
 };
 
 const PublicRoute = ({ children }) => {
-  const { user, status, loading } = useAuth();
-  if (loading || status === SESSION_STATUS.CHECKING) return <AppLoader />;
-  if (status === SESSION_STATUS.ERROR) return <SessionErrorScreen />;
-  if (user) {
-    const destino = user.role === 'admin' || user.role === 'coordenador'
-      ? '/admin'
-      : user.role === 'professor' && (user.curso_coordenado || user.nivel_coordenado)
-        ? '/admin'
-        : user.role === 'professor'
-          ? '/professor'
-          : '/portal';
-    return <Navigate to={destino} />;
+  const { user, status } = useAuth();
+
+  if (status === SESSION_STATUS.ERROR) {
+    return <SessionErrorScreen />;
   }
+
+  if (user) {
+    const destino =
+      user.role === 'admin' || user.role === 'coordenador'
+        ? '/admin'
+        : user.role === 'professor' &&
+          (user.curso_coordenado || user.nivel_coordenado)
+          ? '/admin'
+          : user.role === 'professor'
+            ? '/professor'
+            : '/portal';
+
+    return <Navigate to={destino} replace />;
+  }
+
   return children;
 };
 
@@ -116,7 +123,7 @@ function AppRoutes() {
         <Route path="/admin/usuarios"   element={<PrivateRoute staffOnly><AdminLayout><AdminUsuarios /></AdminLayout></PrivateRoute>} />
         <Route path="/admin/series"     element={<PrivateRoute adminOnly><AdminLayout><AdminSeries /></AdminLayout></PrivateRoute>} />
         <Route path="/admin/academico"  element={<PrivateRoute staffOnly><AdminLayout><AdminAcademico /></AdminLayout></PrivateRoute>} />
-        <Route path="/admin/notas"      element={<PrivateRoute notasOnly><AdminLayout><CoordenadorNotas /></AdminLayout></PrivateRoute>} />
+        <Route path="/admin/notas"      element={<PrivateRoute staffOnly notasOnly><AdminLayout><CoordenadorNotas /></AdminLayout></PrivateRoute>} />
         <Route path="/admin/plano-curricular" element={<PrivateRoute staffOnly><AdminLayout><PlanoCurricular /></AdminLayout></PrivateRoute>} />
         <Route path="/admin/perfil" element={<PrivateRoute staffOnly><AdminLayout><Perfil /></AdminLayout></PrivateRoute>} />
         <Route path="/admin/mensagens" element={<PrivateRoute staffOnly><AdminLayout><Mensagens /></AdminLayout></PrivateRoute>} />

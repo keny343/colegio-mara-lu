@@ -44,8 +44,15 @@ app.use((req, res, next) => {
   });
   next();
 });
+app.use(cors({
+  origin: allowedOrigins,
+  credentials: true
+}));
 
 // ---------- Health check (monitorização de API + banco) ----------
+// Registado DEPOIS do middleware de CORS: o BootCheck do frontend chama
+// esta rota via fetch() do browser, e sem os headers de CORS a resposta
+// (mesmo com 200) fica bloqueada para leitura pelo JS — parecendo "API inacessível".
 app.get('/health', async (req, res) => {
   try {
     const db = require('./config/database');
@@ -55,6 +62,8 @@ app.get('/health', async (req, res) => {
     return res.status(503).json({ status: 'degraded', database: 'unavailable' });
   }
 });
+
+app.use(cookieParser());
 
 // Aviso explícito se o segredo JWT for fraco (configuração errada em produção)
 if (isProd && (!process.env.JWT_SECRET || process.env.JWT_SECRET.length < 32)) {

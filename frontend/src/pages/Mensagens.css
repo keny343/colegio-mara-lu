@@ -41,8 +41,11 @@
   padding: 0.55rem 0.9rem; cursor: pointer; font-size: 0.88rem;
   color: var(--castanho); border-bottom: 1px solid var(--bege-claro);
   display: flex; align-items: center; justify-content: space-between; gap: 8px;
+  width: 100%; background: none; border-left: none; border-right: none; border-top: none;
+  font-family: inherit; text-align: left;
 }
-.msg-contato-item:hover { background: var(--bege-claro); }
+.msg-contato-item:hover, .msg-contato-item:focus-visible { background: var(--bege-claro); }
+.msg-contato-item:focus-visible { outline: 2px solid var(--laranja); outline-offset: -2px; }
 .msg-contato-nome { min-width: 0; }
 .msg-contato-nome-forte { font-weight: 600; }
 .msg-contato-nome-email { color: var(--cinza); }

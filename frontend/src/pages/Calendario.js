@@ -113,9 +113,6 @@ export default function Calendario() {
 
   if (loading) return <LoadingState />;
 
-  const diaAtualStr = diaSelecionado 
-    ? `${ano}-${String(mes+1).padStart(2,'0')}-${String(diaSelecionado).padStart(2,'0')}`
-    : null;
   const itemsDiaSelecionado = diaSelecionado ? itemsDia(diaSelecionado) : [];
 
   return (
