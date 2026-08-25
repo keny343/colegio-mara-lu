@@ -6,6 +6,8 @@ import Toast, { useToast } from '../components/Toast';
 import { Badge, Button, EmptyState, FormField, Input, Select, Textarea, LoadingState } from '../components/ui';
 import './Mensagens.css';
 
+
+
 const tipoBadge = (tipo) => {
   const map = {
     nota_lancada: { label: 'Nota', tone: 'blue' },
@@ -24,42 +26,145 @@ const roleLabel = (role) => ({
 }[role] || role);
 
 // Área de conversa 1-a-1 (chat) com um contacto específico
-function ChatArea({ destinatarioId, destinatarioNome, currentUserId, onSent, onOpened }) {
+export function ChatArea({
+  destinatarioId,
+  destinatarioNome,
+  currentUserId,
+  onSent,
+  onOpened,
+}) {
   const [msgs, setMsgs] = useState([]);
   const [texto, setTexto] = useState('');
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
   const [erroEnvio, setErroEnvio] = useState('');
   const [erroCarregar, setErroCarregar] = useState(false);
+
+  // Controla a request atualmente ativa.
+  const requestControllerRef = useRef(null);
+
+  // Identifica qual request é a mais recente.
+  const requestSeqRef = useRef(0);
+
   const bottomRef = useRef(null);
 
-  const carregar = () => {
+  const carregar = async () => {
+    // Cancelar a request anterior, caso ainda esteja ativa.
+    requestControllerRef.current?.abort();
+
+    const controller = new AbortController();
+    requestControllerRef.current = controller;
+
+    const seq = ++requestSeqRef.current;
+
     setLoading(true);
     setErroCarregar(false);
-    api.get(`/mensagens/conversa/${destinatarioId}`)
-      .then(res => {
-        setMsgs(res.data);
-        onOpened && onOpened(destinatarioId);
-      })
-      .catch(() => setErroCarregar(true))
-      .finally(() => setLoading(false));
+
+    try {
+      const response = await api.get(
+        `/mensagens/conversa/${destinatarioId}`,
+        {
+          signal: controller.signal,
+        }
+      );
+
+      // Uma resposta antiga nunca pode alterar o estado atual.
+      if (
+        controller.signal.aborted ||
+        seq !== requestSeqRef.current
+      ) {
+        return;
+      }
+
+      setMsgs(response.data);
+
+      onOpened?.(destinatarioId);
+    } catch (err) {
+      // Abort é comportamento normal quando trocamos de conversa.
+      if (controller.signal.aborted) {
+        return;
+      }
+
+      // Também ignorar uma resposta que já ficou obsoleta.
+      if (seq !== requestSeqRef.current) {
+        return;
+      }
+
+      setErroCarregar(true);
+    } finally {
+      // Somente a request atual pode alterar loading.
+      if (
+        !controller.signal.aborted &&
+        seq === requestSeqRef.current
+      ) {
+        setLoading(false);
+      }
+
+      // Limpar referência somente se ainda for a request atual.
+      if (requestControllerRef.current === controller) {
+        requestControllerRef.current = null;
+      }
+    }
   };
 
-  useEffect(() => { carregar(); /* eslint-disable-next-line */ }, [destinatarioId]);
-  useEffect(() => { bottomRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [msgs]);
+  useEffect(() => {
+    carregar();
+
+    return () => {
+      // Invalidar qualquer request em andamento
+      // quando o destinatário mudar ou o componente desmontar.
+      requestSeqRef.current += 1;
+
+      requestControllerRef.current?.abort();
+      requestControllerRef.current = null;
+    };
+
+    // O destinatário é a única dependência necessária:
+    // quando ele muda, carregamos outra conversa.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [destinatarioId]);
+
+  useEffect(() => {
+  if (
+    bottomRef.current &&
+    typeof bottomRef.current.scrollIntoView === 'function'
+  ) {
+    bottomRef.current.scrollIntoView({
+      behavior: 'smooth',
+    });
+  }
+}, [msgs]);
 
   const enviar = async (e) => {
     e.preventDefault();
-    if (!texto.trim()) return;
+
+    const mensagem = texto.trim();
+
+    if (!mensagem || sending) {
+      return;
+    }
+
     setSending(true);
     setErroEnvio('');
+
     try {
-      await api.post('/notificacoes', { mensagem: texto, alvo: 'usuario', destinatario_id: destinatarioId });
+      await api.post('/notificacoes', {
+        mensagem,
+        alvo: 'usuario',
+        destinatario_id: destinatarioId,
+      });
+
       setTexto('');
-      carregar();
-      onSent && onSent();
+
+      // Recarregar e esperar a conversa mais recente.
+      await carregar();
+
+      onSent?.();
     } catch (err) {
-      setErroEnvio(err.response?.data?.message || 'Não foi possível enviar. Tente novamente.');
+      setErroEnvio(
+        err.response?.data?.message ||
+          'Não foi possível enviar. Tente novamente.'
+      );
     } finally {
       setSending(false);
     }
@@ -67,34 +172,108 @@ function ChatArea({ destinatarioId, destinatarioNome, currentUserId, onSent, onO
 
   return (
     <div className="chat-box">
-      <div className="chat-header">Conversa com {destinatarioNome}</div>
+      <div className="chat-header">
+        Conversa com {destinatarioNome}
+      </div>
+
       <div className="chat-scroll">
         {loading ? (
-          <p className="chat-vazio">A carregar conversa...</p>
+          <p className="chat-vazio">
+            A carregar conversa...
+          </p>
         ) : erroCarregar ? (
           <p className="chat-vazio">
             Não foi possível carregar a conversa.{' '}
-            <button type="button" className="alert-close" onClick={carregar}>Tentar novamente</button>
+            <button
+              type="button"
+              className="alert-close"
+              onClick={carregar}
+            >
+              Tentar novamente
+            </button>
           </p>
         ) : msgs.length === 0 ? (
-          <p className="chat-vazio">Ainda não há mensagens. Escreva a primeira.</p>
-        ) : msgs.map(m => {
-          const minha = Number(m.remetente_id) === Number(currentUserId);
-          return (
-            <div key={m.id} className={minha ? 'chat-bubble-wrap chat-bubble-wrap--minha' : 'chat-bubble-wrap'}>
-              <div className={minha ? 'chat-bubble chat-bubble--minha' : 'chat-bubble'}>{m.mensagem}</div>
-              <div className={minha ? 'chat-time chat-time--minha' : 'chat-time'}>
-                {new Date(m.criado_em).toLocaleString('pt-AO', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })}
+          <p className="chat-vazio">
+            Ainda não há mensagens. Escreva a primeira.
+          </p>
+        ) : (
+          msgs.map((m) => {
+            const minha =
+              Number(m.remetente_id) ===
+              Number(currentUserId);
+
+            return (
+              <div
+                key={m.id}
+                className={
+                  minha
+                    ? 'chat-bubble-wrap chat-bubble-wrap--minha'
+                    : 'chat-bubble-wrap'
+                }
+              >
+                <div
+                  className={
+                    minha
+                      ? 'chat-bubble chat-bubble--minha'
+                      : 'chat-bubble'
+                  }
+                >
+                  {m.mensagem}
+                </div>
+
+                <div
+                  className={
+                    minha
+                      ? 'chat-time chat-time--minha'
+                      : 'chat-time'
+                  }
+                >
+                  {new Date(
+                    m.criado_em
+                  ).toLocaleString('pt-AO', {
+                    day: '2-digit',
+                    month: 'short',
+                    hour: '2-digit',
+                    minute: '2-digit',
+                  })}
+                </div>
               </div>
-            </div>
-          );
-        })}
+            );
+          })
+        )}
+
         <div ref={bottomRef} />
       </div>
-      {erroEnvio && <div className="chat-erro">{erroEnvio}</div>}
-      <form onSubmit={enviar} className="chat-form">
-        <Input placeholder="Escreva uma mensagem..." value={texto} onChange={e => setTexto(e.target.value)} className="chat-input" />
-        <Button type="submit" variant="primary" size="sm" icon={<Send size={14} />} disabled={sending || !texto.trim()} aria-label="Enviar mensagem" />
+
+      {erroEnvio && (
+        <div className="chat-erro">
+          {erroEnvio}
+        </div>
+      )}
+
+      <form
+        onSubmit={enviar}
+        className="chat-form"
+      >
+        <Input
+          placeholder="Escreva uma mensagem..."
+          value={texto}
+          onChange={(e) =>
+            setTexto(e.target.value)
+          }
+          className="chat-input"
+        />
+
+        <Button
+          type="submit"
+          variant="primary"
+          size="sm"
+          icon={<Send size={14} />}
+          disabled={
+            sending || !texto.trim()
+          }
+          aria-label="Enviar mensagem"
+        />
       </form>
     </div>
   );
@@ -157,8 +336,15 @@ export default function Mensagens() {
   }, [user]);
 
   useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [notifs]);
+  if (
+    bottomRef.current &&
+    typeof bottomRef.current.scrollIntoView === 'function'
+  ) {
+    bottomRef.current.scrollIntoView({
+      behavior: 'smooth',
+    });
+  }
+}, [notifs]);
 
   const handleContactOpened = (contactId) => {
     const idNum = Number(contactId);

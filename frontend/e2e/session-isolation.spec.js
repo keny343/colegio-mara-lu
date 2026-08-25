@@ -2,20 +2,6 @@
 
 const { test, expect } = require('@playwright/test');
 
-// ============================================================
-// CONTAS E2E
-// ============================================================
-//
-// Definir em frontend/e2e/.env:
-//
-// E2E_USER_A_EMAIL
-// E2E_USER_A_PASSWORD
-// E2E_USER_B_EMAIL
-// E2E_USER_B_PASSWORD
-//
-// Nunca commitar credenciais reais.
-// ============================================================
-
 const USER_A = {
   email: process.env.E2E_USER_A_EMAIL,
   senha: process.env.E2E_USER_A_PASSWORD,
@@ -26,14 +12,8 @@ const USER_B = {
   senha: process.env.E2E_USER_B_PASSWORD,
 };
 
-// Estados autenticados.
-// São preenchidos uma única vez no beforeAll.
 let stateA;
 let stateB;
-
-// ============================================================
-// VALIDAÇÃO DAS CREDENCIAIS
-// ============================================================
 
 test.beforeAll(() => {
   if (
@@ -43,22 +23,11 @@ test.beforeAll(() => {
     !USER_B.senha
   ) {
     throw new Error(
-      'Definir E2E_USER_A_EMAIL/PASSWORD e E2E_USER_B_EMAIL/PASSWORD ' +
-        '(contas de teste seedadas na BD).'
+      'Definir E2E_USER_A_EMAIL/PASSWORD e E2E_USER_B_EMAIL/PASSWORD.'
     );
   }
 });
 
-// ============================================================
-// LOGIN
-// ============================================================
-
-/**
- * Faz login de uma conta.
- *
- * O cookie httpOnly criado pelo backend fica armazenado
- * no storageState do browser context.
- */
 async function login(page, user) {
   await page.goto('/login', {
     waitUntil: 'domcontentloaded',
@@ -68,26 +37,29 @@ async function login(page, user) {
   const campoEmail = page.locator('#login-email');
   const campoSenha = page.locator('#login-senha');
 
+  const botaoEntrar = page.getByRole('button', {
+    name: /^entrar$/i,
+  });
+
   await expect(campoEmail).toBeVisible({
     timeout: 20_000,
   });
 
   await expect(campoSenha).toBeVisible({
-    timeout: 10_000,
+    timeout: 20_000,
+  });
+
+  await expect(botaoEntrar).toBeVisible({
+    timeout: 20_000,
   });
 
   await campoEmail.fill(user.email);
   await campoSenha.fill(user.senha);
 
-  const botaoEntrar = page.getByRole('button', {
-    name: /entrar/i,
-  });
-
-  await expect(botaoEntrar).toBeVisible({
+  await expect(botaoEntrar).toBeEnabled({
     timeout: 10_000,
   });
 
-  // Capturar a resposta real do login.
   const loginResponsePromise = page.waitForResponse(
     (response) =>
       response.url().includes('/api/auth/login') &&
@@ -107,7 +79,7 @@ async function login(page, user) {
     try {
       body = await loginResponse.text();
     } catch {
-      body = '<não foi possível ler a resposta>';
+      body = '';
     }
 
     throw new Error(
@@ -118,22 +90,11 @@ async function login(page, user) {
     );
   }
 
-  // O login deve retirar a página de /login.
   await expect(page).not.toHaveURL(/\/login/, {
     timeout: 20_000,
   });
 }
 
-// ============================================================
-// IDENTIDADE DA SESSÃO
-// ============================================================
-
-/**
- * Consulta a identidade da sessão através do backend.
- *
- * O request pertence ao próprio browser context,
- * portanto utiliza os cookies desse dispositivo.
- */
 async function identidadeDaSessao(page) {
   const response = await page.request.get('/api/auth/perfil', {
     timeout: 20_000,
@@ -158,24 +119,10 @@ async function identidadeDaSessao(page) {
     );
   }
 
-  return await response.json();
-}
+  const dados = await response.json();
 
-// ============================================================
-// PREPARAÇÃO DAS SESSÕES
-// ============================================================
-//
-// USER_A faz login uma vez.
-// USER_B faz login uma vez.
-//
-// Os dois logins são feitos em paralelo para reduzir
-// o tempo da preparação da suíte.
-//
-// Os estados são reutilizados pelos cinco cenários.
-//
-// Isso evita múltiplos logins e reduz a possibilidade
-// de atingir o rate limiter do backend.
-// ============================================================
+  return dados.usuario || dados;
+}
 
 test.beforeAll(
   async ({ browser }) => {
@@ -186,17 +133,20 @@ test.beforeAll(
       const pageA = await ctxA.newPage();
       const pageB = await ctxB.newPage();
 
-      // Login das duas contas em paralelo.
-      await Promise.all([
-        login(pageA, USER_A),
-        login(pageB, USER_B),
-      ]);
+      await login(pageA, USER_A);
+      await login(pageB, USER_B);
 
-      // Guardar cookies/sessões.
-      [stateA, stateB] = await Promise.all([
-        ctxA.storageState(),
-        ctxB.storageState(),
-      ]);
+      stateA = await ctxA.storageState();
+      stateB = await ctxB.storageState();
+
+      console.log('========================================');
+      console.log('SESSÕES E2E PREPARADAS');
+      console.log('========================================');
+      console.log('USER_A:', USER_A.email);
+      console.log('USER_B:', USER_B.email);
+      console.log('Cookies USER_A:', stateA.cookies.length);
+      console.log('Cookies USER_B:', stateB.cookies.length);
+      console.log('========================================');
     } finally {
       await Promise.all([
         ctxA.close(),
@@ -205,323 +155,288 @@ test.beforeAll(
     }
   },
   {
-    // Timeout exclusivo da preparação das duas sessões.
     timeout: 180_000,
   }
 );
 
-// ============================================================
-// TESTES
-// ============================================================
+test.describe(
+  'Isolamento de sessão multi-dispositivo',
+  () => {
+    test(
+      'cenário 1 — contas diferentes em dispositivos diferentes não se misturam',
+      async ({ browser }) => {
+        const ctxA = await browser.newContext({
+          storageState: stateA,
+        });
 
-test.describe('Isolamento de sessão multi-dispositivo', () => {
-  // ==========================================================
-  // CENÁRIO 1
-  // ==========================================================
+        const ctxB = await browser.newContext({
+          storageState: stateB,
+        });
 
-  test(
-    'cenário 1 — contas diferentes em dispositivos diferentes não se misturam',
-    async ({ browser }) => {
-      // Dispositivo A → conta A
-      const ctxA = await browser.newContext({
-        storageState: stateA,
-      });
+        try {
+          const pageA = await ctxA.newPage();
+          const pageB = await ctxB.newPage();
 
-      // Dispositivo B → conta B
-      const ctxB = await browser.newContext({
-        storageState: stateB,
-      });
+          const identidadeA =
+            await identidadeDaSessao(pageA);
 
-      try {
-        const pageA = await ctxA.newPage();
-        const pageB = await ctxB.newPage();
+          const identidadeB =
+            await identidadeDaSessao(pageB);
 
-        const identidadeA = await identidadeDaSessao(pageA);
-        const identidadeB = await identidadeDaSessao(pageB);
+          expect(identidadeA).toBeTruthy();
+          expect(identidadeB).toBeTruthy();
 
-        expect(identidadeA).toBeTruthy();
-        expect(identidadeB).toBeTruthy();
+          expect(identidadeA.id).not.toBe(
+            identidadeB.id
+          );
 
-        // As contas devem ser diferentes.
-        expect(identidadeA.id).not.toBe(identidadeB.id);
-
-        // Os nomes das contas de teste também devem ser diferentes.
-        expect(identidadeA.nome).not.toBe(identidadeB.nome);
-      } finally {
-        await ctxA.close();
-        await ctxB.close();
+          expect(identidadeA.nome).not.toBe(
+            identidadeB.nome
+          );
+        } finally {
+          await ctxA.close();
+          await ctxB.close();
+        }
       }
-    }
-  );
+    );
 
-  // ==========================================================
-  // CENÁRIO 2
-  // ==========================================================
+    test(
+      'cenário 2 — mesma conta em dois dispositivos mantém identidade igual',
+      async ({ browser }) => {
+        const ctxA = await browser.newContext({
+          storageState: stateA,
+        });
 
-  test(
-    'cenário 2 — mesma conta em dois dispositivos mantém identidade igual',
-    async ({ browser }) => {
-      // Dois dispositivos independentes usando a mesma conta A.
-      const ctxA = await browser.newContext({
-        storageState: stateA,
-      });
+        const ctxB = await browser.newContext({
+          storageState: stateA,
+        });
 
-      const ctxB = await browser.newContext({
-        storageState: stateA,
-      });
+        try {
+          const pageA = await ctxA.newPage();
+          const pageB = await ctxB.newPage();
 
-      try {
-        const pageA = await ctxA.newPage();
-        const pageB = await ctxB.newPage();
+          const identidadeA =
+            await identidadeDaSessao(pageA);
 
-        const identidadeA = await identidadeDaSessao(pageA);
-        const identidadeB = await identidadeDaSessao(pageB);
+          const identidadeB =
+            await identidadeDaSessao(pageB);
 
-        // Mesmo usuário.
-        expect(identidadeA.id).toBe(identidadeB.id);
+          expect(identidadeA.id).toBe(
+            identidadeB.id
+          );
 
-        // Mesmo nome.
-        expect(identidadeA.nome).toBe(identidadeB.nome);
-      } finally {
-        await ctxA.close();
-        await ctxB.close();
+          expect(identidadeA.nome).toBe(
+            identidadeB.nome
+          );
+        } finally {
+          await ctxA.close();
+          await ctxB.close();
+        }
       }
-    }
-  );
+    );
 
-  // ==========================================================
-  // CENÁRIO 3
-  // ==========================================================
+    test(
+      'cenário 3 — logout num dispositivo não derruba sessão do outro',
+      async ({ browser }) => {
+        const ctxA = await browser.newContext({
+          storageState: stateA,
+        });
 
-  test(
-    'cenário 3 — logout num dispositivo não derruba sessão do outro',
-    async ({ browser }) => {
-      // Dois dispositivos independentes,
-      // ambos usando a conta A.
-      const ctxA = await browser.newContext({
-        storageState: stateA,
-      });
+        const ctxB = await browser.newContext({
+          storageState: stateA,
+        });
 
-      const ctxB = await browser.newContext({
-        storageState: stateA,
-      });
+        try {
+          const pageA = await ctxA.newPage();
+          const pageB = await ctxB.newPage();
 
-      try {
-        const pageA = await ctxA.newPage();
-        const pageB = await ctxB.newPage();
+          const identidadeA =
+            await identidadeDaSessao(pageA);
 
-        // Confirmar que ambas as sessões pertencem ao mesmo usuário.
-        const identidadeA = await identidadeDaSessao(pageA);
-        const identidadeB = await identidadeDaSessao(pageB);
+          const identidadeB =
+            await identidadeDaSessao(pageB);
 
-        expect(identidadeA.id).toBe(identidadeB.id);
+          expect(identidadeA.id).toBe(
+            identidadeB.id
+          );
 
-        // -----------------------------------------------------
-        // LOGOUT SOMENTE NO DISPOSITIVO A
-        // -----------------------------------------------------
+          const logoutResponse =
+            await pageA.request.post(
+              '/api/auth/logout',
+              {
+                headers: {
+                  Accept: 'application/json',
+                },
+              }
+            );
 
-        const logoutResponse =
-          await pageA.request.post('/api/auth/logout', {
-            headers: {
-              Accept: 'application/json',
-            },
-          });
+          expect(logoutResponse.ok()).toBeTruthy();
 
-        expect(logoutResponse.ok()).toBeTruthy();
+          const perfilAposLogout =
+            await pageA.request.get(
+              '/api/auth/perfil',
+              {
+                headers: {
+                  Accept: 'application/json',
+                },
+              }
+            );
 
-        // -----------------------------------------------------
-        // A DEIXOU DE TER SESSÃO
-        // -----------------------------------------------------
+          expect(
+            perfilAposLogout.status()
+          ).toBe(401);
 
-        const perfilAposLogout =
-          await pageA.request.get('/api/auth/perfil', {
-            headers: {
-              Accept: 'application/json',
-            },
-          });
+          const identidadeDepoisB =
+            await identidadeDaSessao(pageB);
 
-        expect(perfilAposLogout.status()).toBe(401);
+          expect(identidadeDepoisB).toBeTruthy();
 
-        // -----------------------------------------------------
-        // B CONTINUA AUTENTICADO
-        // -----------------------------------------------------
-
-        const identidadeDepoisB =
-          await identidadeDaSessao(pageB);
-
-        expect(identidadeDepoisB).toBeTruthy();
-        expect(identidadeDepoisB.id).toBe(identidadeB.id);
-      } finally {
-        await ctxA.close();
-        await ctxB.close();
+          expect(
+            identidadeDepoisB.id
+          ).toBe(identidadeB.id);
+        } finally {
+          await ctxA.close();
+          await ctxB.close();
+        }
       }
-    }
-  );
+    );
 
-  // ==========================================================
-  // CENÁRIO 4
-  // ==========================================================
+    test(
+      'cenário 4 — refresh simultâneo nos dois dispositivos não troca identidade',
+      async ({ browser }) => {
+        const ctxA = await browser.newContext({
+          storageState: stateA,
+        });
 
-  test(
-    'cenário 4 — refresh simultâneo nos dois dispositivos não troca identidade',
-    async ({ browser }) => {
-      // Dispositivo A → conta A
-      const ctxA = await browser.newContext({
-        storageState: stateA,
-      });
+        const ctxB = await browser.newContext({
+          storageState: stateB,
+        });
 
-      // Dispositivo B → conta B
-      const ctxB = await browser.newContext({
-        storageState: stateB,
-      });
+        try {
+          const pageA = await ctxA.newPage();
+          const pageB = await ctxB.newPage();
 
-      try {
-        const pageA = await ctxA.newPage();
-        const pageB = await ctxB.newPage();
+          await Promise.all([
+            pageA.goto('/', {
+              waitUntil: 'commit',
+              timeout: 30_000,
+            }),
 
-        // -----------------------------------------------------
-        // ABRIR A APLICAÇÃO
-        // -----------------------------------------------------
+            pageB.goto('/', {
+              waitUntil: 'commit',
+              timeout: 30_000,
+            }),
+          ]);
 
-        await Promise.all([
-          pageA.goto('/', {
-            waitUntil: 'commit',
-            timeout: 30_000,
-          }),
+          const identidadeAntesA =
+            await identidadeDaSessao(pageA);
 
-          pageB.goto('/', {
-            waitUntil: 'commit',
-            timeout: 30_000,
-          }),
-        ]);
+          const identidadeAntesB =
+            await identidadeDaSessao(pageB);
 
-        // -----------------------------------------------------
-        // IDENTIDADES ANTES DO REFRESH
-        // -----------------------------------------------------
+          expect(
+            identidadeAntesA.id
+          ).not.toBe(
+            identidadeAntesB.id
+          );
 
-        const identidadeAntesA =
-          await identidadeDaSessao(pageA);
+          await Promise.all([
+            pageA.reload({
+              waitUntil: 'commit',
+              timeout: 30_000,
+            }),
 
-        const identidadeAntesB =
-          await identidadeDaSessao(pageB);
+            pageB.reload({
+              waitUntil: 'commit',
+              timeout: 30_000,
+            }),
+          ]);
 
-        expect(identidadeAntesA.id).not.toBe(
-          identidadeAntesB.id
-        );
+          const identidadeDepoisA =
+            await identidadeDaSessao(pageA);
 
-        // -----------------------------------------------------
-        // REFRESH SIMULTÂNEO
-        // -----------------------------------------------------
+          const identidadeDepoisB =
+            await identidadeDaSessao(pageB);
 
-        await Promise.all([
-          pageA.reload({
-            waitUntil: 'commit',
-            timeout: 30_000,
-          }),
+          expect(
+            identidadeDepoisA.id
+          ).toBe(
+            identidadeAntesA.id
+          );
 
-          pageB.reload({
-            waitUntil: 'commit',
-            timeout: 30_000,
-          }),
-        ]);
+          expect(
+            identidadeDepoisB.id
+          ).toBe(
+            identidadeAntesB.id
+          );
 
-        // -----------------------------------------------------
-        // IDENTIDADES DEPOIS DO REFRESH
-        // -----------------------------------------------------
-
-        const identidadeDepoisA =
-          await identidadeDaSessao(pageA);
-
-        const identidadeDepoisB =
-          await identidadeDaSessao(pageB);
-
-        // A continua sendo A.
-        expect(identidadeDepoisA.id).toBe(
-          identidadeAntesA.id
-        );
-
-        // B continua sendo B.
-        expect(identidadeDepoisB.id).toBe(
-          identidadeAntesB.id
-        );
-
-        // A e B continuam diferentes.
-        expect(identidadeDepoisA.id).not.toBe(
-          identidadeDepoisB.id
-        );
-      } finally {
-        await ctxA.close();
-        await ctxB.close();
+          expect(
+            identidadeDepoisA.id
+          ).not.toBe(
+            identidadeDepoisB.id
+          );
+        } finally {
+          await ctxA.close();
+          await ctxB.close();
+        }
       }
-    }
-  );
+    );
 
-  // ==========================================================
-  // CENÁRIO 5
-  // ==========================================================
+    test(
+      'cenário 5 — sessão expirada numa conta não afecta a outra',
+      async ({ browser }) => {
+        const ctxA = await browser.newContext({
+          storageState: stateA,
+        });
 
-  test(
-    'cenário 5 — sessão expirada numa conta não afecta a outra',
-    async ({ browser }) => {
-      // Dispositivo A → conta A
-      const ctxA = await browser.newContext({
-        storageState: stateA,
-      });
+        const ctxB = await browser.newContext({
+          storageState: stateB,
+        });
 
-      // Dispositivo B → conta B
-      const ctxB = await browser.newContext({
-        storageState: stateB,
-      });
+        try {
+          const pageA = await ctxA.newPage();
+          const pageB = await ctxB.newPage();
 
-      try {
-        const pageA = await ctxA.newPage();
-        const pageB = await ctxB.newPage();
+          const identidadeAntesB =
+            await identidadeDaSessao(pageB);
 
-        // -----------------------------------------------------
-        // CONFIRMAR IDENTIDADE DE B
-        // -----------------------------------------------------
+          expect(identidadeAntesB).toBeTruthy();
 
-        const identidadeAntesB =
-          await identidadeDaSessao(pageB);
+          expect(
+            identidadeAntesB.id
+          ).toBeTruthy();
 
-        expect(identidadeAntesB).toBeTruthy();
-        expect(identidadeAntesB.id).toBeTruthy();
+          await ctxA.clearCookies();
 
-        // -----------------------------------------------------
-        // EXPIRAR SOMENTE A SESSÃO DE A
-        // -----------------------------------------------------
+          const perfilA =
+            await pageA.request.get(
+              '/api/auth/perfil',
+              {
+                headers: {
+                  Accept: 'application/json',
+                },
+              }
+            );
 
-        await ctxA.clearCookies();
+          expect(
+            perfilA.status()
+          ).toBe(401);
 
-        // -----------------------------------------------------
-        // A NÃO POSSUI MAIS SESSÃO
-        // -----------------------------------------------------
+          const identidadeDepoisB =
+            await identidadeDaSessao(pageB);
 
-        const perfilA =
-          await pageA.request.get('/api/auth/perfil', {
-            headers: {
-              Accept: 'application/json',
-            },
-          });
+          expect(identidadeDepoisB).toBeTruthy();
 
-        expect(perfilA.status()).toBe(401);
-
-        // -----------------------------------------------------
-        // B CONTINUA AUTENTICADO
-        // -----------------------------------------------------
-
-        const identidadeDepoisB =
-          await identidadeDaSessao(pageB);
-
-        expect(identidadeDepoisB).toBeTruthy();
-
-        expect(identidadeDepoisB.id).toBe(
-          identidadeAntesB.id
-        );
-      } finally {
-        await ctxA.close();
-        await ctxB.close();
+          expect(
+            identidadeDepoisB.id
+          ).toBe(
+            identidadeAntesB.id
+          );
+        } finally {
+          await ctxA.close();
+          await ctxB.close();
+        }
       }
-    }
-  );
-});
+    );
+  }
+);

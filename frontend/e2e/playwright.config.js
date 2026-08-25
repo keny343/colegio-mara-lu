@@ -1,51 +1,66 @@
 // @ts-check
 
+const { defineConfig, devices } = require('@playwright/test');
 const path = require('path');
 const dotenv = require('dotenv');
-const { defineConfig } = require('@playwright/test');
 
-// ============================================================
-// CARREGAR .env DA PASTA E2E
-// ============================================================
-
-const envPath = path.join(__dirname, '.env');
-
-const dotenvResult = dotenv.config({
-  path: envPath,
+dotenv.config({
+  path: path.resolve(__dirname, '.env'),
 });
 
-if (dotenvResult.error) {
-  console.warn(
-    `[e2e] Aviso: não consegui carregar ${envPath} — ${dotenvResult.error.message}`
-  );
-}
-
-// ============================================================
-// CONFIGURAÇÃO PLAYWRIGHT
-// ============================================================
-
+/**
+ * @see https://playwright.dev/docs/test-configuration
+ */
 module.exports = defineConfig({
-  testDir: './',
-
-  timeout: 90_000,
+  testDir: __dirname,
 
   fullyParallel: false,
 
-  retries: 1,
+  forbidOnly: !!process.env.CI,
+
+  retries: process.env.CI ? 2 : 1,
+
+  workers: 1,
 
   reporter: 'list',
 
+  timeout: 60_000,
+
+  expect: {
+    timeout: 20_000,
+  },
+
   use: {
-    baseURL:
-      process.env.E2E_BASE_URL ||
-      'http://localhost:3000',
+    baseURL: 'http://localhost:3000',
 
     trace: 'retain-on-failure',
 
     screenshot: 'only-on-failure',
 
-    actionTimeout: 15_000,
+    video: 'retain-on-failure',
 
-    navigationTimeout: 30_000,
+    actionTimeout: 30_000,
+
+    navigationTimeout: 45_000,
+  },
+
+  projects: [
+    {
+      name: 'chromium',
+
+      use: {
+        ...devices['Desktop Chrome'],
+      },
+    },
+  ],
+
+  webServer: {
+    command: 'npm start',
+
+    url: 'http://localhost:3000',
+
+    reuseExistingServer: true,
+
+    timeout: 120_000,
   },
 });
