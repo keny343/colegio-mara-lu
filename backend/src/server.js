@@ -16,6 +16,30 @@ const isProd = process.env.NODE_ENV === 'production';
 const isE2E = process.env.E2E_TEST === 'true';
 
 // ============================================================
+// PROTEÇÃO CONTRA E2E EM PRODUÇÃO
+// ============================================================
+//
+// E2E_TEST aumenta temporariamente os rate limits para permitir
+// que a suíte Playwright execute vários logins.
+//
+// Essa configuração NUNCA deve estar ativa em produção.
+//
+// Se alguém configurar acidentalmente E2E_TEST=true no Render,
+// o backend será encerrado em vez de iniciar com proteção
+// de rate limit reduzida.
+// ============================================================
+
+if (isProd && isE2E) {
+  console.error(
+    '[SEGURANÇA] E2E_TEST=true não pode ser utilizado em produção.'
+  );
+  console.error(
+    '[SEGURANÇA] Remova E2E_TEST ou defina E2E_TEST=false antes de iniciar o servidor.'
+  );
+  process.exit(1);
+}
+
+// ============================================================
 // PROXY
 // ============================================================
 
