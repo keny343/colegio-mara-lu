@@ -11,6 +11,7 @@ require('dotenv').config();
 const app = express();
 
 const PORT = process.env.PORT || 49152;
+
 const isProd = process.env.NODE_ENV === 'production';
 const isE2E = process.env.E2E_TEST === 'true';
 
@@ -31,23 +32,30 @@ const frontendUrl = (
   .trim()
   .replace(/\/+$/, '');
 
-const additionalOrigins = (process.env.ADDITIONAL_ORIGINS || '')
+const additionalOrigins = (
+  process.env.ADDITIONAL_ORIGINS || ''
+)
   .split(',')
   .map((origin) => origin.trim().replace(/\/+$/, ''))
   .filter(Boolean);
 
 const allowedOrigins = Array.from(
-  new Set([frontendUrl, ...additionalOrigins])
+  new Set([
+    frontendUrl,
+    ...additionalOrigins,
+  ])
 );
 
 // ============================================================
-// REQUEST ID + LOG
+// REQUEST ID + LOG ESTRUTURADO
 // ============================================================
 
 app.use((req, res, next) => {
   const requestId =
-    (req.headers['x-request-id'] &&
-      String(req.headers['x-request-id']).slice(0, 64)) ||
+    (
+      req.headers['x-request-id'] &&
+      String(req.headers['x-request-id']).slice(0, 64)
+    ) ||
     crypto.randomBytes(6).toString('hex');
 
   req.requestId = requestId;
@@ -70,7 +78,9 @@ app.use((req, res, next) => {
           : null,
     };
 
-    console.log(`[REQ] ${JSON.stringify(entry)}`);
+    console.log(
+      `[REQ] ${JSON.stringify(entry)}`
+    );
   });
 
   next();
@@ -102,6 +112,11 @@ app.get('/health', async (req, res) => {
       database: 'ok',
     });
   } catch (err) {
+    console.error(
+      '[HEALTH] Banco indisponível:',
+      err.message
+    );
+
     return res.status(503).json({
       status: 'degraded',
       database: 'unavailable',
@@ -121,8 +136,10 @@ app.use(cookieParser());
 
 if (
   isProd &&
-  (!process.env.JWT_SECRET ||
-    process.env.JWT_SECRET.length < 32)
+  (
+    !process.env.JWT_SECRET ||
+    process.env.JWT_SECRET.length < 32
+  )
 ) {
   console.warn(
     '[AVISO] JWT_SECRET ausente ou fraco em produção. ' +
@@ -139,12 +156,22 @@ app.use(
     contentSecurityPolicy: {
       directives: {
         defaultSrc: ["'self'"],
+
         scriptSrc: ["'self'"],
+
         styleSrc: ["'self'"],
-        imgSrc: ["'self'", 'data:'],
+
+        imgSrc: [
+          "'self'",
+          'data:',
+        ],
+
         objectSrc: ["'none'"],
+
         frameAncestors: ["'none'"],
+
         baseUri: ["'self'"],
+
         formAction: ["'self'"],
 
         ...(isProd
@@ -161,6 +188,9 @@ app.use(
 
 // ============================================================
 // CORS SECURITY CHECK
+// ============================================================
+//
+// Rejeita origens que não estejam na allowlist.
 // ============================================================
 
 app.use((req, res, next) => {
@@ -205,34 +235,39 @@ app.use(
 // RATE LIMITING
 // ============================================================
 //
+// PRODUÇÃO:
+//
+//   API geral       → 300 / 15 min
+//   LOGIN           → 15 / 15 min
+//   INSCRIÇÕES      → 10 / 15 min
+//
+// E2E:
+//
+//   API geral       → 1000 / 15 min
+//   LOGIN           → 1000 / 15 min
+//   INSCRIÇÕES      → 100 / 15 min
+//
 // IMPORTANTE:
 //
-// O rate limit normal continua ativo em produção.
+// E2E_TEST=true deve ser utilizado APENAS no ambiente de testes.
 //
-// E2E não deve simplesmente desativar a segurança.
-// Em vez disso, usamos limites maiores SOMENTE quando
-// E2E_TEST=true.
-//
-// Nunca defina E2E_TEST=true em produção.
-//
+// Nunca colocar E2E_TEST=true no Render de produção.
 // ============================================================
 
-// ------------------------------------------------------------
+
+// ============================================================
 // LIMITADOR GLOBAL DA API
-// ------------------------------------------------------------
+// ============================================================
 
 const apiLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
 
-  // Produção/desenvolvimento normal:
-  // 300 requests / 15 min / IP
-  //
-  // E2E:
-  // permite a suíte completa sem bloquear
-  // prematuramente os testes.
-  limit: isE2E ? 1000 : 300,
+  limit: isE2E
+    ? 1000
+    : 300,
 
   standardHeaders: 'draft-8',
+
   legacyHeaders: false,
 
   handler: (req, res) => {
@@ -243,35 +278,42 @@ const apiLimiter = rateLimit({
   },
 });
 
-app.use('/api', apiLimiter);
+app.use(
+  '/api',
+  apiLimiter
+);
 
-// ------------------------------------------------------------
-// LOGIN RATE LIMITER
-// ------------------------------------------------------------
+
+// ============================================================
+// LIMITADOR DE LOGIN
+// ============================================================
 //
-// PRODUÇÃO:
-// 15 tentativas / 15 minutos / IP
+// Protege contra:
 //
-// E2E:
-// 100 tentativas / 15 minutos / IP
+// - brute force
+// - credential stuffing
+// - tentativas automáticas de password
 //
-// 100 continua sendo uma proteção real contra abuso durante
-// os testes, mas evita que os 11 testes da suíte se bloqueiem.
-//
-// ------------------------------------------------------------
+// Produção: 15 / 15 minutos
+// E2E:      1000 / 15 minutos
+// ============================================================
 
 const loginLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
 
-  limit: isE2E ? 100 : 15,
+  limit: isE2E
+    ? 1000
+    : 15,
 
   standardHeaders: 'draft-8',
+
   legacyHeaders: false,
 
   handler: (req, res) => {
     return res.status(429).json({
       message:
-        'Demasiadas tentativas de login. Tente novamente em 15 minutos.',
+        'Demasiadas tentativas de login. ' +
+        'Tente novamente em 15 minutos.',
     });
   },
 });
@@ -281,26 +323,39 @@ app.use(
   loginLimiter
 );
 
-// ------------------------------------------------------------
-// INSCRIÇÃO PÚBLICA
-// ------------------------------------------------------------
+
+// ============================================================
+// LIMITADOR DE INSCRIÇÕES PÚBLICAS
+// ============================================================
 //
-// Mantém proteção forte mesmo no E2E.
+// Inscrições podem:
 //
-// ------------------------------------------------------------
+// - criar contas
+// - enviar dados
+// - fazer upload de documentos
+//
+// Por isso possuem limite próprio.
+//
+// Produção: 10 / 15 minutos
+// E2E:      100 / 15 minutos
+// ============================================================
 
 const publicInscricaoLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
 
-  limit: isE2E ? 30 : 10,
+  limit: isE2E
+    ? 100
+    : 10,
 
   standardHeaders: 'draft-8',
+
   legacyHeaders: false,
 
   handler: (req, res) => {
     return res.status(429).json({
       message:
-        'Demasiadas inscrições. Tente novamente mais tarde.',
+        'Demasiadas inscrições. ' +
+        'Tente novamente mais tarde.',
     });
   },
 });
@@ -323,7 +378,10 @@ app.use((req, res, next) => {
       'application/json; charset=utf-8'
     );
 
-    return originalJson.call(this, data);
+    return originalJson.call(
+      this,
+      data
+    );
   };
 
   next();
@@ -334,7 +392,7 @@ app.use((req, res, next) => {
 // ============================================================
 
 app.get('/api/test', (req, res) => {
-  res.json({
+  return res.json({
     message: 'Backend OK!',
   });
 });
@@ -342,18 +400,29 @@ app.get('/api/test', (req, res) => {
 // ============================================================
 // NO CACHE PARA API
 // ============================================================
+//
+// Dados autenticados podem conter informações pessoais.
+// ============================================================
 
-app.use('/api', (req, res, next) => {
-  res.setHeader(
-    'Cache-Control',
-    'no-store'
-  );
+app.use(
+  '/api',
+  (req, res, next) => {
+    res.setHeader(
+      'Cache-Control',
+      'no-store'
+    );
 
-  next();
-});
+    next();
+  }
+);
 
 // ============================================================
 // UPLOADS PÚBLICOS
+// ============================================================
+//
+// Somente avatares legados ficam públicos.
+// Documentos e materiais continuam protegidos
+// pelos respectivos endpoints autenticados.
 // ============================================================
 
 app.use(
@@ -368,83 +437,118 @@ app.use(
 );
 
 // ============================================================
-// ROTAS
+// ROTAS DA API
 // ============================================================
 
 const routes = require('./routes/index');
 
-app.use('/api', routes);
+app.use(
+  '/api',
+  routes
+);
 
 // ============================================================
 // API 404
 // ============================================================
 
-app.use('/api', (req, res) => {
-  return res.status(404).json({
-    message: 'Endpoint não encontrado.',
-  });
-});
+app.use(
+  '/api',
+  (req, res) => {
+    return res.status(404).json({
+      message: 'Endpoint não encontrado.',
+    });
+  }
+);
 
 // ============================================================
 // ROOT
 // ============================================================
 
-app.get('/', (req, res) => {
-  return res.json({
-    message: 'API Colégio Mara e Lu 🎓',
-  });
-});
+app.get(
+  '/',
+  (req, res) => {
+    return res.json({
+      message:
+        'API Colégio Mara e Lu 🎓',
+    });
+  }
+);
 
 // ============================================================
 // GLOBAL ERROR HANDLER
 // ============================================================
 
 // eslint-disable-next-line no-unused-vars
-app.use((err, req, res, next) => {
-  console.error(
-    `[ERRO] ${req.method} ${req.originalUrl}:`,
-    err.message
-  );
+app.use(
+  (err, req, res, next) => {
+    console.error(
+      `[ERRO] ${req.method} ${req.originalUrl}:`,
+      err.message
+    );
 
-  if (err.code === 'LIMIT_FILE_SIZE') {
-    return res.status(413).json({
-      message: 'Ficheiro demasiado grande.',
-    });
-  }
+    // Upload demasiado grande
+    if (
+      err.code === 'LIMIT_FILE_SIZE'
+    ) {
+      return res.status(413).json({
+        message:
+          'Ficheiro demasiado grande.',
+      });
+    }
 
-  if (err.type === 'entity.too.large') {
-    return res.status(413).json({
+    // Corpo demasiado grande
+    if (
+      err.type === 'entity.too.large'
+    ) {
+      return res.status(413).json({
+        message:
+          'Corpo da requisição demasiado grande.',
+      });
+    }
+
+    // Erros HTTP controlados
+    if (
+      err.status &&
+      err.expose
+    ) {
+      return res.status(
+        err.status
+      ).json({
+        message: err.message,
+      });
+    }
+
+    // Erro genérico
+    return res.status(500).json({
       message:
-        'Corpo da requisição demasiado grande.',
+        'Erro interno do servidor.',
     });
   }
-
-  if (err.status && err.expose) {
-    return res.status(err.status).json({
-      message: err.message,
-    });
-  }
-
-  return res.status(500).json({
-    message: 'Erro interno do servidor.',
-  });
-});
+);
 
 // ============================================================
 // DATABASE INITIALIZATION
 // ============================================================
 
-const { ensureSchema } = require('./utils/ensureSchema');
-const { ensureIndexes } = require('./utils/ensureIndexes');
+const {
+  ensureSchema,
+} = require('./utils/ensureSchema');
+
+const {
+  ensureIndexes,
+} = require('./utils/ensureIndexes');
 
 Promise.all([
   ensureSchema(),
   ensureIndexes(),
 ])
   .then(() => {
-    app.listen(PORT, () => {
-      logStart(PORT);
-    });
+    app.listen(
+      PORT,
+      () => {
+        logStart(PORT);
+      }
+    );
   })
   .catch((err) => {
     console.error(
@@ -454,12 +558,16 @@ Promise.all([
 
     console.warn(
       '[DB] O servidor inicia mesmo assim — ' +
-      'o middleware de sessão poderá falhar até a coluna token_version existir.'
+      'o middleware de sessão poderá falhar até ' +
+      'a coluna token_version existir.'
     );
 
-    app.listen(PORT, () => {
-      logStart(PORT);
-    });
+    app.listen(
+      PORT,
+      () => {
+        logStart(PORT);
+      }
+    );
   });
 
 // ============================================================
@@ -467,7 +575,9 @@ Promise.all([
 // ============================================================
 
 function logStart(port) {
-  console.log(`\n📁 CWD: ${process.cwd()}`);
+  console.log(
+    `\n📁 CWD: ${process.cwd()}`
+  );
 
   console.log(
     `\n🎓 Servidor rodando em: http://localhost:${port}`
@@ -478,20 +588,45 @@ function logStart(port) {
   );
 
   console.log(
-    `🌐 FRONTEND_URL: ${process.env.FRONTEND_URL}`
+    `🌐 FRONTEND_URL: ${process.env.FRONTEND_URL || 'não definido'}`
   );
 
   console.log(
-    `☁️ CLOUDINARY: ${process.env.CLOUDINARY_CLOUD_NAME}`
+    `☁️ CLOUDINARY: ${
+      process.env.CLOUDINARY_CLOUD_NAME ||
+      'não configurado'
+    }`
   );
 
   console.log(
-    `🧪 E2E_TEST: ${isE2E ? 'ATIVO' : 'desativado'}`
+    `🧪 E2E_TEST: ${
+      isE2E
+        ? 'ATIVO'
+        : 'desativado'
+    }`
   );
 
   console.log(
     `🔐 LOGIN RATE LIMIT: ${
-      isE2E ? '100' : '15'
+      isE2E
+        ? '1000'
+        : '15'
+    } / 15min`
+  );
+
+  console.log(
+    `🛡️ API RATE LIMIT: ${
+      isE2E
+        ? '1000'
+        : '300'
+    } / 15min`
+  );
+
+  console.log(
+    `📝 INSCRIÇÃO RATE LIMIT: ${
+      isE2E
+        ? '100'
+        : '10'
     } / 15min`
   );
 }
