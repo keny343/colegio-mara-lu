@@ -19,31 +19,37 @@ const isE2E = process.env.E2E_TEST === 'true';
 // PROTEÇÃO CONTRA E2E EM PRODUÇÃO
 // ============================================================
 //
-// E2E_TEST aumenta temporariamente os rate limits para permitir
-// que a suíte Playwright execute vários logins.
+// E2E_TEST nunca pode alterar os limites de segurança
+// de uma API de produção.
 //
-// Essa configuração NUNCA deve estar ativa em produção.
+// Se alguém configurar E2E_TEST=true no Render,
+// o servidor não inicia.
 //
-// Se alguém configurar acidentalmente E2E_TEST=true no Render,
-// o backend será encerrado em vez de iniciar com proteção
-// de rate limit reduzida.
 // ============================================================
 
 if (isProd && isE2E) {
   console.error(
     '[SEGURANÇA] E2E_TEST=true não pode ser utilizado em produção.'
   );
+
   console.error(
-    '[SEGURANÇA] Remova E2E_TEST ou defina E2E_TEST=false antes de iniciar o servidor.'
+    '[SEGURANÇA] Remova E2E_TEST do ambiente de produção.'
   );
+
   process.exit(1);
 }
 
 // ============================================================
 // PROXY
 // ============================================================
+//
+// Render / Vercel / ambiente de desenvolvimento.
+//
+// O valor 1 permite ao Express considerar o primeiro proxy
+// como fonte do IP original.
+//
+// ============================================================
 
-// Render / Vercel / ambiente de desenvolvimento
 app.set('trust proxy', 1);
 
 // ============================================================
@@ -60,7 +66,11 @@ const additionalOrigins = (
   process.env.ADDITIONAL_ORIGINS || ''
 )
   .split(',')
-  .map((origin) => origin.trim().replace(/\/+$/, ''))
+  .map((origin) =>
+    origin
+      .trim()
+      .replace(/\/+$/, '')
+  )
   .filter(Boolean);
 
 const allowedOrigins = Array.from(
@@ -84,7 +94,10 @@ app.use((req, res, next) => {
 
   req.requestId = requestId;
 
-  res.setHeader('X-Request-ID', requestId);
+  res.setHeader(
+    'X-Request-ID',
+    requestId
+  );
 
   const start = Date.now();
 
@@ -123,6 +136,11 @@ app.use(
 
 // ============================================================
 // HEALTH CHECK
+// ============================================================
+//
+// Não passa pelo /api limiter.
+// Isso permite que Render/monitorização verifique o serviço.
+//
 // ============================================================
 
 app.get('/health', async (req, res) => {
@@ -215,6 +233,7 @@ app.use(
 // ============================================================
 //
 // Rejeita origens que não estejam na allowlist.
+//
 // ============================================================
 
 app.use((req, res, next) => {
@@ -259,36 +278,44 @@ app.use(
 // RATE LIMITING
 // ============================================================
 //
-// PRODUÇÃO:
-//
-//   API geral       → 300 / 15 min
-//   LOGIN           → 15 / 15 min
-//   INSCRIÇÕES      → 10 / 15 min
-//
-// E2E:
-//
-//   API geral       → 1000 / 15 min
-//   LOGIN           → 1000 / 15 min
-//   INSCRIÇÕES      → 100 / 15 min
-//
 // IMPORTANTE:
 //
-// E2E_TEST=true deve ser utilizado APENAS no ambiente de testes.
+// Estes limites são os limites REAIS do servidor.
 //
-// Nunca colocar E2E_TEST=true no Render de produção.
+// E2E_TEST NÃO aumenta os limites.
+//
+// Dessa forma:
+//
+// - desenvolvimento
+// - testes
+// - produção
+//
+// continuam com a mesma política de segurança.
+//
+// Para executar muitos testes E2E, use um backend de teste
+// separado ou uma configuração própria de infraestrutura.
+//
 // ============================================================
-
 
 // ============================================================
 // LIMITADOR GLOBAL DA API
+// ============================================================
+//
+// 300 requisições por IP a cada 15 minutos.
+//
+// IMPORTANTE:
+//
+// Alguns endpoints possuem limitadores próprios.
+//
+// O login, por exemplo, fica FORA deste limitador para não
+// acumular dois limites independentes.
+//
 // ============================================================
 
 const apiLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
 
-  limit: isE2E
-    ? 1000
-    : 300,
+  limit: 300,
 
   standardHeaders: 'draft-8',
 
@@ -297,37 +324,31 @@ const apiLimiter = rateLimit({
   handler: (req, res) => {
     return res.status(429).json({
       message:
-        'Demasiados pedidos. Tente novamente mais tarde.',
+        'Demasiados pedidos. ' +
+        'Tente novamente mais tarde.',
     });
   },
 });
-
-app.use(
-  '/api',
-  apiLimiter
-);
-
 
 // ============================================================
 // LIMITADOR DE LOGIN
 // ============================================================
 //
+// 15 tentativas por IP a cada 15 minutos.
+//
 // Protege contra:
 //
 // - brute force
 // - credential stuffing
-// - tentativas automáticas de password
+// - password spraying
+// - automação de tentativas
 //
-// Produção: 15 / 15 minutos
-// E2E:      1000 / 15 minutos
 // ============================================================
 
 const loginLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
 
-  limit: isE2E
-    ? 1000
-    : 15,
+  limit: 15,
 
   standardHeaders: 'draft-8',
 
@@ -342,34 +363,18 @@ const loginLimiter = rateLimit({
   },
 });
 
-app.use(
-  '/api/auth/login',
-  loginLimiter
-);
-
-
 // ============================================================
 // LIMITADOR DE INSCRIÇÕES PÚBLICAS
 // ============================================================
 //
-// Inscrições podem:
+// 10 operações por IP a cada 15 minutos.
 //
-// - criar contas
-// - enviar dados
-// - fazer upload de documentos
-//
-// Por isso possuem limite próprio.
-//
-// Produção: 10 / 15 minutos
-// E2E:      100 / 15 minutos
 // ============================================================
 
 const publicInscricaoLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
 
-  limit: isE2E
-    ? 100
-    : 10,
+  limit: 10,
 
   standardHeaders: 'draft-8',
 
@@ -384,9 +389,209 @@ const publicInscricaoLimiter = rateLimit({
   },
 });
 
+// ============================================================
+// LIMITADOR DE ALTERAÇÃO DE CREDENCIAIS
+// ============================================================
+//
+// 10 operações por IP a cada 15 minutos.
+//
+// Protege alterações de:
+//
+// - password
+// - email
+// - credenciais
+//
+// ============================================================
+
+const credentialsLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+
+  limit: 10,
+
+  standardHeaders: 'draft-8',
+
+  legacyHeaders: false,
+
+  handler: (req, res) => {
+    return res.status(429).json({
+      message:
+        'Demasiadas tentativas de alteração de credenciais. ' +
+        'Tente novamente mais tarde.',
+    });
+  },
+});
+
+// ============================================================
+// LIMITADOR DE MENSAGENS
+// ============================================================
+//
+// 120 requisições por IP por minuto.
+//
+// Adequado para:
+//
+// - contactos
+// - conversas
+// - polling moderado
+//
+// ============================================================
+
+const mensagensLimiter = rateLimit({
+  windowMs: 60 * 1000,
+
+  limit: 120,
+
+  standardHeaders: 'draft-8',
+
+  legacyHeaders: false,
+
+  handler: (req, res) => {
+    return res.status(429).json({
+      message:
+        'Demasiadas solicitações de mensagens. ' +
+        'Tente novamente em breve.',
+    });
+  },
+});
+
+// ============================================================
+// LIMITADOR DE NOTIFICAÇÕES
+// ============================================================
+//
+// 120 requisições por IP por minuto.
+//
+// ============================================================
+
+const notificacoesLimiter = rateLimit({
+  windowMs: 60 * 1000,
+
+  limit: 120,
+
+  standardHeaders: 'draft-8',
+
+  legacyHeaders: false,
+
+  handler: (req, res) => {
+    return res.status(429).json({
+      message:
+        'Demasiadas solicitações de notificações. ' +
+        'Tente novamente em breve.',
+    });
+  },
+});
+
+// ============================================================
+// LIMITADOR DE DOCUMENTOS
+// ============================================================
+//
+// 20 operações por IP a cada 15 minutos.
+//
+// Documentos podem consumir:
+//
+// - armazenamento
+// - CPU
+// - memória
+// - largura de banda
+//
+// ============================================================
+
+const documentosLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+
+  limit: 20,
+
+  standardHeaders: 'draft-8',
+
+  legacyHeaders: false,
+
+  handler: (req, res) => {
+    return res.status(429).json({
+      message:
+        'Demasiadas operações com documentos. ' +
+        'Tente novamente mais tarde.',
+    });
+  },
+});
+
+// ============================================================
+// APLICAÇÃO DOS LIMITADORES
+// ============================================================
+//
+// LOGIN:
+//
+// Fica fora do apiLimiter.
+//
+// Assim não temos:
+//
+// loginLimiter + apiLimiter
+//
+// ao mesmo tempo.
+//
+// ============================================================
+
+app.use(
+  '/api/auth/login',
+  loginLimiter
+);
+
+// ============================================================
+// INSCRIÇÕES
+// ============================================================
+
 app.use(
   '/api/public/inscricoes',
   publicInscricaoLimiter
+);
+
+// ============================================================
+// CREDENCIAIS
+// ============================================================
+
+app.use(
+  '/api/auth/credenciais',
+  credentialsLimiter
+);
+
+// ============================================================
+// MENSAGENS
+// ============================================================
+
+app.use(
+  '/api/mensagens',
+  mensagensLimiter
+);
+
+// ============================================================
+// NOTIFICAÇÕES
+// ============================================================
+
+app.use(
+  '/api/notificacoes',
+  notificacoesLimiter
+);
+
+// ============================================================
+// DOCUMENTOS
+// ============================================================
+
+app.use(
+  '/api/documentos',
+  documentosLimiter
+);
+
+// ============================================================
+// API GLOBAL
+// ============================================================
+//
+// Aplicado depois das exceções acima.
+//
+// Rotas específicas continuam protegidas pelo seu próprio
+// rate limiter.
+//
+// ============================================================
+
+app.use(
+  '/api',
+  apiLimiter
 );
 
 // ============================================================
@@ -426,6 +631,7 @@ app.get('/api/test', (req, res) => {
 // ============================================================
 //
 // Dados autenticados podem conter informações pessoais.
+//
 // ============================================================
 
 app.use(
@@ -445,8 +651,9 @@ app.use(
 // ============================================================
 //
 // Somente avatares legados ficam públicos.
-// Documentos e materiais continuam protegidos
-// pelos respectivos endpoints autenticados.
+//
+// Documentos e materiais continuam protegidos.
+//
 // ============================================================
 
 app.use(
@@ -612,7 +819,10 @@ function logStart(port) {
   );
 
   console.log(
-    `🌐 FRONTEND_URL: ${process.env.FRONTEND_URL || 'não definido'}`
+    `🌐 FRONTEND_URL: ${
+      process.env.FRONTEND_URL ||
+      'não definido'
+    }`
   );
 
   console.log(
@@ -631,26 +841,30 @@ function logStart(port) {
   );
 
   console.log(
-    `🔐 LOGIN RATE LIMIT: ${
-      isE2E
-        ? '1000'
-        : '15'
-    } / 15min`
+    '🔐 LOGIN RATE LIMIT: 15 / 15min'
   );
 
   console.log(
-    `🛡️ API RATE LIMIT: ${
-      isE2E
-        ? '1000'
-        : '300'
-    } / 15min`
+    '🛡️ API RATE LIMIT: 300 / 15min'
   );
 
   console.log(
-    `📝 INSCRIÇÃO RATE LIMIT: ${
-      isE2E
-        ? '100'
-        : '10'
-    } / 15min`
+    '📝 INSCRIÇÃO RATE LIMIT: 10 / 15min'
+  );
+
+  console.log(
+    '🔑 CREDENCIAIS RATE LIMIT: 10 / 15min'
+  );
+
+  console.log(
+    '💬 MENSAGENS RATE LIMIT: 120 / min'
+  );
+
+  console.log(
+    '🔔 NOTIFICAÇÕES RATE LIMIT: 120 / min'
+  );
+
+  console.log(
+    '📄 DOCUMENTOS RATE LIMIT: 20 / 15min'
   );
 }
