@@ -29,7 +29,7 @@
   width: 280px;
   height: 100vh;
   height: 100dvh;
-  overflow-y: auto;
+  overflow: hidden;
   z-index: 100;
   background: var(--castanho);
   color: var(--bege);

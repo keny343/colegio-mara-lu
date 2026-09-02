@@ -1,9 +1,11 @@
 User-agent: *
 Allow: /
+
 Disallow: /login
+Disallow: /registro
+
+Disallow: /portal
 Disallow: /admin
 Disallow: /professor
-Disallow: /portal
-Disallow: /registro
 
 Sitemap: https://colegio-mara-lu.vercel.app/sitemap.xml
