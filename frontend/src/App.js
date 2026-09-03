@@ -146,9 +146,19 @@ function AppRoutes() {
 function NavbarConditional() {
   const location = useLocation();
   const { user, loading } = useAuth();
+  const pathname = location.pathname;
+
+  // A Landing Page é pública e deve manter a Navbar estável enquanto a sessão
+  // é verificada. Isto elimina o efeito de aparecer/desaparecer ao recarregar.
+  if (pathname === '/') {
+    if (user && ['admin', 'coordenador', 'professor'].includes(user.role)) return null;
+    return <Navbar />;
+  }
+
   if (loading) return null;
+
   const prefixosSemNavbar = ['/login', '/registro', '/inscricao', '/admin', '/professor'];
-  if (prefixosSemNavbar.some((p) => location.pathname.startsWith(p))) return null;
+  if (prefixosSemNavbar.some((p) => pathname.startsWith(p))) return null;
   if (user && ['admin', 'coordenador', 'professor'].includes(user.role)) return null;
   return <Navbar />;
 }
