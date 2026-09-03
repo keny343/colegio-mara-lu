@@ -4,12 +4,36 @@ import { Star, Users, BookOpen, FileCheck, Shield, Award, Clock, ChevronRight } 
 import './Home.css';
 
 const PASSOS = [
-  { icon: Users, title: 'Faça a inscrição', desc: 'Preencha os dados do aluno e selecione a classe desejada.' },
-  { icon: BookOpen, title: 'Aguarde a aprovação', desc: 'O colégio analisa e aprova a matrícula para ativar o acesso.' },
-  { icon: FileCheck, title: 'Faça a inscrição', desc: 'Escolha a série desejada e envie os documentos necessários digitalmente.' },
-  { icon: Shield, title: 'Aguarde a análise', desc: 'Nossa equipe analisa a documentação e aprova a matrícula com agilidade.' },
-  { icon: Award, title: 'Matrícula confirmada', desc: 'Receba a confirmação por e-mail e notificação no sistema. Bem-vindo!' },
-  { icon: Clock, title: 'Acompanhe em tempo real', desc: 'Veja o status da inscrição a qualquer momento, de qualquer lugar.' },
+  {
+    icon: Users,
+    title: 'Faça a inscrição',
+    desc: 'Preencha os dados do aluno e do encarregado de educação e selecione a classe ou série pretendida.'
+  },
+  {
+    icon: FileCheck,
+    title: 'Envie os documentos',
+    desc: 'Anexe digitalmente os documentos necessários para completar a inscrição do aluno.'
+  },
+  {
+    icon: BookOpen,
+    title: 'Aguarde a análise',
+    desc: 'O colégio verifica os dados e os documentos enviados para validar a inscrição.'
+  },
+  {
+    icon: Shield,
+    title: 'Inscrição aprovada',
+    desc: 'Após a análise, o colégio aprova a inscrição ou solicita a correção ou complementação de alguma informação.'
+  },
+  {
+    icon: Award,
+    title: 'Matrícula confirmada',
+    desc: 'Depois da aprovação da inscrição, receba a confirmação da matrícula e as orientações necessárias para o próximo passo.'
+  },
+  {
+    icon: Clock,
+    title: 'Acompanhe em tempo real',
+    desc: 'Consulte a qualquer momento o estado da inscrição, notificações e atualizações diretamente pelo sistema.'
+  },
 ];
 
 function useRevealOnScroll() {
@@ -75,9 +99,11 @@ export default function Home() {
       <section className="lp-pilares">
         <div className="lp-wrap">
           <Reveal className="lp-section-head lp-section-head-center">
-            <span className="lp-section-eyebrow">Processo de matrícula</span>
+            <span className="lp-section-eyebrow">Processo de inscrição e matrícula</span>
             <h2>Como funciona?</h2>
-            <p className="lp-section-sub">Um processo simples e transparente para garantir a melhor educação para o seu filho.</p>
+            <p className="lp-section-sub">
+              Um processo simples e transparente para o candidato ou encarregado de educação acompanhar a inscrição do início à confirmação da matrícula.
+            </p>
           </Reveal>
         </div>
         <div className="lp-wrap" style={{ padding: 0 }}>
@@ -86,7 +112,10 @@ export default function Home() {
               const Icon = f.icon;
               return (
                 <Reveal as="div" className="lp-pilar" key={i}>
-                  <span className="lp-pilar-num"><Icon size={15} style={{ verticalAlign: '-3px', marginRight: 6 }} />passo {String(i + 1).padStart(2, '0')}</span>
+                  <span className="lp-pilar-num">
+                    <Icon size={15} style={{ verticalAlign: '-3px', marginRight: 6 }} />
+                    passo {String(i + 1).padStart(2, '0')}
+                  </span>
                   <h3>{f.title}</h3>
                   <p>{f.desc}</p>
                 </Reveal>
@@ -102,7 +131,9 @@ export default function Home() {
           <Reveal className="lp-cta-box">
             <div>
               <h2>Pronto para garantir a vaga?</h2>
-              <p>As vagas são limitadas. Faça já a sua inscrição e garanta o lugar do seu filho no próximo ano letivo.</p>
+              <p>
+                As vagas são limitadas. Faça já a sua inscrição e garanta o lugar do seu filho no próximo ano letivo.
+              </p>
             </div>
             <div className="lp-cta-actions">
               <Link to="/inscricao" className="lp-btn-light">
