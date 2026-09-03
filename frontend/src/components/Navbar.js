@@ -83,7 +83,6 @@ export default function Navbar() {
 
   const links = buildLinks();
   const isLandingPage = location.pathname === '/';
-  const showLogout = !isLandingPage && user;
 
   const NavLinks = ({ mobile = false }) => (
     <>
@@ -100,9 +99,11 @@ export default function Navbar() {
           )}
         </Link>
       ))}
-      <button onClick={handleLogout} className="nav-item nav-item-logout">
-        <LogOut size={16} /> <span>Sair</span>
-      </button>
+      {user && !isLandingPage && (
+        <button onClick={handleLogout} className="nav-item nav-item-logout">
+          <LogOut size={16} /> <span>Sair</span>
+        </button>
+      )}
     </>
   );
 
@@ -118,17 +119,6 @@ export default function Navbar() {
 
     <div className="navbar-links">
       <NavLinks />
-
-      {showLogout && (
-        <button
-          className="nav-item nav-item-logout"
-          aria-label="Sair"
-          onClick={handleLogout}
-        >
-          <LogOut size={16} />
-          <span>Sair</span>
-        </button>
-      )}
     </div>
 
     <button
