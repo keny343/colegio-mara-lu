@@ -107,38 +107,53 @@ export default function Navbar() {
   );
 
   return (
-    <nav className="navbar">
-      <Link to="/" className="navbar-logo">
-        <div className="logo-icon"><GraduationCap size={22} color="white" /></div>
-        <span>Colégio Mara & Lu</span>
-      </Link>
-
-      <div className="navbar-links">
-        <NavLinks />
-        {showLogout && (
-          <button className="nav-item nav-item-logout" aria-label="Sair" onClick={handleLogout}>
-            <LogOut size={16} /> <span>Sair</span>
-          </button>
-        )
+  <nav className="navbar">
+    <Link to="/" className="navbar-logo">
+      <div className="logo-icon">
+        <GraduationCap size={22} color="white" />
       </div>
 
-      <button
-        className="navbar-toggle"
-        aria-label={menuOpen ? 'Fechar menu' : 'Abrir menu'}
-        aria-expanded={menuOpen}
-        onClick={() => setMenuOpen(o => !o)}
-      >
-        {menuOpen ? <X size={24} /> : <Menu size={24} />}
-      </button>
+      <span>Colégio Mara & Lu</span>
+    </Link>
 
-      {menuOpen && (
-        <>
-          <div className="navbar-overlay" onClick={() => setMenuOpen(false)} />
-          <div className="navbar-mobile">
-            <NavLinks mobile />
-          </div>
-        </>
+    <div className="navbar-links">
+      <NavLinks />
+
+      {showLogout && (
+        <button
+          className="nav-item nav-item-logout"
+          aria-label="Sair"
+          onClick={handleLogout}
+        >
+          <LogOut size={16} />
+          <span>Sair</span>
+        </button>
       )}
-    </nav>
-  );
+    </div>
+
+    <button
+      className="navbar-toggle"
+      aria-label={menuOpen ? 'Fechar menu' : 'Abrir menu'}
+      aria-expanded={menuOpen}
+      onClick={() => setMenuOpen(o => !o)}
+    >
+      {menuOpen ? <X size={24} /> : <Menu size={24} />}
+    </button>
+
+    {menuOpen && (
+      <>
+        <div
+          className="navbar-overlay"
+          onClick={() => setMenuOpen(false)}
+        />
+
+        <div className="navbar-mobile">
+          <NavLinks mobile />
+        </div>
+      </>
+    )}
+  </nav>
+);
 }
+
+export default Navbar;
