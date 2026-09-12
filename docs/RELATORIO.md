@@ -6,7 +6,7 @@
 **Documento:** Introdução → Conclusão (UML, casos de uso, paradigmas, actores)
 
 ---
-
+ss
 ## Sumário
 
 1. [Introdução](#1-introdução)  
