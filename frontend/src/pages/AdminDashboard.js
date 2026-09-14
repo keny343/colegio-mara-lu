@@ -17,6 +17,13 @@ const normalizeSeriesName = (n) => {
   return String(collapsed).trim();
 };
 
+const saudacao = () => {
+  const h = new Date().getHours();
+  if (h < 12) return 'Bom dia';
+  if (h < 19) return 'Boa tarde';
+  return 'Boa noite';
+};
+
 export default function AdminDashboard() {
   const { user } = useAuth();
   const isAdmin = user?.role === 'admin';
@@ -59,6 +66,8 @@ export default function AdminDashboard() {
   if (error || !dados) return <ErrorState error={error || new Error('Não foi possível carregar os dados.')} onRetry={refetch} />;
 
   const { inscricoes, por_serie = [], total_usuarios, total_alunos } = dados;
+  const primeiroNome = (user?.nome || '').split(' ')[0];
+  const hoje = new Date().toLocaleDateString('pt-PT', { day: '2-digit', month: 'long', year: 'numeric' });
 
   const pizzaData = [
     { name: 'Pendentes', value: Number(inscricoes.pendentes) || 0 },
@@ -76,13 +85,13 @@ export default function AdminDashboard() {
   }));
 
   const stats = [
+    { label: 'Alunos', value: total_alunos, icon: <BookOpen size={22} />, tone: 'castanho' },
+    { label: 'Responsáveis', value: total_usuarios, icon: <Users size={22} />, tone: 'castanho-medio' },
+    { label: 'Total Inscrições', value: Number(inscricoes.total) || 0, icon: <FileText size={22} />, tone: 'laranja' },
     { label: 'Pendentes', value: Number(inscricoes.pendentes) || 0, icon: <Clock size={22} />, tone: 'amarelo' },
     { label: 'Em Análise', value: Number(inscricoes.em_analise) || 0, icon: <AlertCircle size={22} />, tone: 'azul' },
     { label: 'Aprovadas', value: Number(inscricoes.aprovadas) || 0, icon: <CheckCircle size={22} />, tone: 'verde' },
     { label: 'Rejeitadas', value: Number(inscricoes.rejeitadas) || 0, icon: <XCircle size={22} />, tone: 'vermelho' },
-    { label: 'Total Inscrições', value: Number(inscricoes.total) || 0, icon: <FileText size={22} />, tone: 'laranja' },
-    { label: 'Responsáveis', value: total_usuarios, icon: <Users size={22} />, tone: 'castanho-medio' },
-    { label: 'Alunos', value: total_alunos, icon: <BookOpen size={22} />, tone: 'castanho' },
   ];
 
   const vagaColumns = [
@@ -127,11 +136,15 @@ export default function AdminDashboard() {
 
   return (
     <div className="page-container dash-page">
-      <div className="page-header">
-        <h2>{isCoordenador ? 'Dashboard do Coordenador' : 'Dashboard Administrativo'}</h2>
-        <p className="page-header-sub">
-          {isCoordenador ? 'Visão geral para coordenação académica e gestão de inscrições' : 'Visão geral do sistema de matrículas'}
-        </p>
+      <div className="page-header dash-header">
+        <div>
+          <p className="dash-greeting">{saudacao()}{primeiroNome ? `, ${primeiroNome}` : ''}</p>
+          <h2>{isCoordenador ? 'Dashboard do Coordenador' : 'Dashboard Administrativo'}</h2>
+          <p className="page-header-sub">
+            {isCoordenador ? 'Visão geral para coordenação académica e gestão de inscrições' : 'Visão geral do sistema de matrículas'}
+          </p>
+        </div>
+        <div className="dash-date">{hoje}</div>
       </div>
 
       <div className="stats-grid">
