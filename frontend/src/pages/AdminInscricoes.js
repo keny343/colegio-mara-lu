@@ -150,17 +150,38 @@ export default function AdminInscricoes() {
     },
   ];
 
+  const TABS = [
+    ['', 'Todas'],
+    ['pendente', 'Pendentes'],
+    ['aprovada', 'Aprovadas'],
+    ['rejeitada', 'Rejeitadas'],
+  ];
+
   return (
     <div className="page-container">
       {toast && <Toast message={toast.message} type={toast.type} onClose={clearToast} key={toast.key} />}
       <div className="page-header">
         <h2>Gestão de Inscrições</h2>
-        <p>{total} inscrição(ões) encontrada(s)</p>
+        <p className="page-header-sub">Candidaturas recebidas pelo formulário público. Aprove ou rejeite com um clique.</p>
+      </div>
+
+      <div className="status-tabs">
+        {TABS.map(([value, label]) => (
+          <button
+            key={value || 'todas'}
+            type="button"
+            className={`status-tab ${filtros.status === value ? 'status-tab--active' : ''}`}
+            onClick={() => setFiltros({ ...filtros, status: value, page: 1 })}
+          >
+            {label}
+          </button>
+        ))}
+        <span className="status-tabs-count">{total} inscrição(ões) encontrada(s)</span>
       </div>
 
       <div className="card filters-card">
         <div className="filters-row">
-          <FormField label="Status" htmlFor="filtro-status" className="filter-field">
+          <FormField label="Status (detalhado)" htmlFor="filtro-status" className="filter-field">
             <Select id="filtro-status" value={filtros.status} onChange={(e) => setFiltros({ ...filtros, status: e.target.value, page: 1 })}>
               <option value="">Todos os status</option>
               {STATUS_OPTIONS.map(([value, label]) => <option key={value} value={value}>{label.replace(/[✓✗]/g, '').trim()}</option>)}
