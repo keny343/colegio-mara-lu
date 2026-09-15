@@ -35,16 +35,22 @@ Built as a real product architecture (SPA + secured API + MySQL), not a classroo
 
 ## Screenshots
 
-Place images in [`screenshots/`](./screenshots/) (see that folder’s README for capture checklist):
+### Landing
+![Landing page — Colégio Mara & Lu](./screenshots/01-landing.png)
 
-| File | Suggested content |
-|------|-------------------|
-| `01-dashboard.png` | Admin dashboard KPIs |
-| `02-login.png` | Institutional login |
-| `03-inscricoes.png` | Enrollment queue |
-| `04-portal.png` | Student/family portal |
-| `05-notas.png` | Grade sheet (staff) |
-| `06-mobile.png` | Responsive admin / portal |
+### Login
+![Institutional login](./screenshots/02-login.png)
+
+### Admin dashboard
+![Admin dashboard with KPIs and charts](./screenshots/03-dashboard.png)
+
+### Public enrollment
+![Public enrollment form](./screenshots/04-inscricao.png)
+
+### Student portal
+![Student academic portal](./screenshots/05-portal.png)
+
+More capture notes: [`screenshots/README.md`](./screenshots/README.md)
 
 ## Architecture
 
