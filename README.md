@@ -1,423 +1,163 @@
-# Sistema de Matrículas e Gestão Académica — Colégio Mara & Lu
+# Colégio Mara & Lu
 
-Sistema web para **gestão de inscrições, matrículas e atividades académicas**, desenvolvido para apoiar a administração escolar e centralizar informações de alunos, professores e demais utilizadores.
+**School enrollment & academic management platform** — Full Stack portfolio flagship.
 
-O projeto foi desenvolvido com uma arquitetura **frontend + API backend + base de dados MySQL**, com diferentes níveis de acesso de acordo com o perfil do utilizador.
-
-> **Projeto de portfólio:** este repositório demonstra desenvolvimento Full Stack, organização de software, autenticação, controlo de acesso, integração com base de dados, testes e documentação.
+React · Node.js/Express · MySQL · JWT/RBAC · Jest · Playwright · Vercel · Render
 
 ---
 
-## 🎯 Objetivo
+## Problem
 
-O sistema procura digitalizar processos escolares que normalmente dependem de procedimentos manuais, permitindo centralizar:
+Schools often manage enrollments, grades, absences, and family communication across spreadsheets, paper, and fragmented chats. That creates:
 
-* Inscrições e matrículas
-* Gestão de alunos
-* Gestão de utilizadores
-* Gestão académica
-* Notas
-* Faltas
-* Materiais e conteúdos académicos
-* Informações curriculares
-* Comunicação entre os diferentes perfis do sistema
+- Slow enrollment review
+- Unclear vacancy control
+- Weak audit of who changed what
+- No single place for students/families to follow academic progress
 
----
+## Solution
 
-## 👥 Perfis de acesso
+A role-based web system that covers the full cycle:
 
-O sistema possui diferentes perfis de utilizador:
+**Public application → staff review → enrollment → academic year (grades, absences, materials, messaging)**
 
-| Perfil            | Responsabilidade                                                           |
-| ----------------- | -------------------------------------------------------------------------- |
-| **Administrador** | Gestão global do sistema e dos utilizadores                                |
-| **Coordenador**   | Acompanhamento e gestão das atividades académicas sob sua responsabilidade |
-| **Professor**     | Gestão das atividades relacionadas com as suas disciplinas e alunos        |
-| **Aluno**         | Consulta das suas informações académicas                                   |
+Built as a real product architecture (SPA + secured API + MySQL), not a classroom CRUD demo.
 
-O acesso às funcionalidades é controlado de acordo com o papel atribuído ao utilizador.
+## Live demo
 
----
+| Layer | URL |
+|-------|-----|
+| Frontend | Deployed on **Vercel** (see repository / deployment notes) |
+| Backend | `https://colegio-mara-lu-backend.onrender.com` |
+| Health | `GET /health` on the API host |
 
-## ⚙️ Principais funcionalidades
+> Render free tiers may cold-start; wait a few seconds on first request.
 
-### 📋 Inscrições e matrículas
+## Screenshots
 
-* Registo de candidatos
-* Processo de inscrição
-* Gestão de matrículas
-* Acompanhamento do estado das inscrições
-* Organização das informações dos alunos
+Place images in [`screenshots/`](./screenshots/) (see that folder’s README for capture checklist):
 
-### 🎓 Gestão académica
+| File | Suggested content |
+|------|-------------------|
+| `01-dashboard.png` | Admin dashboard KPIs |
+| `02-login.png` | Institutional login |
+| `03-inscricoes.png` | Enrollment queue |
+| `04-portal.png` | Student/family portal |
+| `05-notas.png` | Grade sheet (staff) |
+| `06-mobile.png` | Responsive admin / portal |
 
-* Organização por classes e disciplinas
-* Gestão de períodos académicos
-* Registo e consulta de notas
-* Gestão de faltas
-* Consulta de informações académicas
-
-O modelo académico considera os períodos:
-
-* 1º Período — Prova do Professor
-* 1º Período — Prova Trimestral
-* 2º Período — Prova do Professor
-* 2º Período — Prova Trimestral
-* 3º Período — Prova do Professor
-* 3º Período — Prova Trimestral
-
-### 👤 Gestão de utilizadores
-
-* Criação e gestão de contas
-* Controlo de perfis
-* Ativação/desativação de utilizadores
-* Controlo de permissões
-
-### 🔐 Autenticação e segurança
-
-O backend implementa mecanismos de segurança como:
-
-* Autenticação baseada em JWT
-* Cookies HTTP-only para sessão
-* Proteção de rotas
-* Controlo de acesso por função
-* Política de palavra-passe
-* Rate limiting
-* Helmet
-* Variáveis de ambiente para informações sensíveis
-
-Credenciais, chaves JWT e outras informações sensíveis **não devem ser armazenadas no código-fonte**.
-
----
-
-## 🏗️ Arquitetura
-
-O projeto está dividido em três componentes principais:
+## Architecture
 
 ```text
-┌──────────────────────────────┐
-│          Frontend            │
-│       React.js               │
-│                              │
-│  Interface + Navegação       │
-│  Componentes + Páginas       │
-└──────────────┬───────────────┘
-               │ HTTP / API
-               ▼
-┌──────────────────────────────┐
-│           Backend            │
-│       Node.js / Express      │
-│                              │
-│  Controllers                 │
-│  Routes                      │
-│  Middleware                  │
-│  Autenticação                │
-│  Regras de negócio           │
-└──────────────┬───────────────┘
-               │
-               ▼
-┌──────────────────────────────┐
-│          MySQL               │
-│                              │
-│  Utilizadores                │
-│  Alunos                      │
-│  Inscrições                  │
-│  Dados académicos            │
-│  etc.                        │
-└──────────────────────────────┘
+React (Vercel) ──HTTPS/REST──▶ Express API (Render) ──▶ MySQL
+                                      │
+                                      └──▶ File storage (Supabase)
 ```
 
----
+Deep dive: [`docs/ARCHITECTURE.md`](./docs/ARCHITECTURE.md)
 
-## 🛠️ Tecnologias utilizadas
+## Features
 
-### Frontend
+| Area | Highlights |
+|------|------------|
+| **Auth & RBAC** | Admin, coordenador, professor, aluno — scoped coordinator access |
+| **Enrollments** | Public form, document upload, status workflow, vacancy sync |
+| **Academic** | Courses, subjects, classes, schedules, curriculum plans |
+| **Grades** | Period model (1PP/1PT…), grade sheets, edit rules |
+| **Attendance** | Absences + justifications |
+| **Comms** | Notifications + internal messages |
+| **Dashboards** | Staff KPIs, charts, vacancy table |
 
-* React 18
-* React Router
-* Axios
-* Recharts
-* Lucide React
-* React Toastify
-* React Testing Library
-* Playwright
+## Tech stack
 
-### Backend
+**Frontend:** React 18, React Router, Axios, Recharts, Lucide, React Toastify, CRA  
+**Backend:** Node.js, Express, mysql2, JWT, bcryptjs, Helmet, express-rate-limit, Multer, cookie-parser  
+**Data / files:** MySQL, Supabase storage  
+**Tests:** Jest + Testing Library, Playwright  
+**Deploy:** Vercel + Render  
 
-* Node.js
-* Express
-* MySQL
-* mysql2
-* JWT
-* bcryptjs
-* Helmet
-* Express Rate Limit
-* Multer
-* Cloudinary
-* dotenv
-* cookie-parser
+## Security
 
-### Ferramentas
+- JWT in **httpOnly** cookies
+- bcrypt password hashing + password policy
+- Rate limiting (API, login, public enrollment)
+- Per-account login lockout
+- Helmet + CORS allowlist
+- Upload type/size filters
+- Secrets only via environment variables
 
-* Git
-* GitHub
-* VS Code
-* npm
+Details: [`docs/SECURITY.md`](./docs/SECURITY.md)
 
----
-
-## 📁 Estrutura do projeto
-
-```text
-colegio-mara-lu/
-│
-├── backend/
-│   ├── src/
-│   │   ├── config/
-│   │   ├── controllers/
-│   │   ├── domain/
-│   │   ├── middleware/
-│   │   ├── routes/
-│   │   ├── utils/
-│   │   └── server.js
-│   │
-│   └── package.json
-│
-├── frontend/
-│   ├── public/
-│   ├── src/
-│   │   ├── components/
-│   │   ├── contexts/
-│   │   ├── hooks/
-│   │   ├── layouts/
-│   │   ├── pages/
-│   │   ├── services/
-│   │   ├── utils/
-│   │   └── App.js
-│   │
-│   └── package.json
-│
-├── docs/
-│   ├── RELATORIO.md
-│   └── RELATORIO-E-HOSPEDAGEM.md
-│
-├── diagrams/
-│
-├── INSTALACAO.md
-├── README.md
-└── .gitignore
-```
-
----
-
-## 🚀 Executar localmente
-
-### 1. Clonar o projeto
+## Tests
 
 ```bash
-git clone https://github.com/keny343/colegio-mara-lu.git
-cd colegio-mara-lu
+cd frontend
+npm test          # unit / component
+npm run test:e2e  # Playwright (needs running stack)
+npm run build     # production build
 ```
 
-### 2. Instalar dependências do backend
+Guide: [`docs/TESTING.md`](./docs/TESTING.md)
+
+## Documentation
+
+| Doc | Topic |
+|-----|--------|
+| [ARCHITECTURE.md](./docs/ARCHITECTURE.md) | System design |
+| [SECURITY.md](./docs/SECURITY.md) | Auth, RBAC, hardening |
+| [API.md](./docs/API.md) | Endpoint map |
+| [DATABASE.md](./docs/DATABASE.md) | Schema & evolution |
+| [TESTING.md](./docs/TESTING.md) | Test strategy |
+| [DEPLOYMENT.md](./docs/DEPLOYMENT.md) | Vercel / Render / env |
+| [DECISIONS.md](./docs/DECISIONS.md) | ADRs |
+| [INSTALACAO.md](./INSTALACAO.md) | Local install |
+
+## Quick start
 
 ```bash
+# Database
+# Create MySQL DB and run backend/database.sql
+
+# Backend
 cd backend
+cp .env.example .env   # fill DB + JWT_SECRET
 npm install
-```
+npm run dev            # http://localhost:49152
 
-### 3. Configurar variáveis de ambiente
-
-Crie o arquivo:
-
-```text
-backend/.env
-```
-
-Utilize o arquivo:
-
-```text
-backend/.env.example
-```
-
-como referência.
-
-**Nunca publique o arquivo `.env`.**
-
-### 4. Iniciar o backend
-
-```bash
-npm run dev
-```
-
-Por padrão, a API é executada localmente em:
-
-```text
-http://localhost:49152
-```
-
-### 5. Instalar dependências do frontend
-
-Abra outro terminal:
-
-```bash
+# Frontend
 cd frontend
+cp .env.example .env   # optional when using proxy
 npm install
+npm start              # http://localhost:3000
 ```
 
-### 6. Iniciar o frontend
+Full checklist: [`INSTALACAO.md`](./INSTALACAO.md)
 
-```bash
-npm start
-```
+## Challenges & learnings
 
-A aplicação ficará disponível em:
+- Cross-origin auth between Vercel and Render (cookie `Secure` / `SameSite`)
+- Coordinator scope vs global admin without leaking privileges
+- Dense admin tables at 100% zoom without useless horizontal scroll
+- Enrollment concurrency (`updated_at` / 409 conflicts)
+- Keeping Design System tokens consistent across admin, professor, and portal
 
-```text
-http://localhost:3000
-```
+## Technical decisions
 
----
+See [`docs/DECISIONS.md`](./docs/DECISIONS.md) — cookie sessions, RBAC refresh, boot-time schema helpers, public enrollment without open signup.
 
-## 🧪 Testes
+## Roadmap
 
-O projeto possui testes automatizados para diferentes partes da aplicação.
+- [ ] Backend automated test suite
+- [ ] OpenAPI / Swagger export
+- [ ] Expand Playwright coverage (enrollment happy path)
+- [ ] Observability (structured metrics dashboard)
+- [ ] Optional admin 2FA
 
-### Testes unitários
+## Author
 
-```bash
-cd frontend
-npm test
-```
-
-### Testes E2E
-
-```bash
-cd frontend
-npm run test:e2e
-```
-
-Os testes cobrem, entre outros aspetos:
-
-* Autenticação
-* Fluxos críticos da aplicação
-* Isolamento de sessões
-* Regras de acesso por função
-* Serviços da API
-* Tratamento de erros
-* Hooks React
-* Fluxos de utilização do sistema
+**Adnírcio Inocêncio** — Software / Full Stack Developer  
+GitHub: [keny343](https://github.com/keny343)
 
 ---
 
-## 🔒 Boas práticas de segurança
-
-O projeto utiliza variáveis de ambiente para configurações sensíveis.
-
-Exemplo:
-
-```env
-JWT_SECRET=uma_chave_longa_e_aleatoria
-```
-
-Não coloque no Git:
-
-```text
-.env
-senhas
-tokens
-API keys
-credenciais de bases de dados
-segredos de produção
-```
-
-O `.gitignore` do projeto já contempla os principais ficheiros e diretórios que não devem ser versionados.
-
----
-
-## 📚 Documentação
-
-Documentação adicional disponível no repositório:
-
-* [`INSTALACAO.md`](./INSTALACAO.md) — instalação e configuração
-* [`docs/RELATORIO.md`](./docs/RELATORIO.md) — documentação do projeto
-* [`docs/RELATORIO-E-HOSPEDAGEM.md`](./docs/RELATORIO-E-HOSPEDAGEM.md) — informações sobre hospedagem e configuração
-* [`diagrams/`](./diagrams/) — diagramas relacionados ao sistema
-
----
-
-## 🌐 Ambiente de produção
-
-O projeto foi estruturado para utilização em ambiente de produção, com:
-
-* Frontend hospedado na Vercel
-* Backend hospedado no Render
-* Base de dados MySQL
-* Configuração através de variáveis de ambiente
-
-API:
-
-```text
-https://colegio-mara-lu-backend.onrender.com
-```
-
----
-
-## 📈 Próximos passos
-
-Algumas melhorias futuras previstas para a evolução do projeto:
-
-* [ ] Expandir cobertura de testes automatizados
-* [ ] Melhorar documentação da API
-* [ ] Adicionar pipeline CI/CD
-* [ ] Melhorar observabilidade e logs
-* [ ] Adicionar documentação de arquitetura mais detalhada
-* [ ] Criar documentação da API com Swagger/OpenAPI
-* [ ] Melhorar continuamente a experiência de utilização
-* [ ] Criar releases versionadas
-
----
-
-## 💡 O que este projeto demonstra
-
-Este projeto foi desenvolvido com o objetivo de resolver um problema real de gestão escolar e, ao mesmo tempo, aplicar conceitos de desenvolvimento de software.
-
-Entre as competências demonstradas estão:
-
-* Desenvolvimento Full Stack
-* Desenvolvimento de APIs REST
-* React
-* Node.js e Express
-* MySQL
-* Autenticação e autorização
-* Controlo de acesso baseado em funções
-* Segurança de aplicações web
-* Testes automatizados
-* Git e GitHub
-* Organização de projetos
-* Documentação técnica
-* Deploy de aplicações web
-
----
-
-## 👨‍💻 Autor
-
-**Adnírcio Inocêncio**
-
-Estudante de Engenharia Informática e desenvolvedor interessado em desenvolvimento **Full Stack**, backend, bases de dados, segurança e engenharia de software.
-
-GitHub:
-
-https://github.com/keny343
-
----
-
-## 🏫 Contexto
-
-Projeto desenvolvido para o **Colégio Mara & Lu**, com foco na digitalização dos processos de inscrição, matrícula e gestão académica.
-
----
-
-## 📄 Licença
-
-Este projeto é disponibilizado para fins académicos e de portfólio.
+Licensed for portfolio demonstration. Do not commit secrets. Use `.env` examples only.
