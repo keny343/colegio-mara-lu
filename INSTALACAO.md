@@ -126,13 +126,7 @@ REACT_APP_API_URL=http://localhost:49152/api
 
 ## 6. Credenciais iniciais
 
-| Papel | E-mail | Senha |
-|-------|--------|-------|
-| Administrador | admin@colegiomara.ao | Admin@123 |
-
-**Altere a senha** após o primeiro acesso.
-
----
+As credenciais de acesso devem ser definidas durante a configuração do ambiente e não são armazenadas neste documento.
 
 ## 7. Papéis e rotas principais
 

@@ -147,7 +147,7 @@ HTTPS é automático em Vercel e Render.
 
 ## Checklist antes de publicar
 
-- [ ] Alterar senha do admin `Admin@123`  
+- [ ] Definir uma palavra-passe administrativa segura antes da utilização em produção  
 - [ ] `JWT_SECRET` forte e único em produção  
 - [ ] Testar login, lançamento de notas e upload de foto  
 - [ ] Backup da base MySQL (`mysqldump`)  

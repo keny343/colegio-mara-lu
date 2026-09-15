@@ -24,16 +24,6 @@
   content: '';
   position: absolute;
   inset: 0;
-  background: url('/images/hero-plane.svg') center / cover no-repeat;
-  opacity: 0.28;
-  mix-blend-mode: soft-light;
-  pointer-events: none;
-}
-
-.auth-aside::after {
-  content: '';
-  position: absolute;
-  inset: 0;
   background-image:
     linear-gradient(rgba(245, 230, 211, 0.05) 1px, transparent 1px),
     linear-gradient(90deg, rgba(245, 230, 211, 0.05) 1px, transparent 1px);
