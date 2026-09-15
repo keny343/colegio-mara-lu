@@ -12,4 +12,12 @@
   padding: 0;
   overflow: hidden;
   border: 1px solid var(--borda-suave);
+  border-radius: var(--radius-lg);
+  background: linear-gradient(180deg, var(--branco) 0%, var(--bege-claro) 100%);
+  box-shadow: var(--sombra-sm);
+}
+
+.page-header h2 {
+  font-family: var(--font-display);
+  letter-spacing: -0.02em;
 }

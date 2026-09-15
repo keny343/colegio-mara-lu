@@ -1,6 +1,28 @@
-.page-header-title { display: flex; align-items: center; gap: 8px; }
+.page-header-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-family: var(--font-display);
+  letter-spacing: -0.02em;
+}
 .page-header-icon { color: var(--laranja); }
 
 .turma-grid { display: grid; gap: 10px; }
-.falta-form { margin-top: 20px; display: flex; flex-direction: column; gap: 16px; max-width: 560px; }
+.turma-grid .card,
+.turma-grid > * {
+  transition: border-color var(--duration) var(--ease-out), box-shadow var(--duration) var(--ease-out);
+}
+
+.falta-form {
+  margin-top: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  max-width: 560px;
+  padding: 1.25rem 1.35rem;
+  background: linear-gradient(180deg, var(--branco) 0%, var(--bege-claro) 100%);
+  border: 1px solid var(--borda-suave);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--sombra-sm);
+}
 .falta-msg { margin-top: 10px; }

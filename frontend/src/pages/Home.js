@@ -1,38 +1,24 @@
 import React, { useEffect, useRef } from 'react';
 import { Link } from 'react-router-dom';
-import { Users, BookOpen, FileCheck, Shield, Award, Clock, ChevronRight } from 'lucide-react';
+import { ArrowRight, ArrowUpRight } from 'lucide-react';
 import './Home.css';
 
 const PASSOS = [
   {
-    icon: Users,
-    title: 'Faça a inscrição',
-    desc: 'Preencha os dados do aluno e do encarregado de educação e selecione a classe ou série pretendida.'
+    title: 'Inscrição',
+    desc: 'Dados do aluno, encarregado e classe pretendida — tudo online.',
   },
   {
-    icon: FileCheck,
-    title: 'Envie os documentos',
-    desc: 'Anexe digitalmente os documentos necessários para completar a inscrição do aluno.'
+    title: 'Documentos',
+    desc: 'BI e, quando necessário, boletim da classe anterior.',
   },
   {
-    icon: BookOpen,
-    title: 'Aguarde a análise',
-    desc: 'O colégio verifica os dados e os documentos enviados para validar a inscrição.'
+    title: 'Análise',
+    desc: 'A secretaria valida informações e anexos com cuidado.',
   },
   {
-    icon: Shield,
-    title: 'Inscrição aprovada',
-    desc: 'Após a análise, o colégio aprova a inscrição ou solicita a correção ou complementação de alguma informação.'
-  },
-  {
-    icon: Award,
-    title: 'Matrícula confirmada',
-    desc: 'Depois da aprovação da inscrição, receba a confirmação da matrícula e as orientações necessárias para o próximo passo.'
-  },
-  {
-    icon: Clock,
-    title: 'Acompanhe em tempo real',
-    desc: 'Consulte a qualquer momento o estado da inscrição, notificações e atualizações diretamente pelo sistema.'
+    title: 'Matrícula',
+    desc: 'Aprovação confirmada e acesso ao portal com o BI.',
   },
 ];
 
@@ -48,7 +34,7 @@ function useRevealOnScroll() {
           io.unobserve(el);
         }
       },
-      { threshold: 0.12 }
+      { threshold: 0.14 }
     );
     io.observe(el);
     return () => io.disconnect();
@@ -67,85 +53,99 @@ function Reveal({ as: Tag = 'div', className = '', children, ...rest }) {
 
 export default function Home() {
   return (
-    <div>
-      {/* Hero */}
+    <div className="lp">
       <header className="lp-hero">
-        <div className="lp-hero-grid-bg" aria-hidden="true"></div>
-        <div className="lp-wrap lp-hero-inner-single">
-          <p className="lp-eyebrow">
-            Excelência em educação desde 2005
-          </p>
-          <h1>
-            <em>Colégio Mara &amp; Lu</em>
+        <img
+          className="lp-hero-plane"
+          src={`${process.env.PUBLIC_URL}/images/hero-plane.svg`}
+          alt=""
+          aria-hidden="true"
+        />
+        <div className="lp-hero-veil" aria-hidden="true" />
+        <div className="lp-wrap lp-hero-copy">
+          <p className="lp-kicker lp-hero-kicker">Luanda · desde 2005</p>
+          <h1 className="lp-brand">
+            <span className="lp-brand-line">Colégio</span>
+            <span className="lp-brand-line lp-brand-em">Mara &amp; Lu</span>
           </h1>
           <p className="lp-lede">
-            Invista no futuro dos seus filhos. Faça a inscrição online de forma rápida,
-            segura e transparente. Acompanhe todo o processo em tempo real.
+            Formação sólida, acompanhamento próximo e matrícula online —
+            do primeiro contacto até à confirmação da vaga.
           </p>
           <div className="lp-hero-actions">
-            <Link to="/inscricao" className="btn btn-primary">
-              Fazer Inscrição <ChevronRight size={18} />
+            <Link to="/inscricao" className="lp-btn-solid">
+              Fazer inscrição
+              <ArrowRight size={18} strokeWidth={2.25} />
             </Link>
-            <Link to="/login" className="btn btn-secondary">
+            <Link to="/login" className="lp-btn-ghost">
               Já tenho conta
             </Link>
           </div>
         </div>
+        <div className="lp-hero-scroll" aria-hidden="true">
+          <span>Deslize</span>
+        </div>
       </header>
 
-      {/* Como funciona */}
-      <section className="lp-pilares">
-        <div className="lp-wrap">
-          <Reveal className="lp-section-head lp-section-head-center">
-            <span className="lp-section-eyebrow">Processo de inscrição e matrícula</span>
-            <h2>Como funciona?</h2>
-            <p className="lp-section-sub">
-              Um processo simples e transparente para o candidato ou encarregado de educação acompanhar a inscrição do início à confirmação da matrícula.
-            </p>
+      <section className="lp-manifesto" aria-labelledby="lp-manifesto-title">
+        <div className="lp-wrap lp-manifesto-inner">
+          <Reveal>
+            <p className="lp-kicker">A nossa promessa</p>
+            <h2 id="lp-manifesto-title" className="lp-manifesto-title">
+              Educação que acompanha cada passo — com clareza para as famílias.
+            </h2>
           </Reveal>
         </div>
-        <div className="lp-wrap" style={{ padding: 0 }}>
-          <div className="lp-pilares-grid lp-pilares-grid-6">
-            {PASSOS.map((f, i) => {
-              const Icon = f.icon;
-              return (
-                <Reveal as="div" className="lp-pilar" key={i}>
-                  <span className="lp-pilar-num">
-                    <Icon size={15} style={{ verticalAlign: '-3px', marginRight: 6 }} />
-                    passo {String(i + 1).padStart(2, '0')}
-                  </span>
-                  <h3>{f.title}</h3>
-                  <p>{f.desc}</p>
-                </Reveal>
-              );
-            })}
+      </section>
+
+      <section className="lp-process" aria-labelledby="lp-process-title">
+        <div className="lp-wrap">
+          <Reveal className="lp-process-head">
+            <p className="lp-kicker">Do pedido à vaga</p>
+            <h2 id="lp-process-title">Como corre a inscrição</h2>
+          </Reveal>
+
+          <ol className="lp-track">
+            {PASSOS.map((passo, i) => (
+              <Reveal as="li" className="lp-track-item" key={passo.title}>
+                <span className="lp-track-index" aria-hidden="true">
+                  {String(i + 1).padStart(2, '0')}
+                </span>
+                <div className="lp-track-body">
+                  <h3>{passo.title}</h3>
+                  <p>{passo.desc}</p>
+                </div>
+              </Reveal>
+            ))}
+          </ol>
+        </div>
+      </section>
+
+      <section className="lp-band" aria-labelledby="lp-band-title">
+        <div className="lp-wrap lp-band-inner">
+          <Reveal>
+            <h2 id="lp-band-title">Garanta a vaga do próximo ano letivo</h2>
+            <p>Vagas limitadas por classe. Comece a inscrição agora — leva poucos minutos.</p>
+            <Link to="/inscricao" className="lp-btn-solid lp-btn-on-dark">
+              Começar inscrição
+              <ArrowUpRight size={18} strokeWidth={2.25} />
+            </Link>
+          </Reveal>
+        </div>
+      </section>
+
+      <footer className="lp-footer">
+        <div className="lp-wrap lp-footer-grid">
+          <div>
+            <p className="lp-footer-brand">Colégio Mara &amp; Lu</p>
+            <p className="lp-footer-note">Sistema de matrículas e acompanhamento escolar.</p>
           </div>
+          <nav className="lp-footer-nav" aria-label="Rodapé">
+            <Link to="/inscricao">Inscrição</Link>
+            <Link to="/login">Entrar</Link>
+          </nav>
+          <p className="lp-footer-copy">© {new Date().getFullYear()} Colégio Mara &amp; Lu</p>
         </div>
-      </section>
-
-      {/* CTA */}
-      <section className="lp-cta">
-        <div className="lp-wrap">
-          <Reveal className="lp-cta-box">
-            <div>
-              <h2>Pronto para garantir a vaga?</h2>
-              <p>
-                As vagas são limitadas. Faça já a sua inscrição e garanta o lugar do seu filho no próximo ano letivo.
-              </p>
-            </div>
-            <div className="lp-cta-actions">
-              <Link to="/inscricao" className="lp-btn-light">
-                Começar agora <ChevronRight size={20} />
-              </Link>
-            </div>
-          </Reveal>
-        </div>
-      </section>
-
-      {/* Footer (classes globais existentes) */}
-      <footer className="footer">
-        <p>© 2026 <strong>Colégio Mara &amp; Lu</strong> — Todos os direitos reservados.</p>
-        <p style={{ marginTop: 4 }}>Sistema de Matrículas Online</p>
       </footer>
     </div>
   );

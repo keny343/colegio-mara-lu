@@ -125,6 +125,16 @@ h1, h2, h3 { font-family: var(--font-display); font-weight: 700; letter-spacing:
   backdrop-filter: saturate(1.1);
 }
 
+.navbar--landing {
+  background: rgba(18, 8, 3, 0.55);
+  backdrop-filter: blur(14px) saturate(1.15);
+  -webkit-backdrop-filter: blur(14px) saturate(1.15);
+  box-shadow: none;
+  border-bottom: 1px solid rgba(245, 230, 211, 0.1);
+  position: absolute;
+  top: 0; left: 0; right: 0;
+}
+
 .navbar-logo {
   display: flex; align-items: center; gap: 12px;
   text-decoration: none;
@@ -136,11 +146,27 @@ h1, h2, h3 { font-family: var(--font-display); font-weight: 700; letter-spacing:
   box-shadow: 0 4px 14px rgba(232, 100, 26, 0.35);
   transition: transform var(--duration) var(--ease-out);
 }
+.navbar-logo .logo-icon--mark {
+  border-radius: 2px;
+  box-shadow: none;
+}
+.navbar-logo .logo-icon--mark span {
+  font-family: var(--font-display);
+  font-size: 0.95rem;
+  font-weight: 800;
+  font-style: italic;
+  letter-spacing: -0.04em;
+  color: #fff;
+  line-height: 1;
+}
 .navbar-logo:hover .logo-icon { transform: scale(1.04); }
-.navbar-logo span {
+.navbar-logo > span {
   font-family: var(--font-display);
   color: var(--branco); font-size: 1.2rem; font-weight: 700;
   letter-spacing: -0.01em;
+}
+.navbar--landing .navbar-links .nav-item-primary {
+  border-radius: 2px;
 }
 
 .navbar-links { display: flex; align-items: center; gap: 6px; }

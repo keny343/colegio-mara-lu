@@ -3,7 +3,7 @@ import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { useNotification } from '../contexts/NotificationContext';
 import {
-  Bell, LogOut, GraduationCap, Menu, X, Home, BookOpen, Calendar,
+  Bell, LogOut, Menu, X, Home, BookOpen, Calendar,
   MessageCircle, FileText, AlertTriangle, User, Users, ClipboardList,
   School, BookMarked, LayoutDashboard
 } from 'lucide-react';
@@ -108,13 +108,12 @@ export default function Navbar() {
   );
 
   return (
-  <nav className="navbar">
+  <nav className={`navbar${isLandingPage ? ' navbar--landing' : ''}`}>
     <Link to="/" className="navbar-logo">
-      <div className="logo-icon">
-        <GraduationCap size={22} color="white" />
+      <div className="logo-icon logo-icon--mark" aria-hidden="true">
+        <span>ML</span>
       </div>
-
-      <span>Colégio Mara & Lu</span>
+      <span>Colégio Mara &amp; Lu</span>
     </Link>
 
     <div className="navbar-links">

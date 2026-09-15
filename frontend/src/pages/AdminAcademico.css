@@ -2,30 +2,81 @@
 
 .acad-header { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; flex-wrap: wrap; }
 .acad-header p { color: var(--cinza); }
+.acad-header h2 {
+  font-family: var(--font-display);
+  letter-spacing: -0.02em;
+}
 .acad-tabs { display: flex; gap: 8px; flex-wrap: wrap; }
 
-.card-table { padding: 0; }
-.card-table-head { display: flex; justify-content: space-between; align-items: center; padding: 1.25rem 1.25rem 0; gap: 12px; flex-wrap: wrap; }
-.card-table-title { font-size: 1.1rem; }
+.card-table {
+  padding: 0;
+  background: linear-gradient(180deg, var(--branco) 0%, var(--bege-claro) 100%);
+  border: 1px solid var(--borda-suave);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--sombra-sm);
+  overflow: hidden;
+}
+.card-table-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 1.25rem 1.25rem 0;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.card-table-title {
+  font-size: 1.15rem;
+  font-family: var(--font-display);
+  letter-spacing: -0.01em;
+}
 .text-cinza { color: var(--cinza); }
 .acoes-row { display: flex; gap: 8px; }
 .acoes-wrap { flex-wrap: wrap; }
 
-.chave-pill { border: none; border-radius: 20px; padding: 3px 12px; font-size: 0.75rem; font-weight: 700; cursor: pointer; background: var(--bege-claro); color: var(--cinza); }
-.chave-pill--on { background: #fef3c7; color: #92400e; }
+.chave-pill {
+  border: 1px solid var(--borda-suave);
+  border-radius: 20px;
+  padding: 3px 12px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  cursor: pointer;
+  background: var(--bege-claro);
+  color: var(--cinza);
+  font-family: var(--font-mono);
+  transition: background var(--duration) var(--ease-out), border-color var(--duration) var(--ease-out);
+}
+.chave-pill--on {
+  background: #fef3c7;
+  color: #92400e;
+  border-color: rgba(146, 64, 14, 0.2);
+}
 
 .horario-card { margin: 1rem; }
-.horario-title { margin-bottom: 1rem; }
+.horario-title {
+  margin-bottom: 1rem;
+  font-family: var(--font-display);
+  letter-spacing: -0.01em;
+}
 .horario-list { margin: 1rem; }
 
-.atribuir-title { margin-bottom: 1rem; }
+.atribuir-title {
+  margin-bottom: 1rem;
+  font-family: var(--font-display);
+}
 .atrib-aviso { font-size: 0.85rem; color: var(--cinza); margin-top: 6px; }
 
 .classes-aviso { color: var(--cinza); font-size: 0.85rem; margin-bottom: 1.25rem; }
 .classes-row { align-items: flex-end; }
 .classes-table { margin-top: 1.5rem; }
 
-.check-label { display: flex; align-items: center; gap: 8px; cursor: pointer; font-size: 0.9rem; color: var(--castanho); }
+.check-label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  font-size: 0.9rem;
+  color: var(--castanho);
+}
 
 .modal-actions { display: flex; gap: 12px; }
 .modal-erro { margin-bottom: 1rem; }
@@ -33,7 +84,15 @@
 
 @media (max-width: 768px) {
   .acad-header { flex-direction: column; }
-  .acad-tabs { flex-wrap: nowrap; overflow-x: auto; padding-bottom: 4px; -webkit-overflow-scrolling: touch; scrollbar-width: none; min-width: 0; max-width: 100%; }
+  .acad-tabs {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    padding-bottom: 4px;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+    min-width: 0;
+    max-width: 100%;
+  }
   .acad-tabs::-webkit-scrollbar { display: none; }
   .card-table-head { padding: 1rem 1rem 0; }
   .horario-card, .horario-list { margin: 0.75rem; }
