@@ -213,7 +213,7 @@ export default function Home() {
                 Fazer inscrição
               </Link>
               <Link to="/login" className="lp-btn-outline">
-                Área de gestão
+                login
               </Link>
             </div>
           </Reveal>
