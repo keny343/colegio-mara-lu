@@ -6,7 +6,7 @@ import {
 } from 'lucide-react';
 import api from '../services/api';
 import { TRIMESTRES, normalizarPeriodos, mediaTrimestre, mediaAnual } from '../utils/notasPeriodos';
-import { Badge, LoadingState, EmptyState, ErrorState } from '../components/ui';
+import { LoadingState, EmptyState, ErrorState } from '../components/ui';
 import './Portal.css';
 
 const normalizeDia = (dia) => {

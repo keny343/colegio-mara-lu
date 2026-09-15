@@ -1,23 +1,56 @@
-.page-header-sub { color: var(--cinza); }
+/* Professor Dashboard — Design System V2 */
 
-.dash-actions { display: flex; gap: 12px; margin-bottom: 2rem; flex-wrap: wrap; }
-.dash-actions-sm { gap: 8px; margin-bottom: 1.25rem; }
+.page-header-sub {
+  color: var(--cinza);
+  font-size: var(--text-sm);
+}
 
-.cell-sub { font-size: 0.82rem; color: var(--cinza); }
-.cell-verde { color: var(--verde); font-weight: 600; }
-.cell-sem-notas { font-weight: 600; }
-.cell-text-vermelho { color: var(--vermelho); }
+.page-header h2 {
+  font-family: var(--font-ui);
+  font-size: var(--text-xl);
+  letter-spacing: -0.015em;
+}
+
+.dash-actions {
+  display: flex;
+  gap: 10px;
+  margin-bottom: var(--space-5);
+  flex-wrap: wrap;
+}
+
+.dash-actions-sm {
+  gap: 8px;
+  margin-bottom: var(--space-4);
+}
+
+.cell-sub {
+  font-size: var(--text-xs);
+  color: var(--cinza);
+}
+
+.cell-verde {
+  color: var(--verde);
+  font-weight: 650;
+}
+
+.cell-sem-notas {
+  font-weight: 650;
+}
+
+.cell-text-vermelho {
+  color: var(--vermelho);
+}
 
 .prof-card-table {
   padding: 0;
   overflow: hidden;
-  border: 1px solid var(--borda-suave);
-  border-radius: var(--radius-lg);
-  background: linear-gradient(180deg, var(--branco) 0%, var(--bege-claro) 100%);
-  box-shadow: var(--sombra-sm);
+  border: 1px solid var(--borda);
+  border-radius: var(--radius-card);
+  background: var(--branco);
+  box-shadow: none;
 }
 
-.page-header h2 {
-  font-family: var(--font-display);
-  letter-spacing: -0.02em;
+.prof-card-table .table-wrap {
+  border: none;
+  border-radius: 0;
 }

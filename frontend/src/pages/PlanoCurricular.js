@@ -5,7 +5,7 @@ import { FileText, Upload, Download, Eye } from 'lucide-react';
 import Toast, { useToast } from '../components/Toast';
 import { fileUrl } from '../services/fileUrl';
 import { useFetch } from '../hooks/useFetch';
-import { Card, FormField, Input, Button, DataTable, EmptyState, LoadingState, ErrorState } from '../components/ui';
+import { Card, FormField, Input, Button, DataTable, LoadingState, ErrorState } from '../components/ui';
 import './PlanoCurricular.css';
 
 export default function PlanoCurricular() {

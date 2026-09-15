@@ -4,6 +4,7 @@ const VARIANTS = {
   primary: 'btn-primary',
   secondary: 'btn-secondary',
   outline: 'btn-outline',
+  ghost: 'btn-ghost',
   danger: 'btn-danger',
   success: 'btn-success',
 };
@@ -14,6 +15,7 @@ export function Button({
   block = false,
   loading = false,
   icon,
+  iconOnly = false,
   children,
   className = '',
   type = 'button',
@@ -24,6 +26,7 @@ export function Button({
     'btn',
     VARIANTS[variant] || VARIANTS.primary,
     size === 'sm' ? 'btn-sm' : '',
+    iconOnly ? 'btn-icon' : '',
     block ? 'btn-full' : '',
     loading ? 'btn-loading' : '',
     className,

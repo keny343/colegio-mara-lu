@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import api from '../services/api';
 import { normalizeSeriesName } from '../utils/serieName';
 import { useAuth } from '../contexts/AuthContext';
-import { Plus, Save, Pencil, Trash2, User } from 'lucide-react';
+import { Plus, Save, Pencil, Trash2, User, Users } from 'lucide-react';
 import Toast, { useToast } from '../components/Toast';
 import { useConfirm } from '../contexts/ConfirmContext';
 import { Button, EmptyState, FormField, Input, Modal, Select, Textarea, LoadingState } from '../components/ui';
@@ -394,7 +394,7 @@ export default function AdminAcademico() {
                 <tr>
                   <th>Nome</th>
                   <th>Descrição</th>
-                  <th style={{ width: 190 }}>Ações</th>
+                  <th style={{ width: 88 }}>Ações</th>
                 </tr>
               </thead>
               <tbody>
@@ -404,8 +404,8 @@ export default function AdminAcademico() {
                     <td className="text-cinza" data-label="Descrição">{c.descricao || '—'}</td>
                     <td className="td-actions" data-label="Ações">
                       <div className="acoes-row">
-                        <Button variant="outline" size="sm" icon={<Pencil size={14} />} onClick={() => abrirModal('curso', c)}>Editar</Button>
-                        <Button variant="danger" size="sm" icon={<Trash2 size={14} />} onClick={() => apagarCurso(c)} disabled={saving}>Apagar</Button>
+                        <Button variant="ghost" size="sm" iconOnly icon={<Pencil size={15} />} onClick={() => abrirModal('curso', c)} aria-label="Editar curso" title="Editar" />
+                        <Button variant="ghost" size="sm" iconOnly icon={<Trash2 size={15} />} onClick={() => apagarCurso(c)} disabled={saving} aria-label="Apagar curso" title="Apagar" />
                       </div>
                     </td>
                   </tr>
@@ -479,26 +479,26 @@ export default function AdminAcademico() {
                   <th>Turma</th>
                   <th>Ano</th>
                   <th>Classe</th>
-                  <th>Curso</th>
+                  <th className="col-hide-md">Curso</th>
                   <th>Turno</th>
-                  <th>Ações</th>
+                  <th style={{ width: 120 }}>Ações</th>
                 </tr>
               </thead>
               <tbody>
                 {turmas.map(t => (
                   <tr key={t.id}>
                     <td data-label="Turma"><strong>{t.nome}</strong></td>
-                    <td data-label="Ano">{t.ano_letivo}</td>
+                    <td className="col-num" data-label="Ano">{t.ano_letivo}</td>
                     <td data-label="Classe">{t.serie_classe}ª</td>
-                    <td data-label="Curso">{t.curso_nome || '—'}</td>
+                    <td className="col-hide-md" data-label="Curso">{t.curso_nome || '—'}</td>
                     <td data-label="Turno">{t.turno}</td>
                     <td className="td-actions" data-label="Ações">
-                      <div className="acoes-row acoes-wrap">
-                        <Button variant="outline" size="sm" onClick={() => abrirAlunosTurma(t)}>Ver alunos</Button>
+                      <div className="acoes-row">
+                        <Button variant="ghost" size="sm" iconOnly icon={<Users size={15} />} onClick={() => abrirAlunosTurma(t)} aria-label={`Ver alunos de ${t.nome}`} title="Ver alunos" />
                         {isAdmin && (
-                          <Button variant="outline" size="sm" icon={<Pencil size={13} />} onClick={() => abrirEditTurma(t)} title="Editar turma" aria-label={`Editar turma ${t.nome}`} />
+                          <Button variant="ghost" size="sm" iconOnly icon={<Pencil size={15} />} onClick={() => abrirEditTurma(t)} title="Editar turma" aria-label={`Editar turma ${t.nome}`} />
                         )}
-                        <Button variant="primary" size="sm" onClick={() => abrirMatriculaModal(t)}>Matricular</Button>
+                        <Button variant="outline" size="sm" iconOnly icon={<Plus size={15} />} onClick={() => abrirMatriculaModal(t)} aria-label={`Matricular em ${t.nome}`} title="Matricular" />
                       </div>
                     </td>
                   </tr>

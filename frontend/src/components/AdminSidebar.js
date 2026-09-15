@@ -22,11 +22,7 @@ export default function AdminSidebar() {
   };
 
   const notifBadge = notifCount > 0 && (
-    <span style={{
-      marginLeft: 'auto', background: 'var(--laranja)', color: '#fff',
-      borderRadius: 10, padding: '0 6px', fontSize: '0.72rem',
-      fontWeight: 700, minWidth: 18, textAlign: 'center', lineHeight: '18px',
-    }}>{notifCount}</span>
+    <span className="admin-nav-badge">{notifCount > 99 ? '99+' : notifCount}</span>
   );
 
   const nav = (
@@ -80,6 +76,13 @@ export default function AdminSidebar() {
       </MobileDrawer>
 
       <aside className="admin-sidebar">
+        <div className="admin-sidebar-brand">
+          <div className="admin-sidebar-logo" aria-hidden="true">ML</div>
+          <div>
+            <div className="admin-sidebar-title">Colégio Mara &amp; Lu</div>
+            <div className="admin-sidebar-subtitle">Painel administrativo</div>
+          </div>
+        </div>
         <SidebarUserBlock user={user} perfilPath="/admin/perfil" />
         <nav className="admin-sidebar-nav">{nav}</nav>
         <div className="admin-sidebar-footer">

@@ -113,38 +113,75 @@ export default function AdminInscricoes() {
 
   const columns = [
     {
-      key: 'id', label: '#', headerWidth: '64px',
-      render: (i) => <span className="col-muted">#{i.id}</span>,
-    },
-    {
-      key: 'aluno_nome', label: 'Aluno',
-      render: (i) => <strong>{i.aluno_nome}</strong>,
-    },
-    {
-      key: 'encarregado', label: 'Encarregado',
+      key: 'aluno_nome',
+      label: 'Aluno',
       render: (i) => (
-        <div>
-          <div>{i.encarregado_nome || i.responsavel_nome || '—'}</div>
-          <div className="col-sub">{i.telefone_emergencia || i.responsavel_telefone || i.responsavel_email || '—'}</div>
+        <div className="cell-stack">
+          <strong>{i.aluno_nome}</strong>
+          <span className="col-sub">
+            {i.encarregado_nome || i.responsavel_nome || '—'}
+            {(i.telefone_emergencia || i.responsavel_telefone) ? ` · ${i.telefone_emergencia || i.responsavel_telefone}` : ''}
+          </span>
         </div>
       ),
     },
-    { key: 'classe', label: 'Classe', render: (i) => classeExibida(i) },
-    { key: 'ano_letivo', label: 'Ano', headerWidth: '70px' },
     {
-      key: 'data_inscricao', label: 'Data',
-      render: (i) => <span className="col-muted">{new Date(i.data_inscricao).toLocaleDateString('pt-BR')}</span>,
+      key: 'classe',
+      label: 'Classe',
+      render: (i) => <span className="cell-clamp">{classeExibida(i)}</span>,
     },
     {
-      key: 'status', label: 'Status',
-      render: (i) => <Badge tone={STATUS_TONE[i.status] || 'gray'}>{i.status.replace('_', ' ')}</Badge>,
+      key: 'ano_letivo',
+      label: 'Ano',
+      headerWidth: '56px',
+      cellClassName: 'col-num',
     },
     {
-      key: 'acoes', label: 'Ações',
+      key: 'data_inscricao',
+      label: 'Data',
+      headerWidth: '96px',
+      cellClassName: 'col-hide-md',
+      render: (i) => (
+        <span className="col-muted">
+          {new Date(i.data_inscricao).toLocaleDateString('pt-AO')}
+        </span>
+      ),
+    },
+    {
+      key: 'status',
+      label: 'Status',
+      headerWidth: '110px',
+      render: (i) => (
+        <Badge tone={STATUS_TONE[i.status] || 'gray'}>
+          {i.status.replace('_', ' ')}
+        </Badge>
+      ),
+    },
+    {
+      key: 'acoes',
+      label: 'Ações',
+      headerWidth: '88px',
+      cellClassName: 'td-actions',
       render: (i) => (
         <div className="row-actions">
-          <Button variant="outline" size="sm" icon={<Eye size={14} />} onClick={() => verDetalhe(i.id)} title="Ver detalhes" />
-          <Button variant="primary" size="sm" icon={<CheckCircle size={14} />} onClick={() => abrirStatus(i)} title="Alterar status" />
+          <Button
+            variant="ghost"
+            size="sm"
+            iconOnly
+            icon={<Eye size={16} strokeWidth={2} />}
+            onClick={() => verDetalhe(i.id)}
+            aria-label={`Ver inscrição ${i.id}`}
+            title="Ver detalhes"
+          />
+          <Button
+            variant="outline"
+            size="sm"
+            iconOnly
+            icon={<CheckCircle size={16} strokeWidth={2} />}
+            onClick={() => abrirStatus(i)}
+            aria-label={`Alterar status da inscrição ${i.id}`}
+            title="Alterar status"
+          />
         </div>
       ),
     },

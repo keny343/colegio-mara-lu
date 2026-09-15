@@ -3,7 +3,7 @@ import { Download, BookOpen, FileText } from 'lucide-react';
 import api from '../services/api';
 import { fileUrl } from '../services/fileUrl';
 import { useFetch } from '../hooks/useFetch';
-import { DataTable, EmptyState, LoadingState, ErrorState } from '../components/ui';
+import { DataTable, LoadingState, ErrorState } from '../components/ui';
 import './PortalMateriais.css';
 
 const tipoIcon = (tipo) => {

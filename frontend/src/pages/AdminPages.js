@@ -207,56 +207,54 @@ export function AdminUsuarios() {
           <table className="table">
             <thead>
               <tr>
-                <th>#</th>
                 <th>Nome</th>
                 <th>E-mail</th>
-                <th>Telefone</th>
-                <th>BI</th>
+                <th className="col-hide-lg">Telefone</th>
+                <th className="col-hide-md">BI</th>
                 <th>Tipo</th>
-                <th>Cadastro</th>
+                <th className="col-hide-lg">Cadastro</th>
                 <th>Status</th>
-                <th>Ações</th>
+                <th style={{ width: 120 }}>Ações</th>
               </tr>
             </thead>
             <tbody>
               {usuarios.map(u => (
                 <tr key={u.id}>
-                  <td className="ap-id" data-label="#">#{u.id}</td>
                   <td data-label="Nome"><strong>{u.nome}</strong></td>
-                  <td data-label="E-mail">{u.email}</td>
-                  <td data-label="Telefone">{u.telefone || '—'}</td>
-                  <td data-label="BI">{u.cpf || '—'}</td>
+                  <td data-label="E-mail"><span className="cell-clamp-email">{u.email}</span></td>
+                  <td className="col-hide-lg" data-label="Telefone">{u.telefone || '—'}</td>
+                  <td className="col-hide-md" data-label="BI">{u.cpf || '—'}</td>
                   <td data-label="Tipo">
                     {roleBadge(u.role)}
                     {(u.curso_coordenado || u.nivel_coordenado) && (
                       <div className="ap-coord-info">{u.nivel_coordenado || u.curso_coordenado}</div>
                     )}
                   </td>
-                  <td className="ap-data" data-label="Cadastro">{new Date(u.criado_em).toLocaleDateString('pt-BR')}</td>
+                  <td className="ap-data col-hide-lg" data-label="Cadastro">{new Date(u.criado_em).toLocaleDateString('pt-AO')}</td>
                   <td data-label="Status">
                     <Badge tone={u.ativo ? 'green' : 'red'}>{u.ativo ? 'Ativo' : 'Inativo'}</Badge>
                   </td>
                   <td className="td-actions" data-label="Ações">
                     <div className="ap-acoes">
                       {isAdmin && (
-                        <Button variant="outline" size="sm" icon={<Edit2 size={14} />} onClick={() => abrirEditar(u)} aria-label="Editar" />
+                        <Button variant="ghost" size="sm" iconOnly icon={<Edit2 size={15} />} onClick={() => abrirEditar(u)} aria-label="Editar" title="Editar" />
                       )}
                       {isAdmin && ['professor', 'coordenador'].includes(u.role) && (
-                        <Button variant="primary" size="sm" type="button" onClick={() => abrirCoordenador(u)} title="Designar coordenador">
+                        <Button variant="outline" size="sm" type="button" onClick={() => abrirCoordenador(u)} title="Designar coordenador" aria-label="Designar coordenador">
                           Coord.
                         </Button>
                       )}
                       {isAdmin && (
                         <Button
-                          variant={u.ativo ? 'outline' : 'primary'}
+                          variant="ghost"
                           size="sm"
-                          icon={u.ativo ? <ToggleLeft size={14} /> : <ToggleRight size={14} />}
+                          iconOnly
+                          icon={u.ativo ? <ToggleLeft size={16} /> : <ToggleRight size={16} />}
                           onClick={() => toggleAtivo(u)}
                           disabled={saving}
-                          className="ap-toggle"
-                        >
-                          {u.ativo ? 'Desativar' : 'Ativar'}
-                        </Button>
+                          aria-label={u.ativo ? 'Desativar' : 'Ativar'}
+                          title={u.ativo ? 'Desativar' : 'Ativar'}
+                        />
                       )}
                     </div>
                   </td>
