@@ -202,20 +202,11 @@ export default function Home() {
       <section id="contactos" className="lp-contactos" aria-labelledby="lp-contactos-title">
         <div className="lp-wrap lp-contactos-inner">
           <Reveal>
-            <p className="lp-kicker">Visite-nos</p>
-            <h2 id="lp-contactos-title">Como falar connosco</h2>
+            <p className="lp-kicker">Morada</p>
+            <h2 id="lp-contactos-title">Visite-nos</h2>
             <p className="lp-section-sub">
-              Para candidaturas, use a inscrição online. Depois da matrícula,
-              o portal é o canal principal para acompanhar o percurso escolar.
+              Rua 15, Cassenda, Luanda, ao lado da Administração, defronte o Colégio Mara e Lu.
             </p>
-            <div className="lp-contactos-actions">
-              <Link to="/inscricao" className="lp-btn-solid lp-btn-ink">
-                Fazer inscrição
-              </Link>
-              <Link to="/login" className="lp-btn-outline">
-                Login
-              </Link>
-            </div>
           </Reveal>
         </div>
       </section>
