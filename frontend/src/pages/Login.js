@@ -1,10 +1,10 @@
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
-import { GraduationCap, Eye, EyeOff } from 'lucide-react';
+import { Eye, EyeOff, ArrowLeft } from 'lucide-react';
 import { Button, Input, FormField } from '../components/ui';
 import { getErrorMessage } from '../services/errors';
-import './LoginLamp.css';
+import './Login.css';
 
 export default function Login() {
   const { login } = useAuth();
@@ -13,7 +13,6 @@ export default function Login() {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [showPass, setShowPass] = useState(false);
-  const [lampOn, setLampOn] = useState(true);
 
   const handleChange = (e) => setForm({ ...form, [e.target.name]: e.target.value });
 
@@ -32,38 +31,34 @@ export default function Login() {
   };
 
   return (
-    <div className={`lamp-screen ${lampOn ? 'is-on' : ''}`}>
-      <div className="lamp-rig">
-        <div className="lamp-wire" aria-hidden="true"></div>
-        <button
-          type="button"
-          className="lamp-fixture"
-          onClick={() => setLampOn((v) => !v)}
-          aria-pressed={lampOn}
-          aria-label={lampOn ? 'Apagar luz de decoração' : 'Acender luz de decoração'}
-        >
-          <svg viewBox="0 0 160 140" className="lamp-svg">
-            <polygon points="50,10 110,10 140,70 20,70" className="lamp-shade" />
-            <line x1="80" y1="70" x2="80" y2="66" className="lamp-neck" />
-            <ellipse cx="80" cy="86" rx="22" ry="22" className="lamp-bulb" />
-          </svg>
-          <span className="pull-cord"><span className="pull-knob"></span></span>
-        </button>
-        <div className="light-cone" aria-hidden="true"></div>
-        <p className="lamp-hint">{lampOn ? 'Luz decorativa ligada' : 'Luz decorativa apagada'}</p>
-      </div>
+    <div className="auth-shell">
+      <aside className="auth-aside" aria-label="Bem-vindo">
+        <Link to="/" className="auth-back">
+          <ArrowLeft size={16} strokeWidth={2} />
+          Início
+        </Link>
+        <div className="auth-aside-body">
+          <p className="auth-kicker">Área reservada</p>
+          <h1 className="auth-brand">
+            <span>Colégio</span>
+            <span className="auth-brand-em">Mara &amp; Lu</span>
+          </h1>
+          <p className="auth-lede">
+            Aceda ao portal de alunos, encarregados e equipa académica.
+          </p>
+        </div>
+        <p className="auth-aside-foot">Desde 2005 · Luanda</p>
+      </aside>
 
-      <div className="login-card-wrap">
-        <div className="card login-card">
-          <div className="login-header">
-            <div className="login-icon">
-              <GraduationCap size={28} color="white" />
-            </div>
-            <h2 className="login-title">Colégio Mara &amp; Lu</h2>
-            <p className="login-subtitle">Entre na sua conta</p>
-          </div>
+      <main className="auth-main">
+        <div className="auth-panel">
+          <header className="auth-panel-head">
+            <div className="auth-mark" aria-hidden="true">ML</div>
+            <h2>Entrar</h2>
+            <p>Use o e-mail institucional ou o BI do aluno.</p>
+          </header>
 
-          <form onSubmit={handleSubmit} noValidate>
+          <form onSubmit={handleSubmit} noValidate className="auth-form">
             {error && <div className="alert alert-error" role="alert">{error}</div>}
 
             <FormField label="E-mail ou BI" htmlFor="login-email" required>
@@ -104,17 +99,15 @@ export default function Login() {
             </FormField>
 
             <Button type="submit" variant="primary" block loading={loading}>
-              {loading ? 'Entrando...' : 'Entrar'}
+              {loading ? 'A entrar...' : 'Entrar'}
             </Button>
           </form>
 
-          <div className="login-footer">
-            <p>
-              Ainda não se inscreveu? <Link to="/inscricao">Fazer inscrição</Link>
-            </p>
-          </div>
+          <p className="auth-footer">
+            Ainda não se inscreveu? <Link to="/inscricao">Fazer inscrição</Link>
+          </p>
         </div>
-      </div>
+      </main>
     </div>
   );
 }
