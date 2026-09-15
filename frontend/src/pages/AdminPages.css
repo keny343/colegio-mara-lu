@@ -193,6 +193,118 @@
   margin-top: 4px;
 }
 
+/* —— Séries / Classes e Vagas —— */
+.ap-nivel {
+  margin-bottom: var(--space-5);
+}
+
+.ap-nivel-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: var(--space-3);
+  color: var(--castanho-claro);
+}
+
+.ap-nivel-titulo {
+  margin: 0;
+  font-size: var(--text-sm);
+  font-weight: 650;
+  font-family: var(--font-ui);
+  letter-spacing: -0.01em;
+  color: var(--castanho);
+}
+
+.ap-nivel-count {
+  margin-left: auto;
+  font-size: var(--text-xs);
+  font-family: var(--font-mono);
+  color: var(--cinza);
+  background: var(--bege);
+  border: 1px solid var(--borda);
+  border-radius: var(--radius-xs);
+  padding: 2px 8px;
+}
+
+.ap-ocup-cell {
+  min-width: 140px;
+  max-width: 220px;
+}
+
+.ap-ocup-meta {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 8px;
+  margin-bottom: 4px;
+}
+
+.ap-ocup-frac {
+  font-size: var(--text-sm);
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+  color: var(--castanho);
+}
+
+.ap-ocup-pct {
+  font-size: var(--text-xs);
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+}
+
+.ap-ocup-pct--baixa { color: var(--verde); }
+.ap-ocup-pct--media { color: var(--amarelo); }
+.ap-ocup-pct--alta { color: var(--vermelho); }
+.ap-ocup-pct--cheia { color: var(--vermelho); font-weight: 700; }
+
+.ap-ocup-barra {
+  height: 6px;
+  background: var(--bege);
+  border: 1px solid var(--borda-suave);
+  border-radius: 999px;
+  overflow: hidden;
+}
+
+.ap-ocup-fill {
+  height: 100%;
+  border-radius: inherit;
+  transition: width var(--duration) var(--ease-out);
+}
+
+.ap-ocup-fill--baixa { background: var(--verde); }
+.ap-ocup-fill--media { background: var(--amarelo); }
+.ap-ocup-fill--alta,
+.ap-ocup-fill--cheia { background: var(--vermelho); }
+
+.ap-vagas {
+  font-size: var(--text-sm);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.ap-vagas--ok {
+  color: var(--verde);
+  font-weight: 600;
+}
+
+.ap-vagas--zero {
+  color: var(--vermelho);
+  font-weight: 650;
+}
+
+.ap-modal-acoes {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: var(--space-4);
+  flex-wrap: wrap;
+}
+
+.col-num {
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
 @media (max-width: 1200px) {
   .col-hide-lg {
     display: none !important;
@@ -212,11 +324,6 @@
 
   .filters-row > .form-group {
     min-width: 100%;
-  }
-
-  .col-hide-lg,
-  .col-hide-md {
-    display: block !important;
   }
 
   .cell-clamp-email {

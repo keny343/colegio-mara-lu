@@ -4,7 +4,8 @@ import api from '../services/api';
 import { useAuth } from '../contexts/AuthContext';
 import { useConfirm } from '../contexts/ConfirmContext';
 import { useNotification } from '../contexts/NotificationContext';
-import { Badge, Button, ErrorState, FormField, Input, LoadingState, Modal, Select } from '../components/ui';
+import { normalizeSeriesName } from '../utils/serieName';
+import { Badge, Button, EmptyState, ErrorState, FormField, Input, LoadingState, Modal, Select } from '../components/ui';
 import './AdminPages.css';
 
 // ===== USUÁRIOS =====
@@ -23,7 +24,6 @@ export function AdminUsuarios() {
   const [erro, setErro] = useState('');
   const [erroCarregar, setErroCarregar] = useState(null);
   const [saving, setSaving] = useState(false);
-  const { error: notifyError } = useNotification();
 
   const carregar = () => {
     const url = isAdmin ? '/admin/usuarios' : '/staff/equipa';
@@ -291,9 +291,9 @@ export function AdminUsuarios() {
             </FormField>
           </div>
           <div className="ap-modal-acoes">
-            <Button variant="outline" onClick={() => setModal(false)}>Cancelar</Button>
-            <Button type="submit" variant="primary" block icon={<Save size={16} />} loading={saving}>
-              {saving ? 'Salvando...' : 'Criar usuário'}
+            <Button type="button" variant="outline" onClick={() => setModal(false)}>Cancelar</Button>
+            <Button type="submit" variant="primary" icon={<Save size={16} />} loading={saving}>
+              Criar usuário
             </Button>
           </div>
         </form>
@@ -459,68 +459,145 @@ export function AdminSeries() {
   if (loading) return <LoadingState />;
   if (erroCarregar) return <ErrorState error={erroCarregar} onRetry={carregar} />;
 
-  const niveis = [...new Set(series.map(s => s.nivel))];
+  const NIVEL_ORDEM = [
+    'Ensino Primário (pré até 6ª)',
+    'I Ciclo (Ensino Secundário 7ª–9ª)',
+    'II Ciclo (Ensino Secundário 10ª–13ª)',
+  ];
+  const niveis = [
+    ...NIVEL_ORDEM.filter(n => series.some(s => s.nivel === n)),
+    ...[...new Set(series.map(s => s.nivel))].filter(n => !NIVEL_ORDEM.includes(n)),
+  ];
+
+  const ocupacaoPct = (s) => {
+    const total = Number(s.vagas_total) || 0;
+    if (total <= 0) return 0;
+    const ocupadas = Math.max(0, total - Number(s.vagas_disponiveis || 0));
+    return Math.min(100, Math.round((ocupadas / total) * 100));
+  };
+
+  const toneOcupacao = (pct) => {
+    if (pct >= 100) return 'cheia';
+    if (pct > 80) return 'alta';
+    if (pct > 50) return 'media';
+    return 'baixa';
+  };
 
   return (
     <div className="page-container">
       <div className="page-header ap-header">
         <div>
           <h2>Classes e Vagas</h2>
-          <p className="ap-subtitle">Gerencie as classes disponíveis para inscrição</p>
+          <p className="ap-subtitle">
+            {series.length} classe{series.length === 1 ? '' : 's'} · vagas para inscrição
+          </p>
         </div>
-        <Button variant="primary" icon={<Plus size={18} />} onClick={abrirNovo}>Nova Classe</Button>
+        <Button variant="primary" icon={<Plus size={16} />} onClick={abrirNovo}>Nova classe</Button>
       </div>
 
-      {niveis.map(nivel => (
-        <div key={nivel} className="ap-nivel">
-          <h3 className="ap-nivel-titulo">
-            <BookOpen size={16} /> {nivel}
-          </h3>
-          <div className="ap-serie-grid">
-            {series.filter(s => s.nivel === nivel).map(s => {
-              const pct = Math.round(((s.vagas_total - s.vagas_disponiveis) / s.vagas_total) * 100);
-              return (
-                <div key={s.id} className="card ap-serie-card">
-                  <div className="ap-serie-topo">
-                    <h4 className="ap-serie-nome">{s.nome}</h4>
-                    <div className="ap-serie-acoes">
-                      <Button variant="outline" size="sm" icon={<Edit2 size={12} />} onClick={() => abrirEditar(s)} aria-label="Editar" />
-                      <Button variant="danger" size="sm" icon={<Trash2 size={12} />} onClick={() => excluir(s.id)} aria-label="Desactivar" />
-                    </div>
-                  </div>
-                  <div className="ap-serie-ano">Ano Letivo: <strong>{s.ano_letivo}</strong></div>
-                  <div className="ap-ocupacao">
-                    <div className="ap-ocupacao-topo">
-                      <span className="ap-ocupacao-label">Ocupação</span>
-                      <span className="ap-ocupacao-valor">{s.vagas_total - s.vagas_disponiveis}/{s.vagas_total}</span>
-                    </div>
-                    <div className="ap-ocupacao-barra">
-                      <div
-                        className="ap-ocupacao-preenchida"
-                        style={{
-                          width: `${pct}%`,
-                          background: pct > 80 ? 'var(--vermelho)' : pct > 50 ? 'var(--amarelo)' : 'var(--verde)',
-                        }}
-                      />
-                    </div>
-                  </div>
-                  <div className="ap-ocupacao-status" style={{ color: pct >= 100 ? 'var(--vermelho)' : 'var(--verde)' }}>
-                    {s.vagas_disponiveis > 0 ? `${s.vagas_disponiveis} vagas disponíveis` : 'Sem vagas'}
-                  </div>
+      {series.length === 0 ? (
+        <EmptyState
+          icon={<BookOpen size={28} />}
+          title="Nenhuma classe configurada"
+          message="Crie classes por nível para abrir vagas de inscrição."
+          action={<Button variant="primary" icon={<Plus size={16} />} onClick={abrirNovo}>Nova classe</Button>}
+        />
+      ) : (
+        niveis.map(nivel => {
+          const lista = series
+            .filter(s => s.nivel === nivel)
+            .slice()
+            .sort((a, b) => String(a.nome).localeCompare(String(b.nome), 'pt'));
+          return (
+            <section key={nivel} className="ap-nivel">
+              <header className="ap-nivel-head">
+                <BookOpen size={15} aria-hidden />
+                <h3 className="ap-nivel-titulo">{nivel}</h3>
+                <span className="ap-nivel-count">{lista.length}</span>
+              </header>
+              <div className="card ap-tabela-card">
+                <div className="table-container">
+                  <table className="table">
+                    <thead>
+                      <tr>
+                        <th>Classe</th>
+                        <th className="col-num">Ano</th>
+                        <th>Ocupação</th>
+                        <th className="col-hide-md">Disponíveis</th>
+                        <th style={{ width: 88 }}>Ações</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {lista.map(s => {
+                        const total = Number(s.vagas_total) || 0;
+                        const disponiveis = Number(s.vagas_disponiveis) || 0;
+                        const ocupadas = Math.max(0, total - disponiveis);
+                        const pct = ocupacaoPct(s);
+                        const tone = toneOcupacao(pct);
+                        return (
+                          <tr key={s.id}>
+                            <td data-label="Classe">
+                              <strong>{normalizeSeriesName(s.nome)}</strong>
+                            </td>
+                            <td className="col-num" data-label="Ano">{s.ano_letivo}</td>
+                            <td data-label="Ocupação">
+                              <div className="ap-ocup-cell">
+                                <div className="ap-ocup-meta">
+                                  <span className="ap-ocup-frac">{ocupadas}/{total || '—'}</span>
+                                  <span className={`ap-ocup-pct ap-ocup-pct--${tone}`}>{pct}%</span>
+                                </div>
+                                <div className="ap-ocup-barra" role="presentation">
+                                  <div
+                                    className={`ap-ocup-fill ap-ocup-fill--${tone}`}
+                                    style={{ width: `${pct}%` }}
+                                  />
+                                </div>
+                              </div>
+                            </td>
+                            <td className="col-hide-md" data-label="Disponíveis">
+                              <span className={`ap-vagas ${disponiveis > 0 ? 'ap-vagas--ok' : 'ap-vagas--zero'}`}>
+                                {disponiveis > 0 ? `${disponiveis} vagas` : 'Sem vagas'}
+                              </span>
+                            </td>
+                            <td data-label="Ações">
+                              <div className="ap-acoes">
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  iconOnly
+                                  icon={<Edit2 size={14} />}
+                                  onClick={() => abrirEditar(s)}
+                                  aria-label="Editar classe"
+                                />
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  iconOnly
+                                  icon={<Trash2 size={14} />}
+                                  onClick={() => excluir(s.id)}
+                                  aria-label="Desactivar classe"
+                                />
+                              </div>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
                 </div>
-              );
-            })}
-          </div>
-        </div>
-      ))}
+              </div>
+            </section>
+          );
+        })
+      )}
 
-      <Modal open={modal} onClose={() => setModal(false)} title={editando ? 'Editar Classe' : 'Nova Classe'} size="sm">
+      <Modal open={modal} onClose={() => setModal(false)} title={editando ? 'Editar classe' : 'Nova classe'} size="sm">
         <form onSubmit={salvar}>
           {erro && <div className="alert alert-error">{erro}</div>}
-          <FormField label="Nome *" htmlFor="ser-nome" required>
-            <Input id="ser-nome" value={form.nome} onChange={e => setForm({ ...form, nome: e.target.value })} placeholder="Ex: 1º Ano" required />
+          <FormField label="Nome" htmlFor="ser-nome" required>
+            <Input id="ser-nome" value={form.nome} onChange={e => setForm({ ...form, nome: e.target.value })} placeholder="Ex: 1ª classe" required />
           </FormField>
-          <FormField label="Nível *" htmlFor="ser-nivel" required>
+          <FormField label="Nível" htmlFor="ser-nivel" required>
             <Select id="ser-nivel" value={form.nivel} onChange={e => setForm({ ...form, nivel: e.target.value })} required>
               <option value="">Selecionar...</option>
               <option>Ensino Primário (pré até 6ª)</option>
@@ -529,17 +606,17 @@ export function AdminSeries() {
             </Select>
           </FormField>
           <div className="form-row">
-            <FormField label="Total de Vagas" htmlFor="ser-vagas">
+            <FormField label="Total de vagas" htmlFor="ser-vagas">
               <Input id="ser-vagas" type="number" value={form.vagas_total} onChange={e => setForm({ ...form, vagas_total: e.target.value })} min={1} />
             </FormField>
-            <FormField label="Ano Letivo" htmlFor="ser-ano">
+            <FormField label="Ano letivo" htmlFor="ser-ano">
               <Input id="ser-ano" type="number" value={form.ano_letivo} onChange={e => setForm({ ...form, ano_letivo: e.target.value })} />
             </FormField>
           </div>
           <div className="ap-modal-acoes">
-            <Button variant="outline" onClick={() => setModal(false)}>Cancelar</Button>
-            <Button type="submit" variant="primary" block loading={saving}>
-              {saving ? 'Salvando...' : editando ? 'Salvar' : 'Criar Classe'}
+            <Button type="button" variant="outline" onClick={() => setModal(false)}>Cancelar</Button>
+            <Button type="submit" variant="primary" loading={saving}>
+              {editando ? 'Salvar' : 'Criar classe'}
             </Button>
           </div>
         </form>

@@ -164,8 +164,4 @@
   .cell-clamp {
     max-width: none;
   }
-
-  .col-hide-md {
-    display: flex !important;
-  }
 }
