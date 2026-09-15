@@ -131,8 +131,20 @@ h1, h2, h3 { font-family: var(--font-display); font-weight: 700; letter-spacing:
   -webkit-backdrop-filter: blur(14px) saturate(1.15);
   box-shadow: none;
   border-bottom: 1px solid rgba(245, 230, 211, 0.1);
-  position: absolute;
-  top: 0; left: 0; right: 0;
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 1000;
+  pointer-events: none;
+}
+
+.navbar--landing .navbar-logo,
+.navbar--landing .navbar-links,
+.navbar--landing .navbar-toggle,
+.navbar--landing .navbar-mobile,
+.navbar--landing .navbar-overlay {
+  pointer-events: auto;
 }
 
 .navbar-logo {

@@ -21,10 +21,10 @@ const ALUNOLinks = [
 ];
 
 const LANDING_ANCHORS = [
-  { href: '#escola', label: 'A escola' },
-  { href: '#cursos', label: 'Cursos' },
-  { href: '#inscricao', label: 'Inscrição' },
-  { href: '#contactos', label: 'Contactos' },
+  { id: 'escola', label: 'A escola' },
+  { id: 'cursos', label: 'Cursos' },
+  { id: 'inscricao', label: 'Inscrição' },
+  { id: 'contactos', label: 'Contactos' },
 ];
 
 export default function Navbar() {
@@ -42,17 +42,29 @@ export default function Navbar() {
   const isActive = (to) => location.pathname === to;
   const isLandingPage = location.pathname === '/' && !user;
 
+  const scrollToSection = (id) => {
+    setMenuOpen(false);
+    const el = document.getElementById(id);
+    if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  };
+
+  const goLogin = (e) => {
+    e.preventDefault();
+    setMenuOpen(false);
+    navigate('/login');
+  };
+
   const buildLinks = () => {
     if (!user) {
       if (isLandingPage) {
         return [
-          { to: '/login', label: 'Área de gestão', icon: <User size={16} /> },
+          { to: '/login', label: 'Login', icon: <User size={16} />, onClick: goLogin },
           { to: '/inscricao', label: 'Inscrever', icon: <School size={16} />, primary: true },
         ];
       }
       return [
         { to: '/', label: 'Início', icon: <Home size={16} /> },
-        { to: '/login', label: 'Entrar', icon: <User size={16} /> },
+        { to: '/login', label: 'Entrar', icon: <User size={16} />, onClick: goLogin },
         { to: '/inscricao', label: 'Inscrever-se', icon: <School size={16} />, primary: true },
       ];
     }
@@ -100,14 +112,20 @@ export default function Navbar() {
   const NavLinks = () => (
     <>
       {isLandingPage && LANDING_ANCHORS.map((a) => (
-        <a key={a.href} href={a.href} className="nav-item nav-item-anchor">
+        <button
+          key={a.id}
+          type="button"
+          className="nav-item nav-item-anchor"
+          onClick={() => scrollToSection(a.id)}
+        >
           <span>{a.label}</span>
-        </a>
+        </button>
       ))}
       {links.map((link) => (
         <Link
           key={link.to}
           to={link.to}
+          onClick={link.onClick}
           className={`nav-item${isActive(link.to) ? ' nav-item-active' : ''}${link.primary ? ' nav-item-primary' : ''}`}
         >
           {link.icon}

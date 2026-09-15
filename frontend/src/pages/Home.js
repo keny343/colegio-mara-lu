@@ -213,7 +213,7 @@ export default function Home() {
                 Fazer inscrição
               </Link>
               <Link to="/login" className="lp-btn-outline">
-                login
+                Login
               </Link>
             </div>
           </Reveal>
@@ -231,7 +231,7 @@ export default function Home() {
             <a href="#cursos">Cursos</a>
             <a href="#inscricao">Inscrição</a>
             <a href="#contactos">Contactos</a>
-            <Link to="/login">Área de gestão</Link>
+            <Link to="/login">Login</Link>
             <Link to="/inscricao">Inscrever</Link>
           </nav>
           <p className="lp-footer-copy">© {new Date().getFullYear()} Colégio Mara &amp; Lu</p>
