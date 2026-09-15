@@ -1,6 +1,6 @@
 import React, { useEffect, useRef } from 'react';
 import { Link } from 'react-router-dom';
-import { Star, Users, BookOpen, FileCheck, Shield, Award, Clock, ChevronRight } from 'lucide-react';
+import { Users, BookOpen, FileCheck, Shield, Award, Clock, ChevronRight } from 'lucide-react';
 import './Home.css';
 
 const PASSOS = [
@@ -72,12 +72,10 @@ export default function Home() {
       <header className="lp-hero">
         <div className="lp-hero-grid-bg" aria-hidden="true"></div>
         <div className="lp-wrap lp-hero-inner-single">
-          <span className="lp-eyebrow">
-            <Star size={13} fill="currentColor" style={{ marginRight: 4 }} />
-            Excelência em Educação desde 2005
-          </span>
+          <p className="lp-eyebrow">
+            Excelência em educação desde 2005
+          </p>
           <h1>
-            Bem-vindo ao<br />
             <em>Colégio Mara &amp; Lu</em>
           </h1>
           <p className="lp-lede">

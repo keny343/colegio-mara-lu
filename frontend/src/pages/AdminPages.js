@@ -180,10 +180,10 @@ export function AdminUsuarios() {
   if (erroCarregar) return <ErrorState error={erroCarregar} onRetry={carregar} />;
 
   const roleBadge = (r) => (
-    r === 'admin' ? <Badge tone="red">🔑 Admin</Badge> :
-    r === 'coordenador' ? <Badge tone="yellow">🧩 Coordenador</Badge> :
-    r === 'professor' ? <Badge tone="blue">📚 Professor</Badge> :
-    <Badge tone="gray">🎓 Aluno</Badge>
+    r === 'admin' ? <Badge tone="red">Admin</Badge> :
+    r === 'coordenador' ? <Badge tone="yellow">Coordenador</Badge> :
+    r === 'professor' ? <Badge tone="blue">Professor</Badge> :
+    <Badge tone="gray">Aluno</Badge>
   );
 
   return (

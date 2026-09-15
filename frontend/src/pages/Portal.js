@@ -107,7 +107,7 @@ export default function Portal() {
             <GraduationCap size={26} color="white" />
           </div>
           <div>
-            <h2 className="portal-hero-titulo">Olá, {primeiroNome}! 👋</h2>
+            <h2 className="portal-hero-titulo">Olá, {primeiroNome}</h2>
             <p className="portal-hero-sub">Bem-vindo ao teu portal académico</p>
           </div>
         </div>

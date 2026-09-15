@@ -7,7 +7,9 @@
   align-items: center;
   justify-content: flex-start;
   padding: 2.5rem 1.5rem 3rem;
-  background: linear-gradient(180deg, #1c0f06 0%, var(--castanho) 55%, var(--castanho-medio) 100%);
+  background:
+    radial-gradient(ellipse 90% 40% at 50% 0%, rgba(232, 100, 26, 0.12), transparent 55%),
+    linear-gradient(180deg, #1c0f06 0%, var(--castanho) 55%, var(--castanho-medio) 100%);
   overflow: hidden;
 }
 
@@ -33,7 +35,7 @@
   position: relative;
   width: 150px;
   height: 130px;
-  transition: transform 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+  transition: transform var(--duration-slow) cubic-bezier(0.34, 1.56, 0.64, 1);
 }
 
 .lamp-fixture:active { transform: rotate(3deg); }
@@ -45,7 +47,7 @@
   fill: var(--castanho-medio);
   stroke: var(--castanho-claro);
   stroke-width: 1.5;
-  transition: fill 0.5s ease;
+  transition: fill 0.5s var(--ease-out);
 }
 .is-on .lamp-shade { fill: var(--laranja); }
 
@@ -54,7 +56,7 @@
 .lamp-bulb {
   fill: var(--bege);
   opacity: 0.5;
-  transition: fill 0.4s ease, filter 0.4s ease, opacity 0.4s ease;
+  transition: fill 0.4s var(--ease-out), filter 0.4s var(--ease-out), opacity 0.4s var(--ease-out);
 }
 .is-on .lamp-bulb {
   fill: var(--laranja-claro);
@@ -79,14 +81,19 @@
   clip-path: polygon(44% 0%, 56% 0%, 100% 100%, 0% 100%);
   background: radial-gradient(ellipse at 50% 0%, rgba(232, 100, 26, 0.32), rgba(232, 100, 26, 0.06) 55%, transparent 75%);
   opacity: 0;
-  transition: opacity 0.6s ease, transform 0.7s cubic-bezier(0.22, 1, 0.36, 1);
+  transition: opacity 0.6s var(--ease-out), transform 0.7s var(--ease-out);
   pointer-events: none;
 }
 .is-on .light-cone { opacity: 1; transform: translateX(-50%) scaleY(1); }
 
 .lamp-hint {
-  margin-top: 8px; font-size: 0.85rem; color: rgba(245, 230, 211, 0.55);
-  font-family: 'DM Sans', sans-serif; transition: color 0.5s ease;
+  margin-top: 8px;
+  font-size: 0.78rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: rgba(245, 230, 211, 0.55);
+  font-family: var(--font-mono);
+  transition: color 0.5s var(--ease-out);
 }
 .is-on .lamp-hint { color: var(--laranja-claro); }
 
@@ -96,28 +103,60 @@
   opacity: 1; transform: translateY(0) scale(1); filter: blur(0);
 }
 
-.login-card { box-shadow: var(--sombra-lg); }
-
-.login-header { text-align: center; margin-bottom: 1.5rem; }
-.login-icon {
-  width: 56px; height: 56px; background: var(--laranja); border-radius: 16px;
-  display: flex; align-items: center; justify-content: center; margin: 0 auto 0.75rem;
+.login-card {
+  background: linear-gradient(180deg, var(--branco) 0%, var(--bege-claro) 100%);
+  border: 1px solid var(--borda-suave);
+  border-radius: var(--radius-xl);
+  box-shadow: var(--sombra-lg);
+  padding: 2rem 1.75rem;
 }
-.login-title { font-size: 1.5rem; }
-.login-subtitle { color: var(--cinza); margin-top: 4px; }
+
+.login-header { text-align: center; margin-bottom: 1.75rem; }
+.login-icon {
+  width: 56px; height: 56px; background: var(--laranja); border-radius: var(--radius);
+  display: flex; align-items: center; justify-content: center; margin: 0 auto 0.85rem;
+  box-shadow: 0 6px 20px rgba(232, 100, 26, 0.35);
+}
+.login-title {
+  font-size: 1.55rem;
+  font-family: var(--font-display);
+  letter-spacing: -0.02em;
+  color: var(--castanho);
+}
+.login-subtitle {
+  color: var(--cinza);
+  margin-top: 6px;
+  font-size: 0.9rem;
+}
 
 .password-wrap { position: relative; }
 .password-wrap .form-control { padding-right: 44px; }
 .password-toggle {
   position: absolute; right: 12px; top: 50%; transform: translateY(-50%);
   background: none; border: none; cursor: pointer; color: var(--cinza); padding: 4px;
+  transition: color var(--duration) var(--ease-out);
 }
 .password-toggle:hover { color: var(--laranja); }
 .password-toggle:focus-visible { outline: 2px solid var(--laranja); border-radius: 6px; }
 
-.login-footer { text-align: center; margin-top: 1.5rem; padding-top: 1.5rem; border-top: 1px solid var(--bege); }
+.login-footer {
+  text-align: center;
+  margin-top: 1.5rem;
+  padding-top: 1.5rem;
+  border-top: 1px solid var(--borda-suave);
+}
 .login-footer p { color: var(--cinza); font-size: 0.9rem; }
-.login-footer a { color: var(--laranja); font-weight: 600; }
+.login-footer a {
+  color: var(--laranja);
+  font-weight: 600;
+  transition: color var(--duration) var(--ease-out);
+}
+.login-footer a:hover { color: var(--laranja-claro); }
+
+@media (max-width: 480px) {
+  .login-card { padding: 1.5rem 1.25rem; border-radius: var(--radius-lg); }
+  .login-title { font-size: 1.35rem; }
+}
 
 @media (prefers-reduced-motion: reduce) {
   .lamp-fixture, .light-cone, .login-card-wrap { transition: none !important; }

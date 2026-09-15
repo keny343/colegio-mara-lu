@@ -6,53 +6,67 @@
   justify-content: space-between;
   gap: 16px;
   flex-wrap: wrap;
+  margin-bottom: 0.25rem;
 }
 .dash-greeting {
-  font-size: 0.85rem;
-  font-weight: 600;
+  font-size: 0.75rem;
+  font-weight: 500;
+  font-family: var(--font-mono);
   color: var(--laranja);
   text-transform: uppercase;
-  letter-spacing: 0.04em;
-  margin: 0 0 4px;
+  letter-spacing: 0.08em;
+  margin: 0 0 6px;
 }
 .dash-date {
-  font-size: 0.85rem;
-  color: var(--cinza);
-  background: var(--bege-claro);
-  border: 1px solid var(--bege);
-  padding: 6px 14px;
+  font-size: 0.82rem;
+  color: var(--castanho-medio);
+  background: rgba(255, 255, 255, 0.75);
+  border: 1px solid var(--borda-suave);
+  padding: 7px 14px;
   border-radius: 999px;
   white-space: nowrap;
+  font-family: var(--font-mono);
+  letter-spacing: 0.02em;
 }
 
 .dash-actions { display: flex; gap: 12px; margin-bottom: 2rem; flex-wrap: wrap; }
 .dash-charts { display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; margin-bottom: 2rem; }
+.dash-charts .card {
+  background: linear-gradient(180deg, var(--branco) 0%, var(--bege-claro) 100%);
+}
 
-.chart-empty { height: 240px; display: flex; align-items: center; justify-content: center; color: var(--cinza); flex-direction: column; gap: 8px; }
-.chart-empty svg { opacity: 0.3; }
+.chart-empty {
+  height: 240px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--cinza);
+  flex-direction: column;
+  gap: 8px;
+}
+.chart-empty svg { opacity: 0.35; color: var(--castanho-claro); }
 .chart-empty span { font-size: 0.9rem; }
 
 .vaga-input { width: 72px; }
 
-.dash-note { font-size: 0.82rem; color: var(--cinza); margin-top: 12px; }
+.dash-note { font-size: 0.82rem; color: var(--cinza); margin-top: 12px; line-height: 1.5; }
 
-/* ---------- Stat cards: aspecto "glow" ---------- */
 .stats-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-  gap: 16px;
+  gap: 14px;
   margin: 20px 0 28px;
 }
 
 .stat-card {
   position: relative;
-  background: var(--branco);
-  border: 1px solid var(--bege);
+  background: linear-gradient(165deg, var(--branco) 0%, var(--bege-claro) 100%);
+  border: 1px solid var(--borda-suave);
   border-left: none;
-  border-radius: 16px;
+  border-radius: var(--radius-lg);
   padding: 18px 18px 16px;
-  box-shadow: 0 1px 3px rgba(61, 31, 10, 0.06);
-  transition: transform 0.15s ease, box-shadow 0.15s ease;
+  box-shadow: var(--sombra-sm);
+  transition: transform var(--duration) var(--ease-out), box-shadow var(--duration) var(--ease-out);
   overflow: hidden;
 }
 .stat-card::before {
@@ -64,7 +78,7 @@
 }
 .stat-card:hover {
   transform: translateY(-2px);
-  box-shadow: 0 8px 20px rgba(61, 31, 10, 0.1);
+  box-shadow: var(--sombra);
 }
 
 .stat-icon {
@@ -78,15 +92,18 @@
 }
 
 .stat-number {
-  font-size: 1.7rem;
-  font-weight: 700;
+  font-size: 1.75rem;
+  font-weight: 800;
+  font-family: var(--font-display);
   color: var(--castanho);
   line-height: 1.1;
+  letter-spacing: -0.02em;
 }
 .stat-label {
-  font-size: 0.8rem;
+  font-size: 0.78rem;
   color: var(--cinza);
-  margin-top: 2px;
+  margin-top: 4px;
+  font-weight: 500;
 }
 
 .stat-card--laranja { --tone-color: var(--laranja); }
@@ -109,8 +126,6 @@
   .dash-header { align-items: flex-start; }
 }
 
-/* Mobile — prioridade: pendências/ações rápidas → métricas → dados secundários.
-   Os gráficos são dados secundários e ficam ocultos no telemóvel. */
 @media (max-width: 768px) {
   .dash-page.dash-page { display: flex; flex-direction: column; }
   .dash-page .dash-actions { order: -1; }

@@ -8,4 +8,8 @@
 .cell-sem-notas { font-weight: 600; }
 .cell-text-vermelho { color: var(--vermelho); }
 
-.prof-card-table { padding: 0; }
+.prof-card-table {
+  padding: 0;
+  overflow: hidden;
+  border: 1px solid var(--borda-suave);
+}

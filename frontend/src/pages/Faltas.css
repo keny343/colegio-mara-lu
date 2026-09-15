@@ -7,28 +7,51 @@
 .stat-card--vermelho { border-left-color: var(--vermelho); }
 .stat-card--vermelho .stat-number { color: var(--vermelho); }
 
-.falta-group { margin-bottom: 1.5rem; }
-.falta-group-head { display: flex; align-items: center; gap: 8px; margin-bottom: 0.75rem; }
-.falta-group-head h3 { font-size: 1rem; }
+.falta-group { margin-bottom: 1.75rem; }
+.falta-group-head { display: flex; align-items: center; gap: 8px; margin-bottom: 0.85rem; }
+.falta-group-head h3 {
+  font-size: 1.05rem;
+  font-family: var(--font-display);
+  letter-spacing: -0.01em;
+}
 .falta-count {
   margin-left: auto;
-  background: var(--bege); border-radius: 20px; padding: 2px 10px;
-  font-size: 0.8rem; font-weight: 700; color: var(--castanho);
+  background: var(--bege-medio);
+  border-radius: 20px;
+  padding: 3px 12px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: var(--castanho);
+  font-family: var(--font-mono);
 }
 
-.falta-list { display: flex; flex-direction: column; gap: 6px; }
+.falta-list { display: flex; flex-direction: column; gap: 8px; }
 .falta-item {
   display: flex; align-items: center; justify-content: space-between; gap: 12px;
-  border-radius: 8px; padding: 0.6rem 1rem; font-size: 0.85rem; flex-wrap: wrap;
+  border-radius: 10px; padding: 0.7rem 1rem; font-size: 0.85rem; flex-wrap: wrap;
+  transition: box-shadow var(--duration) var(--ease-out), border-color var(--duration) var(--ease-out);
 }
-.falta-item--justificada { background: #F0FDF4; border: 1px solid #BBF7D0; }
-.falta-item--injustificada { background: #FFF1F2; border: 1px solid #FFE4E6; }
+.falta-item--justificada {
+  background: linear-gradient(180deg, #F0FDF4 0%, #ECFDF5 100%);
+  border: 1px solid #BBF7D0;
+}
+.falta-item--injustificada {
+  background: linear-gradient(180deg, #FFF1F2 0%, #FFF5F5 100%);
+  border: 1px solid #FFE4E6;
+}
 
 .falta-date { display: flex; align-items: center; gap: 8px; }
+.falta-date span:first-child,
+.falta-date time {
+  font-family: var(--font-mono);
+  font-size: 0.8rem;
+}
 .falta-just-text { color: var(--cinza); font-size: 0.78rem; }
 .falta-actions { display: flex; align-items: center; gap: 8px; }
 .falta-status {
-  font-size: 0.72rem; font-weight: 700; text-transform: uppercase; color: var(--vermelho);
+  font-size: 0.7rem; font-weight: 700; text-transform: uppercase;
+  letter-spacing: 0.06em; color: var(--vermelho);
+  font-family: var(--font-mono);
 }
 .falta-status--ok { color: var(--verde); }
 .falta-just-btn { font-size: 0.72rem; padding: 2px 8px; }

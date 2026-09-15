@@ -1,4 +1,5 @@
 import React from 'react';
+import { AlertTriangle } from 'lucide-react';
 import { Button } from './Button';
 
 function getErrorMessage(error) {
@@ -11,7 +12,9 @@ function getErrorMessage(error) {
 export function ErrorState({ error, onRetry, title = 'Algo correu mal' }) {
   return (
     <div className="ui-state ui-state-error" role="alert">
-      <span className="ui-state-icon" aria-hidden="true">&#9888;</span>
+      <div className="ui-state-icon" aria-hidden="true">
+        <AlertTriangle size={28} strokeWidth={1.5} />
+      </div>
       <h3 className="ui-state-title">{title}</h3>
       <p className="ui-state-message">{getErrorMessage(error)}</p>
       {onRetry && (
