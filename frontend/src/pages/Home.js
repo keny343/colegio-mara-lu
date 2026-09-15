@@ -217,14 +217,6 @@ export default function Home() {
             <p className="lp-footer-brand">Colégio Mara &amp; Lu</p>
             <p className="lp-footer-note">Educação e matrículas online · Luanda</p>
           </div>
-          <nav className="lp-footer-nav" aria-label="Rodapé">
-            <a href="#escola">A escola</a>
-            <a href="#cursos">Cursos</a>
-            <a href="#inscricao">Inscrição</a>
-            <a href="#contactos">Contactos</a>
-            <Link to="/login">Login</Link>
-            <Link to="/inscricao">Inscrever</Link>
-          </nav>
           <p className="lp-footer-copy">© {new Date().getFullYear()} Colégio Mara &amp; Lu</p>
         </div>
       </footer>
