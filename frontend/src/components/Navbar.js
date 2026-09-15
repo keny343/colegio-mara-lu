@@ -20,6 +20,13 @@ const ALUNOLinks = [
   { to: '/portal/perfil',      label: 'Perfil',      icon: <User size={16} /> },
 ];
 
+const LANDING_ANCHORS = [
+  { href: '#escola', label: 'A escola' },
+  { href: '#cursos', label: 'Cursos' },
+  { href: '#inscricao', label: 'Inscrição' },
+  { href: '#contactos', label: 'Contactos' },
+];
+
 export default function Navbar() {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
@@ -29,13 +36,20 @@ export default function Navbar() {
 
   useEffect(() => {
     setMenuOpen(false);
-  }, [location.pathname]);
+  }, [location.pathname, location.hash]);
 
   const handleLogout = async () => { await logout(); navigate('/'); };
   const isActive = (to) => location.pathname === to;
+  const isLandingPage = location.pathname === '/' && !user;
 
   const buildLinks = () => {
     if (!user) {
+      if (isLandingPage) {
+        return [
+          { to: '/login', label: 'Área de gestão', icon: <User size={16} /> },
+          { to: '/inscricao', label: 'Inscrever', icon: <School size={16} />, primary: true },
+        ];
+      }
       return [
         { to: '/', label: 'Início', icon: <Home size={16} /> },
         { to: '/login', label: 'Entrar', icon: <User size={16} /> },
@@ -82,11 +96,15 @@ export default function Navbar() {
   };
 
   const links = buildLinks();
-  const isLandingPage = location.pathname === '/';
 
-  const NavLinks = ({ mobile = false }) => (
+  const NavLinks = () => (
     <>
-      {links.map(link => (
+      {isLandingPage && LANDING_ANCHORS.map((a) => (
+        <a key={a.href} href={a.href} className="nav-item nav-item-anchor">
+          <span>{a.label}</span>
+        </a>
+      ))}
+      {links.map((link) => (
         <Link
           key={link.to}
           to={link.to}
@@ -108,39 +126,35 @@ export default function Navbar() {
   );
 
   return (
-  <nav className={`navbar${isLandingPage ? ' navbar--landing' : ''}`}>
-    <Link to="/" className="navbar-logo">
-      <div className="logo-icon logo-icon--mark" aria-hidden="true">
-        <span>ML</span>
-      </div>
-      <span>Colégio Mara &amp; Lu</span>
-    </Link>
-
-    <div className="navbar-links">
-      <NavLinks />
-    </div>
-
-    <button
-      className="navbar-toggle"
-      aria-label={menuOpen ? 'Fechar menu' : 'Abrir menu'}
-      aria-expanded={menuOpen}
-      onClick={() => setMenuOpen(o => !o)}
-    >
-      {menuOpen ? <X size={24} /> : <Menu size={24} />}
-    </button>
-
-    {menuOpen && (
-      <>
-        <div
-          className="navbar-overlay"
-          onClick={() => setMenuOpen(false)}
-        />
-
-        <div className="navbar-mobile">
-          <NavLinks mobile />
+    <nav className={`navbar${isLandingPage ? ' navbar--landing' : ''}`}>
+      <Link to="/" className="navbar-logo">
+        <div className="logo-icon logo-icon--mark" aria-hidden="true">
+          <span>ML</span>
         </div>
-      </>
-    )}
-  </nav>
-);
+        <span>Colégio Mara &amp; Lu</span>
+      </Link>
+
+      <div className="navbar-links">
+        <NavLinks />
+      </div>
+
+      <button
+        className="navbar-toggle"
+        aria-label={menuOpen ? 'Fechar menu' : 'Abrir menu'}
+        aria-expanded={menuOpen}
+        onClick={() => setMenuOpen((o) => !o)}
+      >
+        {menuOpen ? <X size={24} /> : <Menu size={24} />}
+      </button>
+
+      {menuOpen && (
+        <>
+          <div className="navbar-overlay" onClick={() => setMenuOpen(false)} />
+          <div className="navbar-mobile">
+            <NavLinks />
+          </div>
+        </>
+      )}
+    </nav>
+  );
 }

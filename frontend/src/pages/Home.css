@@ -1,6 +1,6 @@
 /* ============================================================
    Home — Colégio Mara & Lu
-   Editorial prospectus direction (not SaaS card grid)
+   Landing institucional (estrutura Lovable, conteúdo honesto)
    ============================================================ */
 
 .lp {
@@ -9,6 +9,7 @@
   --lp-paper-deep: #efe3d4;
   background: var(--lp-paper);
   color: var(--castanho);
+  scroll-behavior: smooth;
 }
 
 .lp-wrap {
@@ -26,14 +27,41 @@
   margin: 0;
 }
 
-/* ---------- HERO (one composition, full-bleed) ---------- */
+.lp-section-head {
+  max-width: 36rem;
+  margin-bottom: clamp(2rem, 5vh, 3.5rem);
+}
+
+.lp-section-head .lp-kicker {
+  margin-bottom: 0.85rem;
+}
+
+.lp-section-head h2,
+.lp-escola-intro h2,
+.lp-process-head h2,
+.lp-contactos h2 {
+  margin: 0;
+  font-size: clamp(1.65rem, 3.2vw, 2.45rem);
+  color: var(--lp-ink);
+  letter-spacing: -0.025em;
+}
+
+.lp-section-sub {
+  margin: 0.85rem 0 0;
+  font-size: 1.02rem;
+  line-height: 1.65;
+  color: var(--castanho-medio);
+  max-width: 38ch;
+}
+
+/* ---------- HERO ---------- */
 .lp-hero {
   position: relative;
   isolation: isolate;
   min-height: min(100dvh, 920px);
   display: grid;
   align-items: end;
-  padding: 72px 0 clamp(48px, 8vh, 88px);
+  padding: 88px 0 clamp(56px, 9vh, 96px);
   overflow: hidden;
   color: var(--bege-claro);
   background: #1f1005;
@@ -54,63 +82,52 @@
   inset: 0;
   z-index: 1;
   background:
-    linear-gradient(90deg, rgba(18, 8, 3, 0.82) 0%, rgba(18, 8, 3, 0.55) 42%, rgba(18, 8, 3, 0.18) 100%),
-    linear-gradient(0deg, rgba(18, 8, 3, 0.75) 0%, transparent 42%);
+    linear-gradient(90deg, rgba(18, 8, 3, 0.88) 0%, rgba(18, 8, 3, 0.62) 48%, rgba(18, 8, 3, 0.28) 100%),
+    linear-gradient(0deg, rgba(18, 8, 3, 0.78) 0%, transparent 45%);
   pointer-events: none;
 }
 
 .lp-hero-copy {
   position: relative;
   z-index: 2;
-  max-width: 640px;
-  padding-bottom: 8px;
+  max-width: 720px;
   animation: lpRise 0.9s var(--ease-out) both;
 }
 
 .lp-hero-kicker {
   color: var(--laranja-claro);
-  margin-bottom: 1.35rem;
+  margin-bottom: 1.25rem;
 }
 
-.lp-brand {
+.lp-hero-title {
   margin: 0;
   font-family: var(--font-display);
-  font-weight: 800;
-  font-size: clamp(3.1rem, 9.5vw, 6.4rem);
-  line-height: 0.92;
-  letter-spacing: -0.035em;
-  color: #fff;
-}
-
-.lp-brand-line {
-  display: block;
-}
-
-.lp-brand-em {
-  font-style: italic;
   font-weight: 700;
-  color: #fff7ef;
+  font-size: clamp(2.15rem, 5.4vw, 3.75rem);
+  line-height: 1.08;
+  letter-spacing: -0.03em;
+  color: #fff;
+  max-width: 16ch;
 }
 
 .lp-lede {
-  margin: 1.5rem 0 0;
-  max-width: 34ch;
-  font-family: var(--font-body);
-  font-size: clamp(1.05rem, 2.1vw, 1.2rem);
+  margin: 1.4rem 0 0;
+  max-width: 40ch;
+  font-size: clamp(1.02rem, 2vw, 1.15rem);
   line-height: 1.65;
   color: rgba(245, 230, 211, 0.88);
-  font-weight: 400;
 }
 
 .lp-hero-actions {
   display: flex;
   flex-wrap: wrap;
   gap: 12px;
-  margin-top: 2.1rem;
+  margin-top: 2rem;
 }
 
 .lp-btn-solid,
-.lp-btn-ghost {
+.lp-btn-ghost,
+.lp-btn-outline {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -141,6 +158,16 @@
   transform: translateY(-1px);
 }
 
+.lp-btn-ink {
+  background: var(--lp-ink);
+  border-color: var(--lp-ink);
+}
+
+.lp-btn-ink:hover {
+  background: var(--castanho-medio);
+  border-color: var(--castanho-medio);
+}
+
 .lp-btn-ghost {
   background: transparent;
   color: rgba(245, 230, 211, 0.95);
@@ -152,70 +179,152 @@
   background: rgba(245, 230, 211, 0.06);
 }
 
-.lp-btn-on-dark {
-  margin-top: 1.75rem;
+.lp-btn-outline {
+  background: transparent;
+  color: var(--lp-ink);
+  border: 1px solid rgba(61, 31, 10, 0.28);
 }
 
-.lp-hero-scroll {
-  position: absolute;
-  right: clamp(20px, 4vw, 40px);
-  bottom: clamp(40px, 7vh, 72px);
-  z-index: 2;
-  writing-mode: vertical-rl;
-  font-family: var(--font-mono);
-  font-size: 0.68rem;
-  letter-spacing: 0.22em;
-  text-transform: uppercase;
-  color: rgba(245, 230, 211, 0.45);
-  animation: lpPulse 2.8s ease-in-out infinite;
+.lp-btn-outline:hover {
+  border-color: var(--laranja);
+  color: var(--laranja);
 }
 
-/* ---------- MANIFESTO ---------- */
-.lp-manifesto {
-  padding: clamp(72px, 12vh, 128px) 0;
-  background:
-    radial-gradient(ellipse 70% 80% at 100% 0%, rgba(232, 100, 26, 0.08), transparent 55%),
-    var(--lp-paper);
+.lp-link-inline {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 1.25rem;
+  font-weight: 600;
+  font-size: 0.98rem;
+  color: var(--laranja);
+  text-decoration: none;
+}
+
+.lp-link-inline:hover {
+  color: var(--laranja-claro);
+}
+
+/* ---------- ESCOLA ---------- */
+.lp-escola {
+  padding: clamp(72px, 12vh, 120px) 0;
+  background: var(--lp-paper);
   border-bottom: 1px solid rgba(61, 31, 10, 0.08);
+  scroll-margin-top: 88px;
 }
 
-.lp-manifesto-inner {
-  max-width: 820px;
+.lp-escola-grid {
+  display: grid;
+  grid-template-columns: 1.1fr 1fr;
+  gap: clamp(2rem, 5vw, 4rem);
+  align-items: start;
 }
 
-.lp-manifesto .lp-kicker {
-  margin-bottom: 1.25rem;
+.lp-escola-intro .lp-kicker {
+  margin-bottom: 1rem;
 }
 
-.lp-manifesto-title {
+.lp-escola-lede {
+  margin: 1.15rem 0 0;
+  font-size: 1.05rem;
+  line-height: 1.7;
+  color: var(--castanho-medio);
+  max-width: 36ch;
+}
+
+.lp-beneficios {
+  list-style: none;
   margin: 0;
-  font-family: var(--font-display);
-  font-weight: 700;
-  font-size: clamp(1.85rem, 4.2vw, 3.15rem);
-  line-height: 1.18;
-  letter-spacing: -0.025em;
+  padding: 0;
+  display: grid;
+  gap: 0;
+  border-top: 1px solid rgba(61, 31, 10, 0.14);
+}
+
+.lp-beneficio {
+  padding: 1.35rem 0;
+  border-bottom: 1px solid rgba(61, 31, 10, 0.12);
+}
+
+.lp-beneficio h3 {
+  margin: 0 0 0.45rem;
+  font-size: 1.15rem;
   color: var(--lp-ink);
 }
 
-/* ---------- PROCESS (editorial track, not cards) ---------- */
-.lp-process {
-  padding: clamp(64px, 10vh, 112px) 0 clamp(80px, 12vh, 128px);
+.lp-beneficio p {
+  margin: 0;
+  font-size: 0.95rem;
+  line-height: 1.6;
+  color: var(--castanho-medio);
+}
+
+/* ---------- CURSOS ---------- */
+.lp-cursos {
+  padding: clamp(64px, 10vh, 112px) 0;
   background: var(--lp-paper-deep);
+  scroll-margin-top: 88px;
+}
+
+.lp-cursos-list {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 0;
+  border-top: 1px solid rgba(61, 31, 10, 0.16);
+}
+
+.lp-curso {
+  padding: 1.75rem 1.5rem 1.75rem 0;
+  border-right: 1px solid rgba(61, 31, 10, 0.12);
+  padding-right: 1.5rem;
+}
+
+.lp-curso:last-child {
+  border-right: 0;
+  padding-right: 0;
+}
+
+.lp-curso-nivel {
+  margin: 0 0 0.75rem;
+  font-family: var(--font-mono);
+  font-size: 0.7rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--laranja);
+}
+
+.lp-curso h3 {
+  margin: 0 0 0.55rem;
+  font-size: 1.35rem;
+  color: var(--lp-ink);
+}
+
+.lp-curso p {
+  margin: 0;
+  font-size: 0.95rem;
+  line-height: 1.6;
+  color: var(--castanho-medio);
+  max-width: 28ch;
+}
+
+.lp-cursos-cta {
+  margin-top: 2.25rem;
+}
+
+/* ---------- PROCESSO ---------- */
+.lp-process {
+  padding: clamp(64px, 10vh, 112px) 0;
+  background: var(--lp-paper);
+  scroll-margin-top: 88px;
 }
 
 .lp-process-head {
   margin-bottom: clamp(40px, 6vh, 64px);
-  max-width: 28rem;
+  max-width: 34rem;
 }
 
 .lp-process-head .lp-kicker {
   margin-bottom: 0.85rem;
-}
-
-.lp-process-head h2 {
-  margin: 0;
-  font-size: clamp(1.65rem, 3vw, 2.35rem);
-  color: var(--lp-ink);
 }
 
 .lp-track {
@@ -251,7 +360,7 @@
 .lp-track-body h3 {
   margin: 0 0 0.55rem;
   font-family: var(--font-display);
-  font-size: 1.35rem;
+  font-size: 1.2rem;
   font-weight: 700;
   color: var(--lp-ink);
   letter-spacing: -0.02em;
@@ -262,47 +371,62 @@
   font-size: 0.95rem;
   line-height: 1.6;
   color: var(--castanho-medio);
-  max-width: 22ch;
+  max-width: 24ch;
 }
 
-/* ---------- CTA BAND (full-bleed, no card) ---------- */
-.lp-band {
+/* ---------- CONTACTOS ---------- */
+.lp-contactos {
+  padding: clamp(64px, 10vh, 104px) 0;
   background:
     linear-gradient(115deg, #2a1508 0%, #4a2712 48%, #c45516 100%);
   color: #fff7ef;
-  padding: clamp(64px, 10vh, 104px) 0;
-  position: relative;
-  overflow: hidden;
+  scroll-margin-top: 88px;
 }
 
-.lp-band::after {
-  content: '';
-  position: absolute;
-  inset: auto -10% -40% 40%;
-  height: 80%;
-  background: radial-gradient(ellipse at center, rgba(242, 131, 64, 0.35), transparent 65%);
-  pointer-events: none;
+.lp-contactos .lp-kicker {
+  color: var(--laranja-claro);
+  margin-bottom: 1rem;
 }
 
-.lp-band-inner {
-  position: relative;
-  z-index: 1;
-  max-width: 36rem;
-}
-
-.lp-band h2 {
-  margin: 0;
-  font-size: clamp(1.7rem, 3.4vw, 2.55rem);
+.lp-contactos h2 {
   color: #fff;
-  letter-spacing: -0.02em;
 }
 
-.lp-band p {
-  margin: 1rem 0 0;
-  font-size: 1.05rem;
-  line-height: 1.65;
+.lp-contactos .lp-section-sub {
   color: rgba(245, 230, 211, 0.82);
-  max-width: 34ch;
+  max-width: 42ch;
+}
+
+.lp-contactos-inner {
+  max-width: 40rem;
+}
+
+.lp-contactos-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-top: 1.75rem;
+}
+
+.lp-contactos .lp-btn-ink {
+  background: var(--laranja);
+  border-color: var(--laranja);
+  color: #fff;
+}
+
+.lp-contactos .lp-btn-ink:hover {
+  background: var(--laranja-claro);
+  border-color: var(--laranja-claro);
+}
+
+.lp-contactos .lp-btn-outline {
+  color: rgba(245, 230, 211, 0.95);
+  border-color: rgba(245, 230, 211, 0.35);
+}
+
+.lp-contactos .lp-btn-outline:hover {
+  border-color: rgba(245, 230, 211, 0.75);
+  color: #fff;
 }
 
 /* ---------- FOOTER ---------- */
@@ -314,7 +438,7 @@
 
 .lp-footer-grid {
   display: grid;
-  grid-template-columns: 1.4fr 1fr auto;
+  grid-template-columns: 1.2fr 1.6fr auto;
   gap: 1.5rem 2rem;
   align-items: end;
 }
@@ -332,19 +456,18 @@
   margin: 0.4rem 0 0;
   font-size: 0.88rem;
   line-height: 1.5;
-  max-width: 28ch;
 }
 
 .lp-footer-nav {
   display: flex;
-  gap: 1.25rem;
+  gap: 1rem 1.25rem;
   flex-wrap: wrap;
 }
 
 .lp-footer-nav a {
   color: rgba(245, 230, 211, 0.85);
   text-decoration: none;
-  font-size: 0.92rem;
+  font-size: 0.9rem;
   font-weight: 500;
   border-bottom: 1px solid transparent;
   transition: color var(--duration) var(--ease-out), border-color var(--duration) var(--ease-out);
@@ -392,16 +515,11 @@
   to { transform: scale(1); }
 }
 
-@keyframes lpPulse {
-  0%, 100% { opacity: 0.35; }
-  50% { opacity: 0.7; }
-}
-
 @media (prefers-reduced-motion: reduce) {
+  .lp { scroll-behavior: auto; }
   .lp-reveal,
   .lp-hero-copy,
-  .lp-hero-plane,
-  .lp-hero-scroll {
+  .lp-hero-plane {
     animation: none !important;
     opacity: 1;
     transform: none;
@@ -413,24 +531,49 @@
 }
 
 /* ---------- RESPONSIVE ---------- */
-@media (max-width: 900px) {
+@media (max-width: 960px) {
+  .lp-escola-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .lp-cursos-list {
+    grid-template-columns: 1fr;
+  }
+
+  .lp-curso {
+    border-right: 0;
+    border-bottom: 1px solid rgba(61, 31, 10, 0.12);
+    padding: 1.5rem 0;
+  }
+
+  .lp-curso:last-child {
+    border-bottom: 0;
+  }
+
+  .lp-curso p {
+    max-width: none;
+  }
+
   .lp-track {
     grid-template-columns: 1fr 1fr;
   }
+
   .lp-track-item:nth-child(2) {
     border-right: 0;
     padding-right: 0;
   }
+
   .lp-track-item:nth-child(1),
   .lp-track-item:nth-child(2) {
     border-bottom: 1px solid rgba(61, 31, 10, 0.12);
     padding-bottom: 1.5rem;
-    margin-bottom: 0.5rem;
   }
+
   .lp-footer-grid {
     grid-template-columns: 1fr;
     align-items: start;
   }
+
   .lp-footer-copy {
     justify-self: start;
   }
@@ -444,25 +587,27 @@
   .lp-hero {
     min-height: 92dvh;
     align-items: center;
-    padding-top: 72px;
+    padding-top: 96px;
   }
 
   .lp-hero-veil {
     background:
-      linear-gradient(180deg, rgba(18, 8, 3, 0.55) 0%, rgba(18, 8, 3, 0.72) 45%, rgba(18, 8, 3, 0.88) 100%);
+      linear-gradient(180deg, rgba(18, 8, 3, 0.55) 0%, rgba(18, 8, 3, 0.72) 45%, rgba(18, 8, 3, 0.9) 100%);
   }
 
-  .lp-hero-scroll {
-    display: none;
+  .lp-hero-title {
+    max-width: none;
   }
 
-  .lp-hero-actions {
+  .lp-hero-actions,
+  .lp-contactos-actions {
     flex-direction: column;
     align-items: stretch;
   }
 
   .lp-btn-solid,
-  .lp-btn-ghost {
+  .lp-btn-ghost,
+  .lp-btn-outline {
     width: 100%;
   }
 

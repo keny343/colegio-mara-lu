@@ -3,22 +3,55 @@ import { Link } from 'react-router-dom';
 import { ArrowRight, ArrowUpRight } from 'lucide-react';
 import './Home.css';
 
+const BENEFICIOS = [
+  {
+    title: 'Acompanhamento próximo',
+    desc: 'Professores e direção acompanham o percurso de cada aluno, com atenção ao ritmo de aprendizagem.',
+  },
+  {
+    title: 'Portal para a família',
+    desc: 'Notas, faltas, materiais e recados ficam acessíveis online depois da matrícula confirmada.',
+  },
+  {
+    title: 'Inscrição sem filas',
+    desc: 'O pedido de vaga começa no telemóvel — documentos e dados enviados de forma digital.',
+  },
+];
+
+const CURSOS = [
+  {
+    nivel: 'Ensino primário',
+    title: '1.ª à 6.ª classe',
+    desc: 'Bases sólidas de leitura, escrita e cálculo, com apoio ao estudo no horário escolar.',
+  },
+  {
+    nivel: '1.º ciclo do secundário',
+    title: '7.ª à 9.ª classe',
+    desc: 'Preparação para o ensino médio, com acompanhamento contínuo do aproveitamento.',
+  },
+  {
+    nivel: 'Ensino médio',
+    title: '10.ª à 13.ª classe',
+    desc: 'Formação orientada para o prosseguimento de estudos e para a vida profissional.',
+  },
+];
+
 const PASSOS = [
   {
-    title: 'Inscrição',
-    desc: 'Dados do aluno, encarregado e classe pretendida — tudo online.',
+    title: 'Preencher a inscrição',
+    desc: 'Dados do aluno, do encarregado e a classe pretendida — tudo online.',
   },
   {
-    title: 'Documentos',
-    desc: 'BI e, quando necessário, boletim da classe anterior.',
+    title: 'Entregar documentos',
+    desc: 'Bilhete de identidade e, se aplicável, o boletim da classe anterior.',
   },
   {
-    title: 'Análise',
-    desc: 'A secretaria valida informações e anexos com cuidado.',
+    title: 'Análise da secretaria',
+    desc: 'O colégio valida os dados e os anexos antes de confirmar a vaga.',
   },
   {
-    title: 'Matrícula',
-    desc: 'Aprovação confirmada e acesso ao portal com o BI.',
+    title: 'Matrícula confirmada',
+    desc: 'Após aprovação, o aluno acede ao portal com o BI (senha inicial = BI).',
   },
 ];
 
@@ -34,7 +67,7 @@ function useRevealOnScroll() {
           io.unobserve(el);
         }
       },
-      { threshold: 0.14 }
+      { threshold: 0.12 }
     );
     io.observe(el);
     return () => io.disconnect();
@@ -63,46 +96,91 @@ export default function Home() {
         />
         <div className="lp-hero-veil" aria-hidden="true" />
         <div className="lp-wrap lp-hero-copy">
-          <p className="lp-kicker lp-hero-kicker">Luanda · desde 2005</p>
-          <h1 className="lp-brand">
-            <span className="lp-brand-line">Colégio</span>
-            <span className="lp-brand-line lp-brand-em">Mara &amp; Lu</span>
+          <p className="lp-kicker lp-hero-kicker">Inscrições abertas · Luanda · desde 2005</p>
+          <h1 className="lp-hero-title">
+            Uma escola que acompanha cada aluno — e mantém a família informada.
           </h1>
           <p className="lp-lede">
-            Formação sólida, acompanhamento próximo e matrícula online —
-            do primeiro contacto até à confirmação da vaga.
+            Do ensino primário ao médio. Turmas acompanhadas de perto e um portal
+            onde a família acompanha o percurso escolar depois da matrícula.
           </p>
           <div className="lp-hero-actions">
             <Link to="/inscricao" className="lp-btn-solid">
               Fazer inscrição
               <ArrowRight size={18} strokeWidth={2.25} />
             </Link>
-            <Link to="/login" className="lp-btn-ghost">
-              Já tenho conta
-            </Link>
+            <a href="#cursos" className="lp-btn-ghost">
+              Ver cursos
+            </a>
           </div>
-        </div>
-        <div className="lp-hero-scroll" aria-hidden="true">
-          <span>Deslize</span>
         </div>
       </header>
 
-      <section className="lp-manifesto" aria-labelledby="lp-manifesto-title">
-        <div className="lp-wrap lp-manifesto-inner">
-          <Reveal>
-            <p className="lp-kicker">A nossa promessa</p>
-            <h2 id="lp-manifesto-title" className="lp-manifesto-title">
-              Educação que acompanha cada passo — com clareza para as famílias.
-            </h2>
+      <section id="escola" className="lp-escola" aria-labelledby="lp-escola-title">
+        <div className="lp-wrap lp-escola-grid">
+          <Reveal className="lp-escola-intro">
+            <p className="lp-kicker">A nossa escola</p>
+            <h2 id="lp-escola-title">Ensino exigente, trato humano</h2>
+            <p className="lp-escola-lede">
+              Abrimos em 2005 e mantemos a mesma regra: nenhum aluno passa
+              despercebido. As famílias acompanham o dia a dia escolar pelo portal
+              após a matrícula confirmada.
+            </p>
+          </Reveal>
+          <ul className="lp-beneficios">
+            {BENEFICIOS.map((b) => (
+              <Reveal as="li" className="lp-beneficio" key={b.title}>
+                <h3>{b.title}</h3>
+                <p>{b.desc}</p>
+              </Reveal>
+            ))}
+          </ul>
+        </div>
+      </section>
+
+      <section id="cursos" className="lp-cursos" aria-labelledby="lp-cursos-title">
+        <div className="lp-wrap">
+          <Reveal className="lp-section-head">
+            <p className="lp-kicker">Oferta formativa</p>
+            <h2 id="lp-cursos-title">Cursos e classes</h2>
+            <p className="lp-section-sub">
+              Do primário ao ensino médio. A disponibilidade de vagas por classe
+              confirma-se no momento da inscrição.
+            </p>
+          </Reveal>
+
+          <div className="lp-cursos-list">
+            {CURSOS.map((c) => (
+              <Reveal className="lp-curso" key={c.title}>
+                <p className="lp-curso-nivel">{c.nivel}</p>
+                <h3>{c.title}</h3>
+                <p>{c.desc}</p>
+              </Reveal>
+            ))}
+          </div>
+
+          <Reveal className="lp-cursos-cta">
+            <Link to="/inscricao" className="lp-btn-solid lp-btn-ink">
+              Ver inscrição
+              <ArrowRight size={18} strokeWidth={2.25} />
+            </Link>
           </Reveal>
         </div>
       </section>
 
-      <section className="lp-process" aria-labelledby="lp-process-title">
+      <section id="inscricao" className="lp-process" aria-labelledby="lp-process-title">
         <div className="lp-wrap">
           <Reveal className="lp-process-head">
             <p className="lp-kicker">Do pedido à vaga</p>
             <h2 id="lp-process-title">Como corre a inscrição</h2>
+            <p className="lp-section-sub">
+              Todo o processo começa online. Não é preciso deslocar-se à secretaria
+              antes da análise da candidatura.
+            </p>
+            <Link to="/inscricao" className="lp-link-inline">
+              Começar agora
+              <ArrowUpRight size={16} strokeWidth={2.25} />
+            </Link>
           </Reveal>
 
           <ol className="lp-track">
@@ -121,15 +199,23 @@ export default function Home() {
         </div>
       </section>
 
-      <section className="lp-band" aria-labelledby="lp-band-title">
-        <div className="lp-wrap lp-band-inner">
+      <section id="contactos" className="lp-contactos" aria-labelledby="lp-contactos-title">
+        <div className="lp-wrap lp-contactos-inner">
           <Reveal>
-            <h2 id="lp-band-title">Garanta a vaga do próximo ano letivo</h2>
-            <p>Vagas limitadas por classe. Comece a inscrição agora — leva poucos minutos.</p>
-            <Link to="/inscricao" className="lp-btn-solid lp-btn-on-dark">
-              Começar inscrição
-              <ArrowUpRight size={18} strokeWidth={2.25} />
-            </Link>
+            <p className="lp-kicker">Visite-nos</p>
+            <h2 id="lp-contactos-title">Como falar connosco</h2>
+            <p className="lp-section-sub">
+              Para candidaturas, use a inscrição online. Depois da matrícula,
+              o portal é o canal principal para acompanhar o percurso escolar.
+            </p>
+            <div className="lp-contactos-actions">
+              <Link to="/inscricao" className="lp-btn-solid lp-btn-ink">
+                Fazer inscrição
+              </Link>
+              <Link to="/login" className="lp-btn-outline">
+                Área de gestão
+              </Link>
+            </div>
           </Reveal>
         </div>
       </section>
@@ -138,11 +224,15 @@ export default function Home() {
         <div className="lp-wrap lp-footer-grid">
           <div>
             <p className="lp-footer-brand">Colégio Mara &amp; Lu</p>
-            <p className="lp-footer-note">Sistema de matrículas e acompanhamento escolar.</p>
+            <p className="lp-footer-note">Educação e matrículas online · Luanda</p>
           </div>
           <nav className="lp-footer-nav" aria-label="Rodapé">
-            <Link to="/inscricao">Inscrição</Link>
-            <Link to="/login">Entrar</Link>
+            <a href="#escola">A escola</a>
+            <a href="#cursos">Cursos</a>
+            <a href="#inscricao">Inscrição</a>
+            <a href="#contactos">Contactos</a>
+            <Link to="/login">Área de gestão</Link>
+            <Link to="/inscricao">Inscrever</Link>
           </nav>
           <p className="lp-footer-copy">© {new Date().getFullYear()} Colégio Mara &amp; Lu</p>
         </div>
