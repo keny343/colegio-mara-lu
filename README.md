@@ -27,9 +27,9 @@ Built as a real product architecture (SPA + secured API + MySQL), not a classroo
 
 | Layer | URL |
 |-------|-----|
-| Frontend | Deployed on **Vercel** (see repository / deployment notes) |
-| Backend | `https://colegio-mara-lu-backend.onrender.com` |
-| Health | `GET /health` on the API host |
+| Frontend | https://colegio-mara-lu.vercel.app/ |
+| Backend | https://colegio-mara-lu-backend.onrender.com |
+| Health | https://colegio-mara-lu-backend.onrender.com/health |
 
 > Render free tiers may cold-start; wait a few seconds on first request.
 

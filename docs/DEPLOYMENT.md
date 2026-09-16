@@ -4,12 +4,11 @@
 
 | Layer | Platform | Notes |
 |-------|----------|-------|
-| Frontend | **Vercel** | CRA build; SPA rewrites |
-| Backend | **Render** | Node `npm start` |
+| Frontend | **Vercel** | https://colegio-mara-lu.vercel.app/ |
+| Backend | **Render** | https://colegio-mara-lu-backend.onrender.com |
 | Database | **MySQL** (cloud) | e.g. Aiven / managed MySQL |
 | Files | **Supabase** storage | Avatars, documents, materials |
 
-Example backend URL (current): `https://colegio-mara-lu-backend.onrender.com`  
 Frontend rewrites: `frontend/vercel.json` proxies `/api/*` and `/uploads/*` to the API host.
 
 ## Environment variables
@@ -20,7 +19,7 @@ Required:
 
 - `DB_HOST`, `DB_PORT`, `DB_USER`, `DB_PASSWORD`, `DB_NAME` (+ `DB_SSL` if needed)
 - `JWT_SECRET` (≥ 32 characters in production)
-- `FRONTEND_URL` (exact Vercel origin)
+- `FRONTEND_URL` (exact Vercel origin, e.g. `https://colegio-mara-lu.vercel.app`)
 - `NODE_ENV=production`
 - `PORT` (provided by host)
 

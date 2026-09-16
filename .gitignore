@@ -6,4 +6,8 @@ frontend/build/
 frontend/.env
 backend/.env
 backend/uploads/
+backend/tmp_*
 *.log
+*.pptx
+Thumbs.db
+.DS_Store
