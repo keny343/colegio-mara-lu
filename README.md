@@ -101,6 +101,9 @@ cd frontend
 npm test          # unit / component
 npm run test:e2e  # Playwright (needs running stack)
 npm run build     # production build
+
+cd ../backend
+npm test          # unit (no DB required)
 ```
 
 Guide: [`docs/TESTING.md`](./docs/TESTING.md)
@@ -153,7 +156,7 @@ See [`docs/DECISIONS.md`](./docs/DECISIONS.md) — cookie sessions, RBAC refresh
 
 ## Roadmap
 
-- [ ] Backend automated test suite
+- [x] Backend automated test suite (unit: auth, RBAC, uploads, password policy)
 - [ ] OpenAPI / Swagger export
 - [ ] Expand Playwright coverage (enrollment happy path)
 - [ ] Observability (structured metrics dashboard)

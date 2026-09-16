@@ -5,8 +5,8 @@
 | Layer | Tool | Location | Status |
 |-------|------|----------|--------|
 | Unit / component | Jest + React Testing Library | `frontend/src/**/*.test.js` | Active |
+| Backend unit | Jest | `backend/tests/**/*.test.js` | Active |
 | End-to-end | Playwright | `frontend/e2e/` | Active |
-| Backend automated | — | — | Not yet (roadmap) |
 
 ## Frontend unit tests
 
@@ -28,6 +28,22 @@ Notable coverage areas:
 
 Setup: `frontend/src/setupTests.js`
 
+## Backend unit tests
+
+```bash
+cd backend
+npm test
+```
+
+Covers:
+
+- Password policy (`passwordPolicy`)
+- Academic RBAC / grade rules (`academicoRules`)
+- Upload MIME/extension filter (`uploadFilters`)
+- Auth middleware (missing token, inactive user, `token_version`, admin gate) with mocked DB
+
+No live MySQL required for the unit suite.
+
 ## Playwright E2E
 
 ```bash
@@ -47,24 +63,20 @@ Requirements:
 
 GitHub Actions workflow: `.github/workflows/ci.yml`
 
-- Install frontend deps
-- Run unit tests
-- Production build
+- Frontend: install → unit tests → production build
+- Backend: install → unit tests → `node --check src/server.js`
 
-E2E is optional/manual until secrets and a stable test environment are wired.
+E2E remains optional/manual until secrets and a stable test environment are wired.
 
-## Backend testing roadmap
+## Next coverage candidates
 
-Priority candidates:
-
-1. Auth middleware (inactive user, token_version)
-2. Enrollment status transitions
-3. Grade write permissions (professor vs coordenador)
-4. Rate-limit behaviour (integration)
+1. Enrollment status transitions (integration)
+2. Grade write permissions end-to-end against a test DB
+3. Rate-limit behaviour (integration)
 
 ## Quality bar for PRs
 
-- Unit tests green
+- Frontend and backend unit tests green
 - `npm run build` green in `frontend/`
 - No secrets in diff
 - Manual smoke: login per role + one enrollment status change

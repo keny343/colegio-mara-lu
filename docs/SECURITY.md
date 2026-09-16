@@ -74,7 +74,7 @@ Never commit `.env` files or real credentials.
 
 ## Known gaps / roadmap
 
-- Formal security regression suite on the API
+- Expand API integration tests (enrollment transitions, grade writes)
 - OpenAPI-driven auth matrix review
 - Optional 2FA for admin accounts
 - Automated secret scanning in CI
