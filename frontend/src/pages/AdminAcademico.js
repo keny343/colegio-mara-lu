@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import api from '../services/api';
 import { normalizeSeriesName } from '../utils/serieName';
+import { turnoLabel } from '../utils/turnos';
 import { useAuth } from '../contexts/AuthContext';
 import { Plus, Save, Pencil, Trash2, User, Users } from 'lucide-react';
 import Toast, { useToast } from '../components/Toast';
@@ -38,9 +39,9 @@ export default function AdminAcademico() {
 
   const [cursoForm, setCursoForm] = useState({ nome: '', descricao: '' });
   const [discForm, setDiscForm] = useState({ nome: '', curso_id: '', serie_min: '', serie_max: '', disciplina_chave: false });
-  const [turmaForm, setTurmaForm] = useState({ nome: '', ano_letivo: new Date().getFullYear() + 1, serie_classe: '', curso_id: '', turno: 'manhã' });
+  const [turmaForm, setTurmaForm] = useState({ nome: '', ano_letivo: new Date().getFullYear() + 1, serie_classe: '', curso_id: '', turno: 'manha' });
   const [turmaEditId, setTurmaEditId] = useState(null);
-  const [turmaEditForm, setTurmaEditForm] = useState({ nome: '', turno: 'manhã' });
+  const [turmaEditForm, setTurmaEditForm] = useState({ nome: '', turno: 'manha' });
   const [turmaEditModal, setTurmaEditModal] = useState(false);
   const [turmaEditSaving, setTurmaEditSaving] = useState(false);
 
@@ -151,7 +152,7 @@ export default function AdminAcademico() {
       setCursoForm({ nome: data?.nome || '', descricao: data?.descricao || '' });
     }
     if (type === 'disciplina') setDiscForm({ nome: '', curso_id: '', serie_min: '', serie_max: '', disciplina_chave: false });
-    if (type === 'turma') setTurmaForm({ nome: '', ano_letivo: new Date().getFullYear() + 1, serie_classe: '', curso_id: '', turno: 'manhã' });
+    if (type === 'turma') setTurmaForm({ nome: '', ano_letivo: new Date().getFullYear() + 1, serie_classe: '', curso_id: '', turno: 'manha' });
   };
 
   const fecharModal = () => {
@@ -491,7 +492,7 @@ export default function AdminAcademico() {
                     <td className="col-num" data-label="Ano">{t.ano_letivo}</td>
                     <td data-label="Classe">{t.serie_classe}ª</td>
                     <td className="col-hide-md" data-label="Curso">{t.curso_nome || '—'}</td>
-                    <td data-label="Turno">{t.turno}</td>
+                    <td data-label="Turno">{turnoLabel(t.turno)}</td>
                     <td className="td-actions" data-label="Ações">
                       <div className="acoes-row">
                         <Button variant="ghost" size="sm" iconOnly icon={<Users size={15} />} onClick={() => abrirAlunosTurma(t)} aria-label={`Ver alunos de ${t.nome}`} title="Ver alunos" />
@@ -812,7 +813,7 @@ export default function AdminAcademico() {
         </FormField>
         <FormField label="Turno" htmlFor="aa-edit-turma-turno">
           <Select id="aa-edit-turma-turno" value={turmaEditForm.turno} onChange={e => setTurmaEditForm(f => ({ ...f, turno: e.target.value }))}>
-            <option value="manhã">Manhã</option>
+            <option value="manha">Manhã</option>
             <option value="tarde">Tarde</option>
             <option value="noite">Noite</option>
           </Select>
@@ -921,7 +922,7 @@ export default function AdminAcademico() {
                 </FormField>
                 <FormField label="Turno" htmlFor="aa-turma-turno">
                   <Select id="aa-turma-turno" value={turmaForm.turno} onChange={e => setTurmaForm({ ...turmaForm, turno: e.target.value })}>
-                    <option value="manhã">Manhã</option>
+                    <option value="manha">Manhã</option>
                     <option value="tarde">Tarde</option>
                     <option value="noite">Noite</option>
                   </Select>

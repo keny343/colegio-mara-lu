@@ -6,6 +6,7 @@ import {
 } from 'lucide-react';
 import api from '../services/api';
 import { TRIMESTRES, normalizarPeriodos, mediaTrimestre, mediaAnual } from '../utils/notasPeriodos';
+import { turnoLabel } from '../utils/turnos';
 import { LoadingState, EmptyState, ErrorState } from '../components/ui';
 import './Portal.css';
 
@@ -123,7 +124,7 @@ export default function Portal() {
             {[
               { label: 'Turma', value: matricula.turma_nome },
               { label: 'Classe', value: matricula.serie_classe + 'ª classe' },
-              { label: 'Turno', value: matricula.turno ? matricula.turno.charAt(0).toUpperCase() + matricula.turno.slice(1) : '' },
+              { label: 'Turno', value: turnoLabel(matricula.turno) },
               matricula.curso_nome ? { label: 'Curso', value: matricula.curso_nome } : null,
               { label: 'Ano Letivo', value: matricula.ano_letivo },
             ].filter(Boolean).map((item, i) => (

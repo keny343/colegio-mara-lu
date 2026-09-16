@@ -3,6 +3,7 @@ import { useSearchParams } from 'react-router-dom';
 import { Eye, CheckCircle } from 'lucide-react';
 import api from '../services/api';
 import { normalizeSeriesName } from '../utils/serieName';
+import { turnoLabel } from '../utils/turnos';
 import { fileUrl } from '../services/fileUrl';
 import Toast, { useToast } from '../components/Toast';
 import {
@@ -373,7 +374,7 @@ export default function AdminInscricoes() {
                   <option value="">Aprovar sem turma (matricular depois)</option>
                   {turmas.map(t => (
                     <option key={t.id} value={t.id}>
-                      {t.nome} — {t.serie_classe}ª{t.curso_nome ? ` · ${t.curso_nome}` : ''} ({t.turno})
+                      {t.nome} — {t.serie_classe}ª{t.curso_nome ? ` · ${t.curso_nome}` : ''} ({turnoLabel(t.turno)})
                     </option>
                   ))}
                 </Select>

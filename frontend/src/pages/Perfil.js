@@ -6,6 +6,7 @@ import api from '../services/api';
 import { normalizeSeriesName } from '../utils/serieName';
 import { temEscopoCoordenacao } from '../utils/roles';
 import { urlFoto } from '../utils/userPhoto';
+import { turnoLabel } from '../utils/turnos';
 import { Button, FormField, Input, Select, LoadingState } from '../components/ui';
 import './Perfil.css';
 
@@ -257,7 +258,7 @@ export default function Perfil() {
                 <div className="perfil-situacao-linha"><span>Turma: </span><strong>{matricula.turma_nome}</strong></div>
               )}
               {matricula && (
-                <div className="perfil-situacao-linha"><span>Turno: </span><strong>{matricula.turno}</strong></div>
+                <div className="perfil-situacao-linha"><span>Turno: </span><strong>{turnoLabel(matricula.turno)}</strong></div>
               )}
               {inscricao && (
                 <div className="perfil-situacao-linha"><span>Ano Letivo: </span><strong>{inscricao.inscricao_ano || matricula?.ano_letivo}</strong></div>
