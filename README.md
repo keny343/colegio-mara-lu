@@ -57,20 +57,29 @@ pending; it never touches other data.
 
 ## Screenshots
 
-### Landing
+The same demo data, seen from three roles.
+
+**Direcção** — enrolment KPIs, status split, and vacancies per class and course.
+
+![Admin dashboard: KPIs, the pending/approved split, and the vacancy table](./screenshots/03-dashboard.png)
+
+An application waiting for review, with the guardian's contact beside the applicant.
+
+![Enrolment management filtered to pending applications](./screenshots/06-inscricoes.png)
+
+**Professor** — their classes with, per subject, who has grades, who does not, and how many absences.
+
+![Professor panel: four subjects, grade coverage and absences per subject](./screenshots/07-professor.png)
+
+**Aluno** — the class, the timetable, and a grade sheet with trimester and annual averages.
+
+![Student portal: enrolment details, subjects, and the grade sheet](./screenshots/05-portal.png)
+
+And the public side: the landing page and the enrolment form that starts the whole cycle.
+
 ![Landing page — Colégio Mara & Lu](./screenshots/01-landing.png)
 
-### Login
-![Institutional login](./screenshots/02-login.png)
-
-### Admin dashboard
-![Admin dashboard with KPIs and charts](./screenshots/03-dashboard.png)
-
-### Public enrollment
 ![Public enrollment form](./screenshots/04-inscricao.png)
-
-### Student portal
-![Student academic portal](./screenshots/05-portal.png)
 
 More capture notes: [`screenshots/README.md`](./screenshots/README.md)
 
