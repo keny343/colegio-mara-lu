@@ -33,6 +33,28 @@ Built as a real product architecture (SPA + secured API + MySQL), not a classroo
 
 > Render free tiers may cold-start; wait a few seconds on first request.
 
+### Sign in and look around
+
+The whole point of the system is that four people see four different things, so
+there is an account for each. Password for all of them: **`demo1234`**.
+
+| Role | Email | What it shows |
+|------|-------|---------------|
+| Direcção (admin) | `admin.demo@colegio.ao` | KPIs, one pending application to approve or reject, every class and user |
+| Coordenação | `coordenador.demo@colegio.ao` | The same screens narrowed to the course and level in their scope |
+| Professor | `professor.demo@colegio.ao` | Their four subjects, the class roster, grade entry and absences |
+| Aluno | `aluno.demo@colegio.ao` | Joana's timetable, grade sheet with trimester averages, and her absences |
+
+The demo carries a class with a full curriculum, a grade sheet with two of three
+trimesters filled in, three absences (one justified) and an application waiting
+for review — so no screen is empty, and the coordinator's narrower view is
+visibly narrower than the admin's.
+
+It is public, so treat it as a sandbox: anything can be edited or deleted by
+anyone. `npm run seed:demo` in `backend/` puts it back. That script only writes
+its own records, resets the four passwords, and returns the application to
+pending; it never touches other data.
+
 ## Screenshots
 
 ### Landing
@@ -139,6 +161,12 @@ cp .env.example .env   # optional when using proxy
 npm install
 npm start              # http://localhost:3000
 ```
+
+A fresh database has no users, and staff accounts are created by staff — there is
+no open signup. `cd backend && npm run seed:demo` creates one account per role
+(password `demo1234`) plus a class, a curriculum, a grade sheet and a pending
+application, which is enough to click through every screen. Re-running it is
+safe: each record is matched on its natural key.
 
 Full checklist: [`INSTALACAO.md`](./INSTALACAO.md)
 
