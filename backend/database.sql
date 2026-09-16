@@ -175,19 +175,10 @@ CREATE TABLE faltas (
   FOREIGN KEY (professor_id) REFERENCES usuarios(id) ON DELETE SET NULL
 );
 
-CREATE TABLE materiais (
-  id INT AUTO_INCREMENT PRIMARY KEY,
-  turma_id INT NOT NULL,
-  disciplina_id INT NOT NULL,
-  professor_id INT NULL,
-  titulo VARCHAR(200) NOT NULL,
-  descricao TEXT,
-  arquivo_url VARCHAR(500),
-  criado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  FOREIGN KEY (turma_id) REFERENCES turmas(id) ON DELETE CASCADE,
-  FOREIGN KEY (disciplina_id) REFERENCES disciplinas(id) ON DELETE CASCADE,
-  FOREIGN KEY (professor_id) REFERENCES usuarios(id) ON DELETE SET NULL
-);
+-- Teaching material lives in `materiais_didaticos`, created at boot by
+-- materiaisController.ensureTables() because it arrived after this file. The
+-- `materiais` table once declared here was never read by any query and is gone,
+-- so nobody seeds the wrong one again.
 
 CREATE TABLE horarios (
   id INT AUTO_INCREMENT PRIMARY KEY,

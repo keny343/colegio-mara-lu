@@ -826,8 +826,8 @@ function logStart(port) {
   );
 
   console.log(
-    `☁️ CLOUDINARY: ${
-      process.env.CLOUDINARY_CLOUD_NAME ||
+    `☁️ SUPABASE: ${
+      process.env.SUPABASE_URL ||
       'não configurado'
     }`
   );

@@ -1,1 +1,0 @@
-const db = require('./src/config/database'); db.query('SELECT id,nome,email,role,ativo FROM usuarios LIMIT 20').then(([rows]) = console.log(JSON.stringify(rows, null, 2)); process.exit(0); }).catch(err = console.error(err.message); process.exit(1); });  
