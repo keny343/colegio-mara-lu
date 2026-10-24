@@ -424,7 +424,7 @@ export function AdminSeries() {
   const abrirNovo = () => { setEditando(null); setForm(formSerieVazio); setErro(''); setModal(true); };
   const nivelCorrigidoSerie = (s) => {
     const ordemInformada = s?.ordem !== undefined && s?.ordem !== null && s?.ordem !== '' ? Number(s.ordem) : NaN;
-    const nomeClasse = String(s?.nome || '').match(/(?:^|\\D)(\\d{1,2})\\s*[ªº]/);
+    const nomeClasse = String(s?.nome || '').match(/(?:^|\D)(\d{1,2})\s*[ªº]/);
     const classe = Number.isFinite(ordemInformada) && ordemInformada >= 0 && ordemInformada <= 13
       ? ordemInformada
       : nomeClasse ? Number(nomeClasse[1]) : NaN;
