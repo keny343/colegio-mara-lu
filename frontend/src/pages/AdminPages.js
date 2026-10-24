@@ -422,7 +422,19 @@ export function AdminSeries() {
   useEffect(() => { carregar(); }, []);
 
   const abrirNovo = () => { setEditando(null); setForm(formSerieVazio); setErro(''); setModal(true); };
-  const abrirEditar = (s) => { setEditando(s.id); setForm({ nome: s.nome, nivel: s.nivel, vagas_total: s.vagas_total, ano_letivo: s.ano_letivo, updated_at: s.updated_at }); setErro(''); setModal(true); };
+  const nivelCorrigidoSerie = (s) => {
+    const ordemInformada = s?.ordem !== undefined && s?.ordem !== null && s?.ordem !== '' ? Number(s.ordem) : NaN;
+    const nomeClasse = String(s?.nome || '').match(/(?:^|\\D)(\\d{1,2})\\s*[ªº]/);
+    const classe = Number.isFinite(ordemInformada) && ordemInformada >= 0 && ordemInformada <= 13
+      ? ordemInformada
+      : nomeClasse ? Number(nomeClasse[1]) : NaN;
+    if (classe >= 10 && classe <= 13) return 'II Ciclo (Ensino Secundário 10ª–13ª)';
+    if (classe >= 7 && classe <= 9) return 'I Ciclo (Ensino Secundário 7ª–9ª)';
+    if (classe >= 0 && classe <= 6) return 'Ensino Primário (pré até 6ª)';
+    return s?.nivel || '';
+  };
+
+  const abrirEditar = (s) => { setEditando(s.id); setForm({ nome: s.nome, nivel: nivelCorrigidoSerie(s), vagas_total: s.vagas_total, ano_letivo: s.ano_letivo, updated_at: s.updated_at }); setErro(''); setModal(true); };
 
   const salvar = async e => {
     e.preventDefault();
@@ -465,8 +477,8 @@ export function AdminSeries() {
     'II Ciclo (Ensino Secundário 10ª–13ª)',
   ];
   const niveis = [
-    ...NIVEL_ORDEM.filter(n => series.some(s => s.nivel === n)),
-    ...[...new Set(series.map(s => s.nivel))].filter(n => !NIVEL_ORDEM.includes(n)),
+    ...NIVEL_ORDEM.filter(n => series.some(s => nivelCorrigidoSerie(s) === n)),
+    ...[...new Set(series.map(s => nivelCorrigidoSerie(s)))].filter(n => n && !NIVEL_ORDEM.includes(n)),
   ];
 
   const ocupacaoPct = (s) => {
@@ -505,7 +517,7 @@ export function AdminSeries() {
       ) : (
         niveis.map(nivel => {
           const lista = series
-            .filter(s => s.nivel === nivel)
+            .filter(s => nivelCorrigidoSerie(s) === nivel)
             .slice()
             .sort((a, b) => String(a.nome).localeCompare(String(b.nome), 'pt'));
           return (
