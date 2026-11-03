@@ -46,6 +46,7 @@ export default function CoordenadorNotas({ modoProfessor = false }) {
   const [atribuicoes, setAtribuicoes] = useState([]);
   const [turmaId, setTurmaId] = useState('');
   const [disciplinaId, setDisciplinaId] = useState('');
+  const [trimestreSelecionado, setTrimestreSelecionado] = useState('1');
   const [alunos, setAlunos] = useState([]);
   const [limites, setLimites] = useState({ min: 0, max: 20 });
   const [serieClasse, setSerieClasse] = useState(null);
@@ -352,6 +353,13 @@ export default function CoordenadorNotas({ modoProfessor = false }) {
               ))}
             </Select>
           </FormField>
+          <FormField label="Trimestre" htmlFor="cn-trimestre">
+            <Select id="cn-trimestre" value={trimestreSelecionado} onChange={e => setTrimestreSelecionado(e.target.value)}>
+              {TRIMESTRES.map(trim => (
+                <option key={trim.id} value={String(trim.id)}>{trim.titulo}</option>
+              ))}
+            </Select>
+          </FormField>
           <div className="filtro-acoes">
             <Button variant="outline" icon={<RefreshCw size={16} />} onClick={carregarNotas} disabled={!turmaId || !disciplinaId || loadingNotas}>
               Actualizar
@@ -480,7 +488,7 @@ export default function CoordenadorNotas({ modoProfessor = false }) {
         </div>
       ) : (
         <>
-          {TRIMESTRES.map((trim) => (
+          {TRIMESTRES.filter((trim) => String(trim.id) === trimestreSelecionado).map((trim) => (
             <div key={trim.id} className="card trim-card">
               <h3 className="nota-section-title">{trim.titulo}</h3>
               <table className="table">
