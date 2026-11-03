@@ -295,6 +295,13 @@ const situacaoComConfig = (periodos, serieClasse, config, notaFinal, notaChamada
   const tipo = usaExame ? 'exame_nacional' : 'defesa_final';
   const s = Number(serieClasse);
   const minimo = (s >= 1 && s <= 6) ? 5 : 10;
+  // A média da escola só é considerada completa quando os seis períodos
+  // (1PP, 1PT, 2PP, 2PT, 3PP e 3PT) estiverem lançados.
+  // Não permitir que mediaPeriodos() calcule uma média parcial nesta fase.
+  if (!periodosCompletos(periodos)) {
+    return { status: 'incompleto', tipo, media_escola: null, media_final: null };
+  }
+
   const mediaEscola = mediaPeriodos(periodos);
   if (mediaEscola == null) {
     return { status: 'incompleto', tipo, media_escola: null, media_final: null };
