@@ -915,6 +915,9 @@ const pautaFinalTurma = async (req, res) => {
           situacao = situacaoAprovacao(periodos, turma.serie_classe);
         }
         const recursoNota = recursoPorAlunoDisc.get(k) ?? null;
+        const periodosEmFalta = PERIODOS_VALIDOS.filter((periodo) =>
+          periodos[periodo] === undefined || periodos[periodo] === null || periodos[periodo] === ''
+        );
         return {
           disciplina_id: d.id,
           nome: d.nome,
@@ -922,6 +925,7 @@ const pautaFinalTurma = async (req, res) => {
           situacao,
           avaliacao_status: avaliacaoStatus,
           recurso_nota: recursoNota,
+          periodos_em_falta: periodosEmFalta,
         };
       });
 
@@ -946,6 +950,14 @@ const pautaFinalTurma = async (req, res) => {
         disciplinas: disciplinasAluno,
         resultado: resultadoFinal,
         negativas: final.negativas.map((n) => ({ disciplina_id: n.disciplina_id, nome: n.nome })),
+        disciplinas_incompletas: disciplinasAluno
+          .filter((d) => d.situacao == null)
+          .map((d) => ({
+            disciplina_id: d.disciplina_id,
+            nome: d.nome,
+            periodos_em_falta: d.periodos_em_falta,
+            avaliacao_status: d.avaliacao_status,
+          })),
         motivo: final.motivo,
       };
     });
