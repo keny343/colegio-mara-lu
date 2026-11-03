@@ -405,6 +405,13 @@ export default function CoordenadorNotas({ modoProfessor = false }) {
                       <td data-label="Aluno"><strong>{a.aluno_nome}</strong></td>
                       <td data-label="Resultado">
                         <StatusPill status={a.resultado} fallback={badges[a.resultado] || 'Notas incompletas'} />
+                        {(a.disciplinas_incompletas || [])
+                          .filter(d => (d.periodos_em_falta || []).length > 0)
+                          .map(d => (
+                            <div className="pauta-aviso" key={d.disciplina_id}>
+                              {d.nome}: faltam {(d.periodos_em_falta || []).join(', ')}
+                            </div>
+                          ))}
                         {aguardaExameDefesa.length > 0 && (
                           <div className="pauta-aviso">Aguarda {pauta.config_avaliacao?.exame_nacional ? 'Exame Nacional' : 'Defesa Final'}</div>
                         )}
