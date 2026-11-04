@@ -2,7 +2,15 @@ const db = require('../config/database');
 
 let ensured = false;
 
-/** Garante coluna periodo VARCHAR e migra valores antigos (1º/2º → 1PP/1PT). */
+/**
+ * Garante espaço para os códigos canónicos (1PP..3PT), complementares
+ * (EXN, DEF, CH2, REC) e eventuais rótulos legados que precisam de auditoria.
+ *
+ * IMPORTANTE: não converter automaticamente '1º', '2º', '3º' ou 'final'.
+ * Esses valores antigos não identificam de forma inequívoca a avaliação
+ * parcial/trimestral. A conversão automática anterior deslocava '2º', '3º'
+ * e 'final' para '1PT', contaminando as médias e ocultando dados inválidos.
+ */
 async function ensureNotasPeriodosSchema() {
   if (ensured) return;
   try {
@@ -10,19 +18,10 @@ async function ensureNotasPeriodosSchema() {
       ALTER TABLE notas
       MODIFY COLUMN periodo VARCHAR(10) NOT NULL
     `);
-    await db.query(`
-      UPDATE notas SET periodo = '1PP' WHERE periodo IN ('1º', '1o', '1')
-    `);
-    await db.query(`
-      UPDATE notas SET periodo = '1PT' WHERE periodo IN ('2º', '2o', '2', '3º', '3o', 'final')
-    `);
-    await db.query(`
-      ALTER TABLE notas
-      MODIFY COLUMN periodo VARCHAR(3) NOT NULL
-    `);
   } catch (err) {
     if (err.code !== 'ER_BAD_FIELD_ERROR') {
       console.warn('[ensureNotasPeriodosSchema]', err.message);
+      throw err;
     }
   }
   ensured = true;
