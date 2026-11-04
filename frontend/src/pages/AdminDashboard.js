@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
-import { Users, FileText, CheckCircle, Clock, XCircle, AlertCircle, BookOpen, TrendingUp } from 'lucide-react';
+import { Users, FileText, CheckCircle, Clock, XCircle, AlertCircle, BookOpen, TrendingUp, BarChart3 } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend } from 'recharts';
 import api from '../services/api';
 import { useNotification } from '../contexts/NotificationContext';
@@ -194,6 +194,9 @@ export default function AdminDashboard() {
         </Link>
         <Link to="/admin/inscricoes" className="btn btn-outline">
           <FileText size={16} aria-hidden="true" /> Todas as inscrições
+        </Link>
+        <Link to="/admin/relatorios" className="btn btn-outline">
+          <BarChart3 size={16} aria-hidden="true" /> Relatórios de alunos e notas
         </Link>
       </div>
 
