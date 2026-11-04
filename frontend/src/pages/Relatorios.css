@@ -1,0 +1,455 @@
+.relatorios-page {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+}
+
+.relatorios-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-4);
+  margin-bottom: 0;
+}
+
+.relatorios-header-copy {
+  min-width: 0;
+}
+
+.relatorios-header .page-header-title {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 0;
+  color: var(--castanho);
+  font-family: var(--font-ui);
+  font-size: var(--text-xl);
+  letter-spacing: -0.015em;
+}
+
+.relatorios-header .page-header-icon {
+  flex: 0 0 auto;
+  color: var(--laranja);
+}
+
+.relatorios-header .page-header-sub {
+  max-width: 680px;
+  margin: 6px 0 0;
+  color: var(--cinza);
+  font-size: var(--text-sm);
+}
+
+.relatorios-export {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 6px;
+  flex: 0 0 auto;
+}
+
+.relatorios-export-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.relatorios-export-note {
+  margin: 0;
+  color: var(--cinza);
+  font-size: var(--text-xs);
+  text-align: right;
+}
+
+.relatorios-summary {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: var(--space-3);
+}
+
+.relatorios-stat {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+  padding: var(--space-4);
+  background: var(--branco);
+  border: 1px solid var(--borda);
+  border-radius: var(--radius-card);
+}
+
+.relatorios-stat-icon {
+  display: grid;
+  place-items: center;
+  flex: 0 0 auto;
+  width: 38px;
+  height: 38px;
+  color: var(--laranja);
+  background: var(--bege);
+  border: 1px solid var(--borda);
+  border-radius: var(--radius-card);
+}
+
+.relatorios-stat-label {
+  margin: 0 0 4px;
+  color: var(--cinza);
+  font-size: var(--text-xs);
+}
+
+.relatorios-stat-value {
+  margin: 0;
+  color: var(--castanho);
+  font-family: var(--font-ui);
+  font-size: var(--text-lg);
+  font-weight: 750;
+  line-height: 1.2;
+  font-variant-numeric: tabular-nums;
+}
+
+.relatorios-filters {
+  padding: var(--space-4);
+  background: var(--branco);
+  border: 1px solid var(--borda);
+  border-radius: var(--radius-card);
+}
+
+.relatorios-filter-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: var(--space-3);
+  align-items: end;
+}
+
+.relatorios-filter-grid .form-group {
+  margin: 0;
+  min-width: 0;
+}
+
+.relatorios-filter-grid .form-label {
+  margin-bottom: 6px;
+}
+
+.relatorios-search {
+  position: relative;
+}
+
+.relatorios-search .form-control {
+  width: 100%;
+}
+
+.relatorios-results {
+  min-width: 0;
+}
+
+.relatorios-tabs {
+  display: flex;
+  gap: 6px;
+  margin-bottom: var(--space-4);
+  border-bottom: 1px solid var(--borda);
+}
+
+.relatorios-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 42px;
+  padding: 0 12px;
+  color: var(--cinza);
+  background: transparent;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  font: inherit;
+  font-size: var(--text-sm);
+  font-weight: 650;
+  cursor: pointer;
+}
+
+.relatorios-tab span {
+  min-width: 22px;
+  padding: 2px 6px;
+  color: var(--castanho);
+  background: var(--bege);
+  border-radius: 999px;
+  font-size: var(--text-xs);
+  font-variant-numeric: tabular-nums;
+  text-align: center;
+}
+
+.relatorios-tab:hover,
+.relatorios-tab.is-active {
+  color: var(--castanho);
+}
+
+.relatorios-tab.is-active {
+  border-bottom-color: var(--laranja);
+}
+
+.relatorios-tab:focus-visible {
+  outline: 2px solid var(--laranja);
+  outline-offset: 2px;
+}
+
+.relatorios-results-heading {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: var(--space-3);
+  margin-bottom: var(--space-3);
+}
+
+.relatorios-results-heading h3 {
+  margin: 0;
+  color: var(--castanho);
+  font-family: var(--font-ui);
+  font-size: var(--text-md);
+  font-weight: 700;
+}
+
+.relatorios-results-heading p {
+  margin: 4px 0 0;
+  color: var(--cinza);
+  font-size: var(--text-xs);
+}
+
+.relatorios-table {
+  overflow-x: auto;
+  background: var(--branco);
+  border: 1px solid var(--borda);
+  border-radius: var(--radius-card);
+}
+
+.relatorios-table .table {
+  min-width: 780px;
+}
+
+.relatorios-table .table th,
+.relatorios-table .table td {
+  vertical-align: middle;
+}
+
+.relatorios-cell-primary {
+  color: var(--castanho);
+  font-weight: 700;
+}
+
+.relatorios-cell-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 120px;
+}
+
+.relatorios-cell-stack strong {
+  color: var(--castanho);
+  font-weight: 650;
+}
+
+.relatorios-cell-stack span {
+  color: var(--cinza);
+  font-size: var(--text-xs);
+}
+
+.relatorios-status {
+  display: inline-flex;
+  align-items: center;
+  padding: 3px 8px;
+  color: var(--castanho);
+  background: var(--bege);
+  border: 1px solid var(--borda);
+  border-radius: 999px;
+  font-size: var(--text-xs);
+  font-weight: 650;
+  white-space: nowrap;
+}
+
+.relatorios-print-meta {
+  display: none;
+}
+
+@media (max-width: 1050px) {
+  .relatorios-filter-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 760px) {
+  .relatorios-page {
+    gap: var(--space-4);
+  }
+
+  .relatorios-header {
+    flex-direction: column;
+  }
+
+  .relatorios-export {
+    align-items: flex-start;
+  }
+
+  .relatorios-export-actions {
+    justify-content: flex-start;
+  }
+
+  .relatorios-export-note {
+    text-align: left;
+  }
+
+  .relatorios-summary {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 520px) {
+  .relatorios-filter-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .relatorios-export-actions {
+    width: 100%;
+  }
+
+  .relatorios-export-actions .btn {
+    flex: 1 1 auto;
+  }
+
+  .relatorios-stat {
+    gap: 9px;
+    padding: 12px;
+  }
+
+  .relatorios-stat-icon {
+    width: 32px;
+    height: 32px;
+  }
+
+  .relatorios-stat-value {
+    font-size: var(--text-md);
+  }
+
+  .relatorios-tab {
+    flex: 1 1 50%;
+    justify-content: center;
+    padding: 0 6px;
+    font-size: var(--text-xs);
+  }
+}
+
+@media print {
+  @page {
+    size: landscape;
+    margin: 12mm;
+  }
+
+  html,
+  body {
+    min-height: 0 !important;
+    background: #fff !important;
+  }
+
+  .admin-sidebar,
+  .mobile-drawer,
+  .mobile-drawer-backdrop,
+  .mobile-drawer-trigger,
+  .no-print {
+    display: none !important;
+  }
+
+  .admin-shell,
+  .admin-main,
+  .admin-content {
+    width: 100% !important;
+    max-width: none !important;
+    min-height: 0 !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    overflow: visible !important;
+    background: #fff !important;
+    box-shadow: none !important;
+  }
+
+  .relatorios-page {
+    display: block;
+    max-width: none !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    color: #111;
+  }
+
+  .relatorios-page > * {
+    margin-bottom: 10px;
+  }
+
+  .relatorios-print-meta {
+    display: block;
+    margin-bottom: 12px;
+  }
+
+  .relatorios-print-meta h1 {
+    margin: 0 0 4px;
+    color: #111;
+    font-size: 16pt;
+  }
+
+  .relatorios-print-meta p {
+    margin: 0;
+    color: #333;
+    font-size: 9pt;
+  }
+
+  .relatorios-summary {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 6px;
+  }
+
+  .relatorios-stat {
+    padding: 8px;
+    border-color: #bbb;
+    break-inside: avoid;
+  }
+
+  .relatorios-stat-icon {
+    display: none;
+  }
+
+  .relatorios-stat-label,
+  .relatorios-stat-value,
+  .relatorios-results-heading h3,
+  .relatorios-results-heading p,
+  .relatorios-cell-stack strong,
+  .relatorios-cell-primary,
+  .relatorios-cell-stack span,
+  .relatorios-status {
+    color: #111 !important;
+  }
+
+  .relatorios-table {
+    overflow: visible !important;
+    border: 0;
+    border-radius: 0;
+  }
+
+  .relatorios-table .table {
+    width: 100%;
+    min-width: 0 !important;
+    border-collapse: collapse;
+  }
+
+  .relatorios-table .table thead {
+    display: table-header-group;
+  }
+
+  .relatorios-table .table tr {
+    break-inside: avoid;
+  }
+
+  .relatorios-table .table th,
+  .relatorios-table .table td {
+    padding: 4px 5px;
+    color: #111 !important;
+    border-color: #bbb !important;
+    font-size: 8pt;
+  }
+
+  .relatorios-table .table th {
+    background: #f0f0f0 !important;
+  }
+}

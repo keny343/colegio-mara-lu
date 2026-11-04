@@ -33,6 +33,7 @@ const ProfessorFaltas = lazy(() => import('./pages/ProfessorFaltas'));
 const ProfessorJustificacoes = lazy(() => import('./pages/ProfessorJustificacoes'));
 const AdminDashboard = lazy(() => import('./pages/AdminDashboard'));
 const AdminInscricoes = lazy(() => import('./pages/AdminInscricoes'));
+const Relatorios = lazy(() => import('./pages/Relatorios'));
 const AdminUsuarios = lazy(() => import('./pages/AdminPages').then((m) => ({ default: m.AdminUsuarios })));
 const AdminSeries = lazy(() => import('./pages/AdminPages').then((m) => ({ default: m.AdminSeries })));
 const AdminAcademico = lazy(() => import('./pages/AdminAcademico'));
@@ -120,6 +121,7 @@ function AppRoutes() {
 
         <Route path="/admin"            element={<PrivateRoute staffOnly><AdminLayout><AdminDashboard /></AdminLayout></PrivateRoute>} />
         <Route path="/admin/inscricoes" element={<PrivateRoute staffOnly><AdminLayout><AdminInscricoes /></AdminLayout></PrivateRoute>} />
+        <Route path="/admin/relatorios" element={<PrivateRoute staffOnly><AdminLayout><Relatorios /></AdminLayout></PrivateRoute>} />
         <Route path="/admin/usuarios"   element={<PrivateRoute staffOnly><AdminLayout><AdminUsuarios /></AdminLayout></PrivateRoute>} />
         <Route path="/admin/series"     element={<PrivateRoute adminOnly><AdminLayout><AdminSeries /></AdminLayout></PrivateRoute>} />
         <Route path="/admin/academico"  element={<PrivateRoute staffOnly><AdminLayout><AdminAcademico /></AdminLayout></PrivateRoute>} />

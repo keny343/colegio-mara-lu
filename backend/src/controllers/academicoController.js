@@ -18,6 +18,7 @@ const {
 } = require('../utils/academicoRules');
 const { normalizarTurno } = require('../utils/turnos');
 const { ensureNotasPeriodosSchema } = require('../utils/ensureNotasSchema');
+const { agruparRelatorioAlunos } = require('../domain/RelatorioAlunosService');
 const { ensureDisciplinaChaveSchema } = require('../utils/ensureDisciplinaSchema');
 const { ensureConfigAvaliacaoSchema } = require('../utils/ensureConfigAvaliacaoSchema');
 
@@ -1201,6 +1202,90 @@ const lancarNotaChamada2 = async (req, res) => {
   }
 };
 
+const STATUS_MATRICULA_RELATORIO = new Set(['ativa', 'transferida', 'concluida', 'cancelada']);
+
+const listarRelatorioAlunos = async (req, res) => {
+  const status = String(req.query.status || 'ativa');
+  const anoParam = req.query.ano_letivo == null ? '' : String(req.query.ano_letivo).trim();
+
+  if (status !== 'todas' && !STATUS_MATRICULA_RELATORIO.has(status)) {
+    return res.status(400).json({ message: 'Situação de matrícula inválida.' });
+  }
+  if (anoParam && !/^\d{4}$/.test(anoParam)) {
+    return res.status(400).json({ message: 'Ano letivo inválido.' });
+  }
+
+  try {
+    await ensureNotasPeriodosSchema();
+
+    const [anosRows] = await db.query(`
+      SELECT DISTINCT m.ano_letivo, t.serie_classe, c.nome AS curso_nome
+      FROM matriculas m
+      INNER JOIN turmas t ON t.id = m.turma_id
+      LEFT JOIN cursos c ON c.id = t.curso_id
+      WHERE m.ano_letivo IS NOT NULL
+      ORDER BY m.ano_letivo DESC
+    `);
+    const anosLetivos = Array.from(new Set(
+      anosRows
+        .filter((row) => req.user.role === 'admin' || coordenadorPodeGerirTurma(req.user, row))
+        .map((row) => String(row.ano_letivo))
+        .filter(Boolean)
+    )).sort((a, b) => Number(b) - Number(a));
+    const anoLetivo = anoParam || anosLetivos[0] || String(new Date().getFullYear());
+    const statusClause = status === 'todas' ? '' : ' AND m.status = ?';
+    const parametros = [anoLetivo];
+    if (status !== 'todas') parametros.push(status);
+
+    const [rows] = await db.query(`
+      SELECT
+        m.id AS matricula_id,
+        m.aluno_id,
+        m.ano_letivo,
+        m.status AS matricula_status,
+        m.data_matricula,
+        a.nome AS aluno_nome,
+        t.id AS turma_id,
+        t.nome AS turma_nome,
+        t.serie_classe,
+        c.nome AS curso_nome,
+        d.id AS disciplina_id,
+        d.nome AS disciplina_nome,
+        n.periodo,
+        n.nota
+      FROM matriculas m
+      INNER JOIN alunos a ON a.id = m.aluno_id
+      INNER JOIN turmas t ON t.id = m.turma_id
+      LEFT JOIN cursos c ON c.id = t.curso_id
+      LEFT JOIN (
+        SELECT DISTINCT turma_id, disciplina_id
+        FROM turma_professores
+      ) tp ON tp.turma_id = t.id
+      LEFT JOIN disciplinas d ON d.id = tp.disciplina_id
+      LEFT JOIN notas n ON n.matricula_id = m.id AND n.disciplina_id = d.id
+      WHERE m.ano_letivo = ?${statusClause}
+      ORDER BY t.nome, a.nome, d.nome,
+        FIELD(n.periodo, '1PP', '1PT', '2PP', '2PT', '3PP', '3PT')
+    `, parametros);
+
+    const linhasAcessiveis = req.user.role === 'admin'
+      ? rows
+      : rows.filter((row) => coordenadorPodeGerirTurma(req.user, row));
+    const alunos = agruparRelatorioAlunos(linhasAcessiveis);
+
+    return res.json({
+      ano_letivo: Number(anoLetivo),
+      anos_letivos: anosLetivos,
+      status,
+      total_alunos: alunos.length,
+      total_notas_lancadas: alunos.reduce((total, aluno) => total + aluno.total_notas_lancadas, 0),
+      alunos,
+    });
+  } catch (err) {
+    return handleDb(res, err);
+  }
+};
+
 module.exports = {
   listarCursos, criarCurso, atualizarCurso, removerCurso,
   listarDisciplinas, criarDisciplina, atualizarDisciplina,
@@ -1212,6 +1297,7 @@ module.exports = {
   alunosDaTurmaStaff, notasDaTurma,
   criarMatricula, listarAlunosParaMatricula,
   pautaFinalTurma, lancarNotaRecurso,
+  listarRelatorioAlunos,
   listarConfigAvaliacao, salvarConfigAvaliacao,
   lancarNotaExameDefesa, lancarNotaChamada2,
 };
