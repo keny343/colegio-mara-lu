@@ -376,6 +376,15 @@ const lancarNota = async (req, res) => {
     );
     if (!ctx) return res.status(404).json({ message: 'Matrícula não encontrada.' });
 
+    // Impede registar notas numa disciplina que não faz parte da turma.
+    const [disciplinaAtribuida] = await db.query(
+      'SELECT id FROM turma_professores WHERE turma_id = ? AND disciplina_id = ? LIMIT 1',
+      [ctx.turma_id, disciplina_id]
+    );
+    if (disciplinaAtribuida.length === 0) {
+      return res.status(400).json({ message: 'Esta disciplina não está atribuída à turma da matrícula.' });
+    }
+
     const comoCoord = podeAlterarNotasComoCoordenador(req.user) && coordenadorPodeGerirTurma(req.user, ctx);
     const comoProfessor = await professorLecionaDisciplina(req.user.id, ctx.turma_id, disciplina_id);
     const isAdmin = req.user.role === 'admin';
@@ -746,6 +755,14 @@ const notasDaTurma = async (req, res) => {
       [turma_id]
     );
     if (!turma) return res.status(404).json({ message: 'Turma não encontrada.' });
+
+    const [disciplinaAtribuida] = await db.query(
+      'SELECT id FROM turma_professores WHERE turma_id = ? AND disciplina_id = ? LIMIT 1',
+      [turma_id, disciplina_id]
+    );
+    if (disciplinaAtribuida.length === 0) {
+      return res.status(404).json({ message: 'Esta disciplina não está atribuída à turma.' });
+    }
 
     const lecionadas = await idsTurmasLecionadas(req.user.id);
     if (!turmaVisivelParaNotas(req.user, turma, lecionadas)) {

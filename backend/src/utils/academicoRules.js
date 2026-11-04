@@ -18,12 +18,13 @@ const TRIMESTRES = [
   { id: 3, titulo: '3º Trimestre', parcial: '3PP', trimestral: '3PT' },
 ];
 
-const normalizarPeriodoKey = (periodo) => {
-  const p = String(periodo || '').trim();
-  if (p === '1º' || p === '1o') return '1PP';
-  if (p === '2º' || p === '2o' || p === '3º' || p === '3o' || p === 'final') return '1PT';
-  return p;
-};
+/**
+ * Os códigos antigos ('1º', '2º', '3º', 'final') são ambíguos:
+ * não permitem inferir se representam parcial, trimestral ou média final.
+ * Mantemos o valor original para que seja identificado no relatório de auditoria,
+ * em vez de o converter silenciosamente para um período incorrecto.
+ */
+const normalizarPeriodoKey = (periodo) => String(periodo || '').trim();
 
 const normalizarTexto = (s) =>
   String(s || '')
