@@ -40,12 +40,12 @@ ORDER BY m.turma_id, n.matricula_id, n.disciplina_id, n.periodo;
 -- 5) Resumo das notas em falta por matrícula/disciplina atribuída.
 SELECT m.id AS matricula_id, m.aluno_id, m.turma_id, tp.disciplina_id,
        d.nome AS disciplina,
-       SUM(CASE WHEN n.periodo = '1PP' THEN 1 ELSE 0 END) AS tem_1PP,
-       SUM(CASE WHEN n.periodo = '1PT' THEN 1 ELSE 0 END) AS tem_1PT,
-       SUM(CASE WHEN n.periodo = '2PP' THEN 1 ELSE 0 END) AS tem_2PP,
-       SUM(CASE WHEN n.periodo = '2PT' THEN 1 ELSE 0 END) AS tem_2PT,
-       SUM(CASE WHEN n.periodo = '3PP' THEN 1 ELSE 0 END) AS tem_3PP,
-       SUM(CASE WHEN n.periodo = '3PT' THEN 1 ELSE 0 END) AS tem_3PT,
+       MAX(CASE WHEN n.periodo = '1PP' THEN 1 ELSE 0 END) AS tem_1PP,
+       MAX(CASE WHEN n.periodo = '1PT' THEN 1 ELSE 0 END) AS tem_1PT,
+       MAX(CASE WHEN n.periodo = '2PP' THEN 1 ELSE 0 END) AS tem_2PP,
+       MAX(CASE WHEN n.periodo = '2PT' THEN 1 ELSE 0 END) AS tem_2PT,
+       MAX(CASE WHEN n.periodo = '3PP' THEN 1 ELSE 0 END) AS tem_3PP,
+       MAX(CASE WHEN n.periodo = '3PT' THEN 1 ELSE 0 END) AS tem_3PT,
        COUNT(n.id) AS total_registos
 FROM matriculas m
 JOIN turma_professores tp ON tp.turma_id = m.turma_id
@@ -56,7 +56,7 @@ LEFT JOIN notas n
  AND n.periodo IN ('1PP','1PT','2PP','2PT','3PP','3PT')
 WHERE m.status = 'ativa'
 GROUP BY m.id, m.aluno_id, m.turma_id, tp.disciplina_id, d.nome
-HAVING total_registos < 6
+HAVING tem_1PP = 0 OR tem_1PT = 0 OR tem_2PP = 0\n    OR tem_2PT = 0 OR tem_3PP = 0 OR tem_3PT = 0
 ORDER BY m.turma_id, m.aluno_id, d.nome;
 
 -- 6) Notas fora da escala da classe (pré/1ª-6ª: 0-10; 7ª-13ª: 0-20).
