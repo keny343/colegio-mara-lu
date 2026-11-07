@@ -38,7 +38,7 @@ const {
   lancarFalta,   listarTodosHorarios, listarHorariosTurma, criarHorario, removerHorario,
   alunosDaTurmaStaff, lancarNota, notasDaTurma,
   criarMatricula, listarAlunosParaMatricula,
-  pautaFinalTurma, lancarNotaRecurso,
+  pautaFinalTurma, lancarNotaRecurso, listarRelatorioAlunos,
   listarConfigAvaliacao, salvarConfigAvaliacao,
   lancarNotaExameDefesa, lancarNotaChamada2
 } = require('../controllers/academicoController');
@@ -125,6 +125,7 @@ router.post('/staff/disciplinas', staffMiddleware, criarDisciplina);
 router.put('/staff/disciplinas/:id', staffMiddleware, atualizarDisciplina);
 
 router.get('/staff/turmas', staffMiddleware, listarTurmas);
+router.get('/staff/relatorios/alunos', staffMiddleware, listarRelatorioAlunos);
 router.post('/staff/turmas', adminMiddleware, criarTurma);
 router.put('/staff/turmas/:id', adminMiddleware, atualizarTurma);
 router.post('/staff/atribuir-professor', staffMiddleware, atribuirProfessor);
