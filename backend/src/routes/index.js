@@ -42,6 +42,7 @@ const {
   listarConfigAvaliacao, salvarConfigAvaliacao,
   lancarNotaExameDefesa, lancarNotaChamada2
 } = require('../controllers/academicoController');
+const { relatorioNotasTurma } = require('../controllers/relatorioNotasController');
 const {
   uploadMaterial, uploadPlano,
   listarMateriaisProfessor, enviarMaterial, listarMateriaisRecebidos,
@@ -158,7 +159,8 @@ router.post('/staff/notas-chamada2', staffMiddleware, lancarNotaChamada2);
 router.post('/professor/notas', notasAccessMiddleware, lancarNota);
 router.get('/professor/turmas/:turma_id/notas/:disciplina_id', notasAccessMiddleware, notasDaTurma);
 router.get('/professor/turmas/:turma_id/pauta', notasAccessMiddleware, pautaFinalTurma);
-
+router.get('/staff/turmas/:turma_id/relatorio-notas', notasAccessMiddleware, relatorioNotasTurma);
+router.get('/professor/turmas/:turma_id/relatorio-notas', notasAccessMiddleware, relatorioNotasTurma);
 // ===== HORÁRIOS ACADÉMICOS (admin/coordenador) =====
 router.get('/staff/horarios', staffMiddleware, listarTodosHorarios);
 router.get('/staff/horarios/:turma_id', staffMiddleware, listarHorariosTurma);

@@ -6,6 +6,7 @@ import { podeAcederNotas, podeEditarNotas, isProfessor } from '../utils/roles';
 import { TRIMESTRES, mediaTrimestre, mediaAnual } from '../utils/notasPeriodos';
 import Toast, { useToast } from '../components/Toast.js';
 import { Button, EmptyState, FormField, Modal, Select, LoadingState } from '../components/ui';
+import RelatorioNotasBotoes from '../components/RelatorioNotasBotoes';
 import './CoordenadorNotas.css';
 
 function StatusPill({ status, fallback }) {
@@ -373,6 +374,13 @@ export default function CoordenadorNotas({ modoProfessor = false }) {
 
       {turmaId && (
         <div className="card pauta-card">
+                <RelatorioNotasBotoes
+        turmaId={turmaId}
+        baseNotas={baseNotas}
+        geradoPor={user?.nome}
+        onErro={(msg) => showToast(msg, 'error')}
+        onSucesso={(msg) => showToast(msg, 'success')}
+      />
           <h3 className="nota-section-title">Pauta final — situação do aluno (todas as disciplinas)</h3>
           {loadingPauta ? (
             <p className="pauta-loading">A carregar pauta...</p>

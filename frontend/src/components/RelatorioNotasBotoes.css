@@ -1,0 +1,12 @@
+.relatorio-acoes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin-bottom: var(--space-4);
+}
+
+@media (max-width: 640px) {
+  .relatorio-acoes .btn {
+    flex: 1 1 100%;
+  }
+}
