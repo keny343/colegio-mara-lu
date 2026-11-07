@@ -376,6 +376,7 @@ export default function CoordenadorNotas({ modoProfessor = false }) {
         <div className="card pauta-card">
                 <RelatorioNotasBotoes
         turmaId={turmaId}
+        disciplinaId={disciplinaId}
         baseNotas={baseNotas}
         geradoPor={user?.nome}
         onErro={(msg) => showToast(msg, 'error')}
