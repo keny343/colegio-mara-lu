@@ -1,37 +1,20 @@
 const db = require('../config/database');
 const {
-  podeAcederNotas,
-  coordenadorPodeGerirTurma,
-  turmaVisivelParaNotas,
-  PERIODOS_VALIDOS,
-  LABELS_PERIODOS,
-  limitesNota,
-  normalizarPeriodoKey,
-  mediaPeriodos,
+  podeAcederNotas, coordenadorPodeGerirTurma, turmaVisivelParaNotas,
+  PERIODOS_VALIDOS, LABELS_PERIODOS, limitesNota, normalizarPeriodoKey, mediaPeriodos,
 } = require('../utils/academicoRules');
 const { ensureNotasPeriodosSchema } = require('../utils/ensureNotasSchema');
 
-// Mínimo de aprovação por disciplina: 1ª–6ª classe = 5 (escala 0–10); 7ª–13ª = 10 (escala 0–20)
 const notaMinima = (serieClasse) => {
   const s = Number(serieClasse);
   return s >= 1 && s <= 6 ? 5 : 10;
 };
-
 const media = (valores) => {
   const nums = valores.filter((v) => v != null).map(Number).filter((n) => !Number.isNaN(n));
   if (!nums.length) return null;
   return (nums.reduce((a, b) => a + b, 0) / nums.length).toFixed(1);
 };
 
-/**
- * GET /staff|professor/turmas/:turma_id/relatorio-notas
- * Devolve, para cada aluno ativo da turma, as notas de cada disciplina por período,
- * a média anual da disciplina e a média geral do aluno.
- *
- * Acesso (igual ao da pauta):
- *  - admin e coordenadores com âmbito sobre a turma → todas as disciplinas
- *  - professor → só as disciplinas que leciona nessa turma
- */
 const relatorioNotasTurma = async (req, res) => {
   try {
     await ensureNotasPeriodosSchema();
@@ -40,6 +23,12 @@ const relatorioNotasTurma = async (req, res) => {
     }
 
     const turmaId = req.params.turma_id;
+    const disciplinaParam = req.query.disciplina_id;
+    const disciplinaId = disciplinaParam == null || disciplinaParam === '' ? null : Number(disciplinaParam);
+    if (disciplinaId !== null && (!Number.isInteger(disciplinaId) || disciplinaId <= 0)) {
+      return res.status(400).json({ message: 'Disciplina inválida.' });
+    }
+
     const [[turma]] = await db.query(
       `SELECT t.*, c.nome AS curso_nome
          FROM turmas t LEFT JOIN cursos c ON t.curso_id = c.id
@@ -65,7 +54,7 @@ const relatorioNotasTurma = async (req, res) => {
       paramsDisc.push(req.user.id);
     }
 
-    const [disciplinas] = await db.query(
+    let [disciplinas] = await db.query(
       `SELECT DISTINCT d.id, d.nome
          FROM turma_professores tp
          JOIN disciplinas d ON tp.disciplina_id = d.id
@@ -73,6 +62,14 @@ const relatorioNotasTurma = async (req, res) => {
         ORDER BY d.nome`,
       paramsDisc
     );
+
+    if (disciplinaId !== null) {
+      const permitida = disciplinas.some((d) => Number(d.id) === disciplinaId);
+      if (!permitida) {
+        return res.status(403).json({ message: 'Não tem acesso a esta disciplina nesta turma.' });
+      }
+      disciplinas = disciplinas.filter((d) => Number(d.id) === disciplinaId);
+    }
 
     const [alunos] = await db.query(
       `SELECT m.id AS matricula_id, a.id AS aluno_id, a.nome AS aluno_nome
@@ -84,12 +81,8 @@ const relatorioNotasTurma = async (req, res) => {
     );
 
     const cabecalho = {
-      id: turma.id,
-      nome: turma.nome,
-      serie_classe: turma.serie_classe,
-      curso_nome: turma.curso_nome || null,
-      ano_letivo: turma.ano_letivo,
-      turno: turma.turno || null,
+      id: turma.id, nome: turma.nome, serie_classe: turma.serie_classe,
+      curso_nome: turma.curso_nome || null, ano_letivo: turma.ano_letivo, turno: turma.turno || null,
     };
     const limites = limitesNota(turma.serie_classe);
     const minimo = notaMinima(turma.serie_classe);
@@ -97,8 +90,9 @@ const relatorioNotasTurma = async (req, res) => {
 
     if (!disciplinas.length || !alunos.length) {
       return res.json({
-        turma: cabecalho, limites, nota_minima: minimo, periodos,
-        disciplinas, alunos: [], gerado_em: new Date().toISOString(),
+        turma: cabecalho, limites, nota_minima: minimo, periodos, disciplinas,
+        disciplina_selecionada: disciplinas[0] || null, alunos: [],
+        gerado_em: new Date().toISOString(),
       });
     }
 
@@ -109,11 +103,10 @@ const relatorioNotasTurma = async (req, res) => {
       [alunos.map((a) => a.matricula_id), disciplinas.map((d) => d.id)]
     );
 
-    // `${matricula_id}-${disciplina_id}` -> { '1PP': 12, ... }
     const porAlunoDisc = new Map();
     for (const r of notas) {
       const key = normalizarPeriodoKey(r.periodo);
-      if (!PERIODOS_VALIDOS.includes(key)) continue; // ignora REC/EXN/DEF/CH2 neste relatório
+      if (!PERIODOS_VALIDOS.includes(key)) continue;
       const k = `${r.matricula_id}-${r.disciplina_id}`;
       if (!porAlunoDisc.has(k)) porAlunoDisc.set(k, {});
       porAlunoDisc.get(k)[key] = r.nota == null ? null : Number(r.nota);
@@ -124,30 +117,21 @@ const relatorioNotasTurma = async (req, res) => {
         const p = porAlunoDisc.get(`${a.matricula_id}-${d.id}`) || {};
         const mediaAnual = mediaPeriodos(p);
         return {
-          disciplina_id: d.id,
-          periodos: p,
-          media: mediaAnual,
+          disciplina_id: d.id, periodos: p, media: mediaAnual,
           positiva: mediaAnual == null ? null : parseFloat(mediaAnual) >= minimo,
         };
       });
       return {
-        matricula_id: a.matricula_id,
-        aluno_id: a.aluno_id,
-        aluno_nome: a.aluno_nome,
-        disciplinas: discAluno,
-        media_geral: media(discAluno.map((d) => d.media)),
+        matricula_id: a.matricula_id, aluno_id: a.aluno_id, aluno_nome: a.aluno_nome,
+        disciplinas: discAluno, media_geral: media(discAluno.map((d) => d.media)),
         negativas: discAluno.filter((d) => d.positiva === false).length,
       };
     });
 
     return res.json({
-      turma: cabecalho,
-      limites,
-      nota_minima: minimo,
-      periodos,
-      disciplinas,
-      alunos: lista,
-      gerado_em: new Date().toISOString(),
+      turma: cabecalho, limites, nota_minima: minimo, periodos, disciplinas,
+      disciplina_selecionada: disciplinas.length === 1 ? disciplinas[0] : null,
+      alunos: lista, gerado_em: new Date().toISOString(),
     });
   } catch (err) {
     if (err.code === 'ER_NO_SUCH_TABLE') {
