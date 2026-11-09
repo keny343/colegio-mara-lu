@@ -15,6 +15,15 @@ const media = (valores) => {
   return (nums.reduce((a, b) => a + b, 0) / nums.length).toFixed(1);
 };
 
+/**
+ * Relatório de notas por turma.
+ * Query: disciplina_id (opcional) — se omitido, relatório geral das disciplinas permitidas.
+ *
+ * Permissões:
+ * - admin: todas as disciplinas da turma (ou uma específica)
+ * - coordenador: só turmas do seu âmbito; todas as disciplinas dessas turmas
+ * - professor: só disciplinas que leciona na turma
+ */
 const relatorioNotasTurma = async (req, res) => {
   try {
     await ensureNotasPeriodosSchema();
@@ -66,9 +75,28 @@ const relatorioNotasTurma = async (req, res) => {
     if (disciplinaId !== null) {
       const permitida = disciplinas.some((d) => Number(d.id) === disciplinaId);
       if (!permitida) {
-        return res.status(403).json({ message: 'Não tem acesso a esta disciplina nesta turma.' });
+        // Admin: permite disciplina existente mesmo sem professor atribuído (lançamento directo).
+        if (req.user.role === 'admin') {
+          const [[disc]] = await db.query(
+            'SELECT id, nome FROM disciplinas WHERE id = ? AND ativo = 1 LIMIT 1',
+            [disciplinaId]
+          );
+          if (!disc) {
+            return res.status(404).json({ message: 'Disciplina não encontrada.' });
+          }
+          disciplinas = [disc];
+        } else if (veTodasDisciplinas) {
+          return res.status(403).json({
+            message: 'Esta disciplina não está atribuída a esta turma da sua coordenação.',
+          });
+        } else {
+          return res.status(403).json({
+            message: 'Só pode gerar o relatório das disciplinas que leciona nesta turma.',
+          });
+        }
+      } else {
+        disciplinas = disciplinas.filter((d) => Number(d.id) === disciplinaId);
       }
-      disciplinas = disciplinas.filter((d) => Number(d.id) === disciplinaId);
     }
 
     const [alunos] = await db.query(
@@ -91,7 +119,7 @@ const relatorioNotasTurma = async (req, res) => {
     if (!disciplinas.length || !alunos.length) {
       return res.json({
         turma: cabecalho, limites, nota_minima: minimo, periodos, disciplinas,
-        disciplina_selecionada: disciplinas[0] || null, alunos: [],
+        disciplina_selecionada: disciplinas.length === 1 ? disciplinas[0] : null, alunos: [],
         gerado_em: new Date().toISOString(),
       });
     }

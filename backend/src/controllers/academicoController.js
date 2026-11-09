@@ -318,6 +318,53 @@ const minhasDisciplinas = async (req, res) => {
   }
 };
 
+/**
+ * Disciplinas de uma turma, filtradas pelo perfil:
+ * - admin / coordenador da turma: todas as atribuídas à turma
+ * - professor: só as que leciona nessa turma
+ */
+const listarDisciplinasDaTurma = async (req, res) => {
+  try {
+    if (!podeAcederNotas(req.user)) {
+      return res.status(403).json({ message: 'Sem permissão para consultar disciplinas.' });
+    }
+    const turmaId = req.params.turma_id;
+    const [[turma]] = await db.query(
+      `SELECT t.*, c.nome AS curso_nome
+         FROM turmas t LEFT JOIN cursos c ON t.curso_id = c.id
+        WHERE t.id = ?`,
+      [turmaId]
+    );
+    if (!turma) return res.status(404).json({ message: 'Turma não encontrada.' });
+
+    const lecionadas = await idsTurmasLecionadas(req.user.id);
+    if (!turmaVisivelParaNotas(req.user, turma, lecionadas)) {
+      return res.status(403).json({ message: 'Não tem acesso a esta turma.' });
+    }
+
+    const veTodas = req.user.role === 'admin' || coordenadorPodeGerirTurma(req.user, turma);
+    const params = [turmaId];
+    let filtroProf = '';
+    if (!veTodas) {
+      filtroProf = 'AND tp.professor_id = ?';
+      params.push(req.user.id);
+    }
+
+    const [rows] = await db.query(
+      `SELECT DISTINCT d.id, d.nome
+         FROM turma_professores tp
+         JOIN disciplinas d ON tp.disciplina_id = d.id
+        WHERE tp.turma_id = ? ${filtroProf}
+        ORDER BY d.nome`,
+      params
+    );
+    return res.json(rows);
+  } catch (err) {
+    if (err.code === 'ER_NO_SUCH_TABLE') return res.json([]);
+    return res.status(500).json({ message: 'Erro interno do servidor.' });
+  }
+};
+
 // ===== PROFESSOR: alunos da turma =====
 const alunosDaTurma = async (req, res) => {
   try {
@@ -836,13 +883,21 @@ const pautaFinalTurma = async (req, res) => {
       return res.status(403).json({ message: 'Não tem acesso à pauta desta turma.' });
     }
 
+    const veTodasDisciplinas = req.user.role === 'admin' || coordenadorPodeGerirTurma(req.user, turma);
+    const paramsDisc = [turma_id];
+    let filtroProfPauta = '';
+    if (!veTodasDisciplinas) {
+      filtroProfPauta = 'AND tp.professor_id = ?';
+      paramsDisc.push(req.user.id);
+    }
+
     const [disciplinas] = await db.query(
       `SELECT DISTINCT d.id, d.nome, d.disciplina_chave
        FROM turma_professores tp
        JOIN disciplinas d ON tp.disciplina_id = d.id
-       WHERE tp.turma_id = ?
+       WHERE tp.turma_id = ? ${filtroProfPauta}
        ORDER BY d.nome`,
-      [turma_id]
+      paramsDisc
     );
     if (disciplinas.length === 0) {
       return res.json({ turma: { id: turma.id, nome: turma.nome, serie_classe: turma.serie_classe }, disciplinas: [], alunos: [] });
@@ -1206,7 +1261,7 @@ module.exports = {
   listarDisciplinas, criarDisciplina, atualizarDisciplina,
   listarTurmas, criarTurma, atualizarTurma,
   atribuirProfessor,
-  minhasDisciplinas,
+  minhasDisciplinas, listarDisciplinasDaTurma,
   alunosDaTurma, lancarNota, lancarFalta,
   listarTodosHorarios, listarHorariosTurma, criarHorario, removerHorario,
   alunosDaTurmaStaff, notasDaTurma,

@@ -1,16 +1,38 @@
 import React, { useState } from 'react';
-import { Printer, FileSpreadsheet } from 'lucide-react';
+import { Printer, Download } from 'lucide-react';
 import api from '../services/api';
-import { Button } from './ui';
+import { Button, Select } from './ui';
 import './RelatorioNotasBotoes.css';
-import { abrirJanelaRelatorio, imprimirRelatorio, descarregarCsv } from '../utils/relatorioNotas';
+import { abrirJanelaRelatorio, imprimirRelatorio, descarregarFormato } from '../utils/relatorioNotas';
+import { FORMATOS_EXPORT } from '../utils/exportFormatos';
 
-// Sem disciplina selecionada: relatório geral. Com disciplina: relatório individual.
-export default function RelatorioNotasBotoes({ turmaId, disciplinaId, baseNotas, geradoPor, onErro, onSucesso }) {
+/**
+ * Relatório de notas.
+ * - Sem disciplina: relatório geral (todas as disciplinas acessíveis ao perfil).
+ * - Com disciplina: relatório só dessa disciplina.
+ * Admin: geral ou qualquer disciplina da turma.
+ * Coordenador: só turmas/disciplinas da sua coordenação.
+ * Professor: só disciplinas que leciona.
+ */
+export default function RelatorioNotasBotoes({
+  turmaId,
+  disciplinaId,
+  disciplinaNome,
+  baseNotas,
+  geradoPor,
+  onErro,
+  onSucesso,
+}) {
   const [aGerar, setAGerar] = useState(null);
+  const [formato, setFormato] = useState('csv');
+
+  const temDisciplina = disciplinaId !== null && disciplinaId !== undefined && String(disciplinaId) !== '';
+  const ambito = temDisciplina
+    ? `disciplina: ${disciplinaNome || 'seleccionada'}`
+    : 'geral (todas as disciplinas permitidas)';
 
   const buscar = async () => {
-    const params = disciplinaId ? { disciplina_id: disciplinaId } : {};
+    const params = temDisciplina ? { disciplina_id: disciplinaId } : {};
     const res = await api.get(`${baseNotas}/turmas/${turmaId}/relatorio-notas`, { params });
     return res.data;
   };
@@ -26,7 +48,7 @@ export default function RelatorioNotasBotoes({ turmaId, disciplinaId, baseNotas,
     try {
       const dados = await buscar();
       imprimirRelatorio(janela, dados, { geradoPor });
-      onSucesso?.('Relatório pronto. Na janela de impressão, escolha "Guardar como PDF".');
+      onSucesso?.(`Relatório ${ambito} pronto. Na impressão, escolha "Guardar como PDF".`);
     } catch (e) {
       janela.close();
       onErro?.(e.response?.data?.message || 'Não foi possível gerar o relatório.');
@@ -35,13 +57,14 @@ export default function RelatorioNotasBotoes({ turmaId, disciplinaId, baseNotas,
     }
   };
 
-  const gerarExcel = async () => {
+  const exportar = async () => {
     if (!turmaId || aGerar) return;
-    setAGerar('excel');
+    setAGerar('export');
     try {
       const dados = await buscar();
-      descarregarCsv(dados);
-      onSucesso?.('Ficheiro CSV descarregado. Abra-o no Excel.');
+      descarregarFormato(formato, dados);
+      const label = FORMATOS_EXPORT.find((f) => f.id === formato)?.label || formato.toUpperCase();
+      onSucesso?.(`Ficheiro ${label} descarregado (${ambito}).`);
     } catch (e) {
       onErro?.(e.response?.data?.message || 'Não foi possível exportar as notas.');
     } finally {
@@ -51,14 +74,41 @@ export default function RelatorioNotasBotoes({ turmaId, disciplinaId, baseNotas,
 
   return (
     <div className="relatorio-acoes">
-      <Button variant="primary" icon={<Printer size={16} />} onClick={gerarPdf}
-        loading={aGerar === 'pdf'} disabled={!turmaId || !!aGerar}>
-        Relatório (PDF)
-      </Button>
-      <Button variant="outline" icon={<FileSpreadsheet size={16} />} onClick={gerarExcel}
-        loading={aGerar === 'excel'} disabled={!turmaId || !!aGerar}>
-        Exportar CSV
-      </Button>
+      <p className="relatorio-ambito">
+        Âmbito do relatório: <strong>{temDisciplina ? (disciplinaNome || 'disciplina seleccionada') : 'geral da turma'}</strong>
+        {!temDisciplina && ' — seleccione uma disciplina acima para exportar só essa.'}
+      </p>
+      <div className="relatorio-acoes-row">
+        <Button
+          variant="primary"
+          icon={<Printer size={16} />}
+          onClick={gerarPdf}
+          loading={aGerar === 'pdf'}
+          disabled={!turmaId || !!aGerar}
+        >
+          Relatório (PDF)
+        </Button>
+        <Select
+          id="relatorio-formato"
+          value={formato}
+          onChange={(e) => setFormato(e.target.value)}
+          disabled={!!aGerar}
+          aria-label="Formato de exportação"
+        >
+          {FORMATOS_EXPORT.map((f) => (
+            <option key={f.id} value={f.id}>{f.label}</option>
+          ))}
+        </Select>
+        <Button
+          variant="outline"
+          icon={<Download size={16} />}
+          onClick={exportar}
+          loading={aGerar === 'export'}
+          disabled={!turmaId || !!aGerar}
+        >
+          Exportar
+        </Button>
+      </div>
     </div>
   );
 }

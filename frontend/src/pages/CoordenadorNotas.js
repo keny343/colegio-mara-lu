@@ -47,6 +47,7 @@ export default function CoordenadorNotas({ modoProfessor = false }) {
   const [atribuicoes, setAtribuicoes] = useState([]);
   const [turmaId, setTurmaId] = useState('');
   const [disciplinaId, setDisciplinaId] = useState('');
+  const [loadingDiscTurma, setLoadingDiscTurma] = useState(false);
   const [trimestreSelecionado, setTrimestreSelecionado] = useState('1');
   const [alunos, setAlunos] = useState([]);
   const [limites, setLimites] = useState({ min: 0, max: 20 });
@@ -173,23 +174,38 @@ export default function CoordenadorNotas({ modoProfessor = false }) {
         .finally(() => setLoading(false));
       return;
     }
-    Promise.all([
-      api.get('/staff/turmas', { params: { scope: 'notas' } }),
-      api.get('/staff/disciplinas'),
-    ])
-      .then(([t, d]) => {
-        setTurmas(t.data);
-        setDisciplinas(d.data);
-      })
-      .catch(() => setErro('Erro ao carregar turmas ou disciplinas.'))
+    api.get('/staff/turmas', { params: { scope: 'notas' } })
+      .then((t) => setTurmas(t.data))
+      .catch(() => setErro('Erro ao carregar turmas.'))
       .finally(() => setLoading(false));
   }, [user, professor]);
 
-  const disciplinasDaTurma = professor && !podeEditarNotas(user)
-    ? atribuicoes
-        .filter(a => String(a.turma_id) === String(turmaId))
-        .map(a => ({ id: a.disciplina_id, nome: a.disciplina_nome }))
-    : disciplinas;
+  // Disciplinas da turma seleccionada (respeita o perfil no backend).
+  useEffect(() => {
+    if (!turmaId) {
+      setDisciplinas([]);
+      return;
+    }
+    if (professor && !podeEditarNotas(user)) {
+      setDisciplinas(
+        atribuicoes
+          .filter((a) => String(a.turma_id) === String(turmaId))
+          .map((a) => ({ id: a.disciplina_id, nome: a.disciplina_nome }))
+      );
+      return;
+    }
+    setLoadingDiscTurma(true);
+    api.get(`${baseNotas}/turmas/${turmaId}/disciplinas`)
+      .then((r) => setDisciplinas(r.data || []))
+      .catch(() => {
+        setDisciplinas([]);
+        setErro('Erro ao carregar disciplinas desta turma.');
+      })
+      .finally(() => setLoadingDiscTurma(false));
+  }, [turmaId, professor, user, atribuicoes, baseNotas]);
+
+  const disciplinasDaTurma = disciplinas;
+  const disciplinaSel = disciplinasDaTurma.find((d) => String(d.id) === String(disciplinaId));
 
   const carregarNotas = useCallback(async () => {
     if (!turmaId || !disciplinaId) return;
@@ -347,8 +363,15 @@ export default function CoordenadorNotas({ modoProfessor = false }) {
             </Select>
           </FormField>
           <FormField label="Disciplina *" htmlFor="cn-disciplina">
-            <Select id="cn-disciplina" value={disciplinaId} onChange={e => setDisciplinaId(e.target.value)} disabled={!turmaId}>
-              <option value="">Selecionar disciplina...</option>
+            <Select
+              id="cn-disciplina"
+              value={disciplinaId}
+              onChange={e => setDisciplinaId(e.target.value)}
+              disabled={!turmaId || loadingDiscTurma}
+            >
+              <option value="">
+                {loadingDiscTurma ? 'A carregar disciplinas...' : 'Selecionar disciplina...'}
+              </option>
               {disciplinasDaTurma.map(d => (
                 <option key={d.id} value={d.id}>{d.nome}</option>
               ))}
@@ -374,14 +397,15 @@ export default function CoordenadorNotas({ modoProfessor = false }) {
 
       {turmaId && (
         <div className="card pauta-card">
-                <RelatorioNotasBotoes
-        turmaId={turmaId}
-        disciplinaId={disciplinaId}
-        baseNotas={baseNotas}
-        geradoPor={user?.nome}
-        onErro={(msg) => showToast(msg, 'error')}
-        onSucesso={(msg) => showToast(msg, 'success')}
-      />
+          <RelatorioNotasBotoes
+            turmaId={turmaId}
+            disciplinaId={disciplinaId}
+            disciplinaNome={disciplinaSel?.nome}
+            baseNotas={baseNotas}
+            geradoPor={user?.nome}
+            onErro={(msg) => showToast(msg, 'error')}
+            onSucesso={(msg) => showToast(msg, 'success')}
+          />
           <h3 className="nota-section-title">Pauta final — situação do aluno (todas as disciplinas)</h3>
           {loadingPauta ? (
             <p className="pauta-loading">A carregar pauta...</p>

@@ -1,5 +1,14 @@
-// Geração do relatório "alunos e notas" de uma turma.
-// Recebe a resposta de GET /(staff|professor)/turmas/:id/relatorio-notas
+// Geração do relatório "alunos e notas" de uma turma (HTML/PDF).
+// CSV/JSON/Avro/Parquet/ORC: ver exportFormatos.js
+
+import {
+  gerarCsv,
+  gerarPorFormato,
+  nomeFicheiro,
+  descarregarBlob,
+} from './exportFormatos';
+
+export { gerarCsv, gerarPorFormato, nomeFicheiro, descarregarBlob };
 
 const ESCOLA = 'Colégio Mara Lu';
 
@@ -21,72 +30,19 @@ const fmt = (v, vazio = '—') => {
 const nomeTurma = (t) =>
   `${t.nome} — ${t.serie_classe}ª classe${t.curso_nome ? ` · ${t.curso_nome}` : ''} (${t.ano_letivo})`;
 
-const slug = (s) =>
-  String(s || 'turma')
-    .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '')
-    .replace(/[^a-zA-Z0-9]+/g, '-')
-    .replace(/^-+|-+$/g, '')
-    .toLowerCase();
-
 const dataHora = (iso) =>
   new Date(iso || Date.now()).toLocaleString('pt-AO', {
     day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit',
   });
 
-// ---------------------------------------------------------------- CSV (Excel)
-
-// Evita "injecção de fórmulas" no Excel: células que começam por = + - @ passam a texto.
-const celulaCsv = (v) => {
-  let s = String(v ?? '');
-  if (/^[=+\-@\t\r]/.test(s)) s = `'${s}`;
-  return `"${s.replace(/"/g, '""')}"`;
-};
-
-export function gerarCsv(dados) {
-  const { turma, periodos, disciplinas, alunos } = dados;
-  const discPorId = new Map(disciplinas.map((d) => [d.id, d.nome]));
-  const cab = ['Nº', 'Aluno', 'Disciplina', ...periodos.map((p) => p.label), 'Média anual', 'Situação'];
-
-  const linhas = [cab];
-  alunos.forEach((a, i) => {
-    a.disciplinas.forEach((d) => {
-      linhas.push([
-        i + 1,
-        a.aluno_nome,
-        discPorId.get(d.disciplina_id) || '',
-        ...periodos.map((p) => fmt(d.periodos[p.key], '')),
-        fmt(d.media, ''),
-        d.positiva == null ? 'Sem notas' : d.positiva ? 'Positiva' : 'Negativa',
-      ]);
-    });
-  });
-
-  const topo = [
-    [ESCOLA],
-    ['Relatório de notas', nomeTurma(turma)],
-    ['Gerado em', dataHora(dados.gerado_em)],
-    [],
-  ];
-  // \uFEFF (BOM) para o Excel abrir os acentos correctamente; ";" é o separador do Excel em pt
-  return '\uFEFF' + [...topo, ...linhas].map((l) => l.map(celulaCsv).join(';')).join('\r\n');
-}
-
-function descarregar(conteudo, nomeFicheiro, tipo) {
-  const blob = new Blob([conteudo], { type: tipo });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = nomeFicheiro;
-  document.body.appendChild(a);
-  a.click();
-  a.remove();
-  setTimeout(() => URL.revokeObjectURL(url), 1000);
-}
-
 export function descarregarCsv(dados) {
-  const ficheiro = `notas-${slug(dados.turma.nome)}-${dados.turma.ano_letivo}.csv`;
-  descarregar(gerarCsv(dados), ficheiro, 'text/csv;charset=utf-8');
+  const { body, mime, ext } = gerarPorFormato('csv', dados);
+  descarregarBlob(body, nomeFicheiro(dados, ext), mime);
+}
+
+export function descarregarFormato(formato, dados) {
+  const { body, mime, ext } = gerarPorFormato(formato, dados);
+  descarregarBlob(body, nomeFicheiro(dados, ext), mime);
 }
 
 // ------------------------------------------------------- HTML (imprimir / PDF)

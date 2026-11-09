@@ -34,7 +34,7 @@ const {
   listarDisciplinas, criarDisciplina, atualizarDisciplina,
   listarTurmas, criarTurma, atualizarTurma,
   atribuirProfessor,
-  minhasDisciplinas, alunosDaTurma,
+  minhasDisciplinas, listarDisciplinasDaTurma, alunosDaTurma,
   lancarFalta,   listarTodosHorarios, listarHorariosTurma, criarHorario, removerHorario,
   alunosDaTurmaStaff, lancarNota, notasDaTurma,
   criarMatricula, listarAlunosParaMatricula,
@@ -43,6 +43,9 @@ const {
   lancarNotaExameDefesa, lancarNotaChamada2
 } = require('../controllers/academicoController');
 const { relatorioNotasTurma } = require('../controllers/relatorioNotasController');
+const { justificarFalta, listarPedidosJustificacao, baixarDocumentoJustificacao, decidirJustificacao } = require('../controllers/justificacoesController');
+const { fileFilter } = require('../config/uploadFilters');
+const uploadJustif = require('multer')({ dest: 'uploads/', limits: { fileSize: 10 * 1024 * 1024 }, fileFilter });
 const {
   uploadMaterial, uploadPlano,
   listarMateriaisProfessor, enviarMaterial, listarMateriaisRecebidos,
@@ -159,6 +162,8 @@ router.post('/staff/notas-chamada2', staffMiddleware, lancarNotaChamada2);
 router.post('/professor/notas', notasAccessMiddleware, lancarNota);
 router.get('/professor/turmas/:turma_id/notas/:disciplina_id', notasAccessMiddleware, notasDaTurma);
 router.get('/professor/turmas/:turma_id/pauta', notasAccessMiddleware, pautaFinalTurma);
+router.get('/staff/turmas/:turma_id/disciplinas', notasAccessMiddleware, listarDisciplinasDaTurma);
+router.get('/professor/turmas/:turma_id/disciplinas', notasAccessMiddleware, listarDisciplinasDaTurma);
 router.get('/staff/turmas/:turma_id/relatorio-notas', notasAccessMiddleware, relatorioNotasTurma);
 router.get('/professor/turmas/:turma_id/relatorio-notas', notasAccessMiddleware, relatorioNotasTurma);
 // ===== HORÁRIOS ACADÉMICOS (admin/coordenador) =====
@@ -170,12 +175,10 @@ router.get('/staff/turmas/:id/alunos', staffMiddleware, alunosDaTurmaStaff);
 router.get('/staff/alunos-para-matricula', staffMiddleware, listarAlunosParaMatricula);
 router.post('/staff/matriculas', staffMiddleware, criarMatricula);
 
-module.exports = router;
 // ===== JUSTIFICAÇÃO DE FALTAS =====
-const { justificarFalta, listarPedidosJustificacao, baixarDocumentoJustificacao, decidirJustificacao } = require('../controllers/justificacoesController');
-const { fileFilter } = require('../config/uploadFilters');
-const uploadJustif = require('multer')({ dest: 'uploads/', limits: { fileSize: 10 * 1024 * 1024 }, fileFilter });
 router.post('/aluno/faltas/justificar', authMiddleware, uploadJustif.single('documento'), justificarFalta);
 router.get('/professor/justificacoes', professorMiddleware, listarPedidosJustificacao);
 router.get('/professor/justificacoes/:id/documento', professorMiddleware, baixarDocumentoJustificacao);
 router.patch('/professor/justificacoes/:id', professorMiddleware, decidirJustificacao);
+
+module.exports = router;
