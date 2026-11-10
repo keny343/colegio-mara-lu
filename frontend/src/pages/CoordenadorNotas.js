@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState, useCallback, useRef } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { ClipboardList, Save, RefreshCw, CheckCircle } from 'lucide-react';
 import api from '../services/api';
@@ -78,16 +78,24 @@ export default function CoordenadorNotas({ modoProfessor = false }) {
   const baseNotas = professor && !podeEditarNotas(user) ? '/professor' : '/staff';
   const postNotas = `${baseNotas}/notas`;
 
-  const carregarPauta = useCallback(async () => {
+  const pautaReqRef = useRef(0);
+
+  /**
+   * Recarrega a pauta. Com { silencioso: true } (após guardar uma nota) não mostra
+   * "A carregar..." nem apaga a pauta atual se o pedido falhar.
+   */
+  const carregarPauta = useCallback(async ({ silencioso = false } = {}) => {
+    // Só carregamentos normais (troca de turma) invalidam pedidos anteriores; os silenciosos não.
+    const pedido = silencioso ? pautaReqRef.current : ++pautaReqRef.current;
     if (!turmaId) { setPauta(null); return; }
-    setLoadingPauta(true);
+    if (!silencioso) setLoadingPauta(true);
     try {
       const res = await api.get(`${baseNotas}/turmas/${turmaId}/pauta`);
-      setPauta(res.data);
+      if (pedido === pautaReqRef.current) setPauta(res.data);
     } catch (e) {
-      setPauta(null);
+      if (!silencioso && pedido === pautaReqRef.current) setPauta(null);
     } finally {
-      setLoadingPauta(false);
+      if (!silencioso && pedido === pautaReqRef.current) setLoadingPauta(false);
     }
   }, [turmaId, baseNotas]);
 
@@ -266,7 +274,7 @@ export default function CoordenadorNotas({ modoProfessor = false }) {
       });
       const alunoInfo = alunos.find(a => a.matricula_id === matricula_id);
       setNotaModal({ aluno: alunoInfo?.aluno_nome || 'Aluno', periodo });
-      await carregarNotas();
+      await Promise.all([carregarNotas(), carregarPauta({ silencioso: true })]);
     } catch (e) {
       setErro(e.response?.data?.message || 'Erro ao guardar nota.');
       showToast(e.response?.data?.message || 'Erro ao guardar nota.', 'error');
@@ -287,7 +295,7 @@ export default function CoordenadorNotas({ modoProfessor = false }) {
     try {
       await api.post('/staff/notas-exame-defesa', { matricula_id, disciplina_id: Number(disciplinaId), nota: parseFloat(valor) });
       showToast('Nota lançada com sucesso.', 'success');
-      await carregarNotas();
+      await Promise.all([carregarNotas(), carregarPauta({ silencioso: true })]);
     } catch (e) {
       showToast(e.response?.data?.message || 'Erro ao lançar nota.', 'error');
     } finally {
@@ -305,7 +313,7 @@ export default function CoordenadorNotas({ modoProfessor = false }) {
     try {
       await api.post('/staff/notas-chamada2', { matricula_id, disciplina_id: Number(disciplinaId), nota: parseFloat(valor) });
       showToast('Nota da 2ª chamada lançada.', 'success');
-      await carregarNotas();
+      await Promise.all([carregarNotas(), carregarPauta({ silencioso: true })]);
     } catch (e) {
       showToast(e.response?.data?.message || 'Erro ao lançar 2ª chamada.', 'error');
     } finally {
@@ -385,7 +393,7 @@ export default function CoordenadorNotas({ modoProfessor = false }) {
             </Select>
           </FormField>
           <div className="filtro-acoes">
-            <Button variant="outline" icon={<RefreshCw size={16} />} onClick={carregarNotas} disabled={!turmaId || !disciplinaId || loadingNotas}>
+            <Button variant="outline" icon={<RefreshCw size={16} />} onClick={() => { carregarNotas(); carregarPauta({ silencioso: true }); }} disabled={!turmaId || !disciplinaId || loadingNotas}>
               Actualizar
             </Button>
           </div>
