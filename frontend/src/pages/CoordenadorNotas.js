@@ -78,26 +78,54 @@ export default function CoordenadorNotas({ modoProfessor = false }) {
   const baseNotas = professor && !podeEditarNotas(user) ? '/professor' : '/staff';
   const postNotas = `${baseNotas}/notas`;
 
-  const pautaReqRef = useRef(0);
+  const pautaReqRef = useRef(0); // carregamentos normais (troca de turma)
+  const pautaSilenciosoRef = useRef(0); // sequência dos recarregamentos silenciosos
 
   /**
    * Recarrega a pauta. Com { silencioso: true } (após guardar uma nota) não mostra
    * "A carregar..." nem apaga a pauta atual se o pedido falhar.
    */
   const carregarPauta = useCallback(async ({ silencioso = false } = {}) => {
-    // Só carregamentos normais (troca de turma) invalidam pedidos anteriores; os silenciosos não.
+    // Só carregamentos normais (troca de turma) invalidam pedidos anteriores.
     const pedido = silencioso ? pautaReqRef.current : ++pautaReqRef.current;
+    // Entre silenciosos, só a resposta do pedido mais recente é aplicada.
+    const seq = ++pautaSilenciosoRef.current;
+    const aindaValido = () => pedido === pautaReqRef.current && (!silencioso || seq === pautaSilenciosoRef.current);
     if (!turmaId) { setPauta(null); return; }
     if (!silencioso) setLoadingPauta(true);
     try {
       const res = await api.get(`${baseNotas}/turmas/${turmaId}/pauta`);
-      if (pedido === pautaReqRef.current) setPauta(res.data);
+      if (aindaValido()) setPauta(res.data);
     } catch (e) {
       if (!silencioso && pedido === pautaReqRef.current) setPauta(null);
     } finally {
       if (!silencioso && pedido === pautaReqRef.current) setLoadingPauta(false);
     }
   }, [turmaId, baseNotas]);
+
+  /**
+   * Atualização imediata: assim que uma nota é guardada, o período sai da lista
+   * "faltam ..." da pauta, sem esperar pela resposta do servidor (que confirma a seguir).
+   */
+  const removerPendenciaPauta = (matricula_id, disciplina_id, periodo) => {
+    setPauta((atual) => {
+      if (!atual || !Array.isArray(atual.alunos)) return atual;
+      return {
+        ...atual,
+        alunos: atual.alunos.map((a) => {
+          if (Number(a.matricula_id) !== Number(matricula_id)) return a;
+          return {
+            ...a,
+            disciplinas_incompletas: (a.disciplinas_incompletas || []).map((d) => (
+              Number(d.disciplina_id) === Number(disciplina_id)
+                ? { ...d, periodos_em_falta: (d.periodos_em_falta || []).filter((p) => p !== periodo) }
+                : d
+            )),
+          };
+        }),
+      };
+    });
+  };
 
   useEffect(() => { carregarPauta(); }, [carregarPauta]);
 
@@ -272,9 +300,10 @@ export default function CoordenadorNotas({ modoProfessor = false }) {
         periodo,
         nota: parseFloat(valor),
       });
+      removerPendenciaPauta(matricula_id, disciplinaId, periodo); // some da lista de pendências de imediato
       const alunoInfo = alunos.find(a => a.matricula_id === matricula_id);
       setNotaModal({ aluno: alunoInfo?.aluno_nome || 'Aluno', periodo });
-      await Promise.all([carregarNotas(), carregarPauta({ silencioso: true })]);
+      await Promise.all([carregarNotas(), carregarPauta({ silencioso: true })]); // confirmação do servidor
     } catch (e) {
       setErro(e.response?.data?.message || 'Erro ao guardar nota.');
       showToast(e.response?.data?.message || 'Erro ao guardar nota.', 'error');
