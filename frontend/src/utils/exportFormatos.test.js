@@ -7,6 +7,7 @@ import {
   linhasRelatorio,
   FORMATOS_EXPORT,
   gerarPorFormato,
+  nomeColuna,
 } from './exportFormatos';
 
 const PERIODOS = [
@@ -50,6 +51,14 @@ describe('linhasRelatorio', () => {
     expect(linhas[1].disciplina).toBe('Língua Portuguesa');
     expect(linhas[1].situacao).toBe('Negativa');
   });
+
+  test('média sem veredicto definitivo fica "Em curso"; sem média, "Sem notas"', () => {
+    const emCurso = { periodos: { '1PP': 4 }, media: '4.0', positiva: null };
+    const semNotas = { periodos: {}, media: null, positiva: null };
+    const linhas = linhasRelatorio(dadosBase([aluno('Ana', emCurso, semNotas)]));
+    expect(linhas[0].situacao).toBe('Em curso');
+    expect(linhas[1].situacao).toBe('Sem notas');
+  });
 });
 
 describe('formatos de exportação', () => {
@@ -69,10 +78,18 @@ describe('formatos de exportação', () => {
     expect(json.linhas).toHaveLength(2);
   });
 
-  test('Avro começa com magic Obj', () => {
+  test('Avro começa com magic Obj e só tem nomes de campo válidos', () => {
     const buf = gerarAvro(dados);
     expect(String.fromCharCode(buf[0], buf[1], buf[2])).toBe('Obj');
     expect(buf.length).toBeGreaterThan(32);
+    const texto = Buffer.from(buf).toString('latin1');
+    const schema = JSON.parse(texto.slice(texto.indexOf('{"type":"record"'), texto.indexOf('}]}') + 3));
+    schema.fields.forEach((f) => expect(f.name).toMatch(/^[A-Za-z_][A-Za-z0-9_]*$/));
+    expect(schema.fields.map((f) => f.name)).toContain(nomeColuna('1PP'));
+  });
+
+  test('nomeColuna nunca começa por dígito', () => {
+    expect(nomeColuna('1PP')).toBe('p_1PP');
   });
 
   test('Parquet começa e termina com PAR1', () => {
@@ -81,11 +98,28 @@ describe('formatos de exportação', () => {
     const tail = String.fromCharCode(buf[buf.length - 4], buf[buf.length - 3], buf[buf.length - 2], buf[buf.length - 1]);
     expect(head).toBe('PAR1');
     expect(tail).toBe('PAR1');
+    // O tamanho do footer (4 bytes antes do PAR1 final) tem de caber no ficheiro.
+    const footerLen = new DataView(buf.buffer, buf.byteOffset + buf.length - 8, 4).getUint32(0, true);
+    expect(footerLen).toBeGreaterThan(0);
+    expect(footerLen).toBeLessThan(buf.length - 12);
+    // Sem NaN nem texto "null": nulos vão em definition levels.
+    expect(Buffer.from(buf).includes(Buffer.from('NaN'))).toBe(false);
   });
 
   test('ORC começa com magic ORC', () => {
     const buf = gerarOrc(dados);
     expect(String.fromCharCode(buf[0], buf[1], buf[2])).toBe('ORC');
+    // Último byte = tamanho do postscript, que termina com o magic "ORC".
+    const psLen = buf[buf.length - 1];
+    const ps = buf.slice(buf.length - 1 - psLen, buf.length - 1);
+    expect(String.fromCharCode(...ps.slice(-3))).toBe('ORC');
+  });
+
+  test('Parquet e ORC aceitam relatório sem alunos', () => {
+    const vazio = dadosBase([]);
+    expect(gerarParquet(vazio).length).toBeGreaterThan(8);
+    expect(gerarOrc(vazio).length).toBeGreaterThan(8);
+    expect(gerarAvro(vazio).length).toBeGreaterThan(32);
   });
 
   test('FORMATOS_EXPORT cobre os 5 tipos pedidos', () => {

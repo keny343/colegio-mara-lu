@@ -31,6 +31,9 @@ const getEncoder = () => {
   };
 };
 
+/** "1PP" → "p_1PP": nomes válidos na spec Avro ([A-Za-z_][A-Za-z0-9_]*) e seguros em Parquet/ORC. */
+export const nomeColuna = (key) => `p_${String(key).replace(/[^A-Za-z0-9_]/g, '_')}`;
+
 export function linhasRelatorio(dados) {
   const discPorId = new Map((dados.disciplinas || []).map((d) => [d.id, d.nome]));
   const periodos = dados.periodos || [];
@@ -42,7 +45,10 @@ export function linhasRelatorio(dados) {
         aluno: a.aluno_nome,
         disciplina: discPorId.get(d.disciplina_id) || '',
         media_anual: d.media == null ? null : Number(d.media),
-        situacao: d.positiva == null ? 'Sem notas' : d.positiva ? 'Positiva' : 'Negativa',
+        // positiva só é definitiva com os 6 períodos lançados (ver backend); antes disso "Em curso".
+        situacao: d.positiva == null
+          ? (d.media == null ? 'Sem notas' : 'Em curso')
+          : d.positiva ? 'Positiva' : 'Negativa',
       };
       for (const p of periodos) {
         const v = d.periodos?.[p.key];
@@ -129,15 +135,11 @@ function concatBytes(chunks) {
   return out;
 }
 
+const byteArr = (...b) => Uint8Array.from(b);
+
 function u32le(n) {
   const b = new Uint8Array(4);
   new DataView(b.buffer).setUint32(0, n >>> 0, true);
-  return b;
-}
-
-function u64le(n) {
-  const b = new Uint8Array(8);
-  new DataView(b.buffer).setBigUint64(0, BigInt(n), true);
   return b;
 }
 
@@ -147,9 +149,9 @@ function f64le(n) {
   return b;
 }
 
-function avroLong(n) {
+/** Varint sem sinal (LEB128). */
+function uvarint(n) {
   let v = BigInt(n);
-  v = (v << 1n) ^ (v >> 63n);
   const bytes = [];
   while (v >= 0x80n) {
     bytes.push(Number((v & 0x7fn) | 0x80n));
@@ -159,19 +161,27 @@ function avroLong(n) {
   return Uint8Array.from(bytes);
 }
 
-function avroString(s) {
-  const raw = getEncoder().encode(String(s ?? ''));
-  return concatBytes([avroLong(raw.length), raw]);
+/** Varint com zig-zag (inteiros com sinal: Avro, Thrift Compact, ORC RLE v1 com sinal). */
+function zigzag(n) {
+  const v = BigInt(n);
+  return uvarint((v << 1n) ^ (v >> 63n));
 }
 
+// ---------------------------------------------------------------- Avro
+
+const avroString = (s) => {
+  const raw = getEncoder().encode(String(s ?? ''));
+  return concatBytes([zigzag(raw.length), raw]);
+};
+
 function avroNullUnionDouble(n) {
-  if (n == null || Number.isNaN(Number(n))) return avroLong(0);
-  return concatBytes([avroLong(1), f64le(Number(n))]);
+  if (n == null || Number.isNaN(Number(n))) return zigzag(0);
+  return concatBytes([zigzag(1), f64le(Number(n))]);
 }
 
 function avroNullUnionString(s) {
-  if (s == null) return avroLong(0);
-  return concatBytes([avroLong(1), avroString(s)]);
+  if (s == null) return zigzag(0);
+  return concatBytes([zigzag(1), avroString(s)]);
 }
 
 function randomSync() {
@@ -181,7 +191,7 @@ function randomSync() {
   return b;
 }
 
-/** Avro Object Container File (codec null). */
+/** Avro Object Container File (codec null). Colunas de período: p_1PP, p_1PT, ... */
 export function gerarAvro(dados) {
   const periodos = dados.periodos || [];
   const schema = {
@@ -192,7 +202,7 @@ export function gerarAvro(dados) {
       { name: 'numero', type: 'int' },
       { name: 'aluno', type: 'string' },
       { name: 'disciplina', type: 'string' },
-      ...periodos.map((p) => ({ name: p.key, type: ['null', 'double'], default: null })),
+      ...periodos.map((p) => ({ name: nomeColuna(p.key), type: ['null', 'double'], default: null })),
       { name: 'media_anual', type: ['null', 'double'], default: null },
       { name: 'situacao', type: ['null', 'string'], default: null },
     ],
@@ -200,231 +210,311 @@ export function gerarAvro(dados) {
   const sync = randomSync();
   const header = concatBytes([
     getEncoder().encode('Obj\x01'),
-    avroLong(2),
+    zigzag(2),
     avroString('avro.codec'),
-    avroString('null'),
+    getEncoder().encode('\x08null'),
     avroString('avro.schema'),
     avroString(JSON.stringify(schema)),
-    avroLong(0),
+    zigzag(0),
     sync,
   ]);
 
   const linhas = linhasRelatorio(dados);
   const records = linhas.map((r) => {
-    const parts = [avroLong(r.numero), avroString(r.aluno), avroString(r.disciplina)];
+    const parts = [zigzag(r.numero), avroString(r.aluno), avroString(r.disciplina)];
     for (const p of periodos) parts.push(avroNullUnionDouble(r[p.key]));
     parts.push(avroNullUnionDouble(r.media_anual));
     parts.push(avroNullUnionString(r.situacao));
     return concatBytes(parts);
   });
+  if (!linhas.length) return header;
   const blockData = concatBytes(records);
-  const block = concatBytes([avroLong(linhas.length), avroLong(blockData.length), blockData, sync]);
+  const block = concatBytes([zigzag(linhas.length), zigzag(blockData.length), blockData, sync]);
   return concatBytes([header, block]);
 }
 
-// ---- Parquet (v1, UNCOMPRESSED, PLAIN, colunas REQUIRED)
+// ---------------------------------------------------------------- Parquet
+// Parquet v1, página de dados PLAIN, sem compressão, um row group.
+// Thrift Compact: cabeçalho de campo = (delta de id << 4) | tipo; tamanhos = varint SEM zig-zag.
 
-function zzVarInt(n) {
-  return zzVarLong(n | 0);
-}
+const TT = { I32: 5, I64: 6, BINARY: 8, LIST: 9, STRUCT: 12 };
 
-function zzVarLong(n) {
-  let v = BigInt(n);
-  v = (v << 1n) ^ (v >> 63n);
-  const bytes = [];
-  while (v >= 0x80n) {
-    bytes.push(Number((v & 0x7fn) | 0x80n));
-    v >>= 7n;
+/** campos: [id, tipo, corpo][] com ids por ordem crescente. */
+function tStruct(campos) {
+  const out = [];
+  let ultimo = 0;
+  for (const [id, tipo, corpo] of campos) {
+    const delta = id - ultimo;
+    if (delta > 0 && delta <= 15) out.push(byteArr((delta << 4) | tipo));
+    else out.push(byteArr(tipo), zigzag(id));
+    out.push(corpo);
+    ultimo = id;
   }
-  bytes.push(Number(v));
-  return Uint8Array.from(bytes);
+  out.push(byteArr(0));
+  return concatBytes(out);
+}
+const tInt = (n) => zigzag(n);
+const tBinary = (bytes) => concatBytes([uvarint(bytes.length), bytes]);
+const tString = (s) => tBinary(getEncoder().encode(String(s ?? '')));
+function tList(tipo, itens) {
+  const n = itens.length;
+  const cab = n < 15 ? byteArr((n << 4) | tipo) : concatBytes([byteArr(0xf0 | tipo), uvarint(n)]);
+  return concatBytes([cab, ...itens]);
 }
 
-const T = { I32: 5, I64: 6, STRING: 8, LIST: 9, STRUCT: 12 };
+// Tipos físicos Parquet
+const PQ = { INT32: 1, DOUBLE: 5, BYTE_ARRAY: 6 };
 
-function cField(id, type, body) {
-  return concatBytes([Uint8Array.from([((type & 0xf) << 4) | (id & 0xf)]), body]);
-}
-function cStop() {
-  return Uint8Array.from([0]);
-}
-function cString(s) {
-  const raw = getEncoder().encode(s);
-  return concatBytes([zzVarInt(raw.length), raw]);
-}
-function cList(type, items) {
-  const n = items.length;
-  const head = n < 15
-    ? Uint8Array.from([((n & 0xf) << 4) | (type & 0xf)])
-    : concatBytes([Uint8Array.from([(0xf << 4) | (type & 0xf)]), zzVarInt(n)]);
-  return concatBytes([head, ...items]);
+/** Definition levels (largura 1 bit) em RLE/bit-packed híbrido, só com runs RLE. */
+function pqDefLevels(presentes) {
+  const runs = [];
+  let i = 0;
+  while (i < presentes.length) {
+    let j = i;
+    while (j < presentes.length && presentes[j] === presentes[i]) j++;
+    runs.push(uvarint((j - i) << 1), byteArr(presentes[i]));
+    i = j;
+  }
+  const corpo = concatBytes(runs);
+  return concatBytes([u32le(corpo.length), corpo]);
 }
 
 export function gerarParquet(dados) {
   const periodos = dados.periodos || [];
-  const colDefs = [
-    { name: 'numero', kind: 'int32' },
-    { name: 'aluno', kind: 'byte_array' },
-    { name: 'disciplina', kind: 'byte_array' },
-    ...periodos.map((p) => ({ name: p.key, kind: 'double' })),
-    { name: 'media_anual', kind: 'double' },
-    { name: 'situacao', kind: 'byte_array' },
+  const rows = linhasRelatorio(dados);
+  const numRows = rows.length;
+  const enc = getEncoder();
+
+  const colunas = [
+    { nome: 'numero', tipo: PQ.INT32, opcional: false, get: (r) => Number(r.numero) || 0 },
+    { nome: 'aluno', tipo: PQ.BYTE_ARRAY, opcional: false, get: (r) => String(r.aluno ?? '') },
+    { nome: 'disciplina', tipo: PQ.BYTE_ARRAY, opcional: false, get: (r) => String(r.disciplina ?? '') },
+    ...periodos.map((p) => ({
+      nome: nomeColuna(p.key), tipo: PQ.DOUBLE, opcional: true, get: (r) => (r[p.key] == null ? null : Number(r[p.key])),
+    })),
+    { nome: 'media_anual', tipo: PQ.DOUBLE, opcional: true, get: (r) => (r.media_anual == null ? null : Number(r.media_anual)) },
+    { nome: 'situacao', tipo: PQ.BYTE_ARRAY, opcional: false, get: (r) => String(r.situacao ?? '') },
   ];
-  const linhas = linhasRelatorio(dados).map((r) => {
-    const o = {
-      numero: Number(r.numero) || 0,
-      aluno: String(r.aluno ?? ''),
-      disciplina: String(r.disciplina ?? ''),
-      media_anual: r.media_anual == null ? Number.NaN : Number(r.media_anual),
-      situacao: String(r.situacao ?? ''),
-    };
-    for (const p of periodos) o[p.key] = r[p.key] == null ? Number.NaN : Number(r[p.key]);
-    return o;
-  });
-  const numRows = linhas.length;
-  const MAGIC = getEncoder().encode('PAR1');
 
-  const pages = [];
-  const colMetas = [];
-  let fileOffset = 4;
+  const MAGIC = enc.encode('PAR1');
+  const paginas = [];
+  const chunks = [];
+  let offset = 4;
 
-  for (const col of colDefs) {
-    const parts = [];
-    for (const row of linhas) {
-      const v = row[col.name];
-      if (col.kind === 'int32') {
-        const b = new Uint8Array(4);
-        new DataView(b.buffer).setInt32(0, v | 0, true);
-        parts.push(b);
-      } else if (col.kind === 'double') {
-        parts.push(f64le(Number.isFinite(v) ? v : Number.NaN));
-      } else {
-        const raw = getEncoder().encode(String(v ?? ''));
-        parts.push(concatBytes([u32le(raw.length), raw]));
+  if (numRows > 0) {
+    for (const col of colunas) {
+      const valores = rows.map(col.get);
+      const presentes = valores.map((v) => (v === null || Number.isNaN(v) ? 0 : 1));
+      const naoNulos = valores.filter((v, i) => presentes[i] === 1);
+      const partes = [];
+      if (col.opcional) partes.push(pqDefLevels(presentes));
+      for (const v of naoNulos) {
+        if (col.tipo === PQ.INT32) {
+          const b = new Uint8Array(4);
+          new DataView(b.buffer).setInt32(0, v | 0, true);
+          partes.push(b);
+        } else if (col.tipo === PQ.DOUBLE) {
+          partes.push(f64le(v));
+        } else {
+          const raw = enc.encode(v);
+          partes.push(u32le(raw.length), raw);
+        }
       }
-    }
-    const valuesBuf = concatBytes(parts);
-    const dataPageHeader = concatBytes([
-      cField(1, T.I32, zzVarInt(numRows)),
-      cField(2, T.I32, zzVarInt(0)),
-      cField(3, T.I32, zzVarInt(3)),
-      cField(4, T.I32, zzVarInt(4)),
-      cStop(),
-    ]);
-    const pageHeader = concatBytes([
-      cField(1, T.I32, zzVarInt(0)),
-      cField(2, T.I32, zzVarInt(valuesBuf.length)),
-      cField(3, T.I32, zzVarInt(valuesBuf.length)),
-      cField(5, T.STRUCT, dataPageHeader),
-      cStop(),
-    ]);
-    const page = concatBytes([pageHeader, valuesBuf]);
-    colMetas.push({ name: col.name, kind: col.kind, offset: fileOffset, size: page.length, numValues: numRows });
-    pages.push(page);
-    fileOffset += page.length;
-  }
-
-  const body = concatBytes(pages);
-
-  const schemaEls = [
-    concatBytes([
-      cField(4, T.STRING, cString('schema')),
-      cField(5, T.I32, zzVarInt(colDefs.length)),
-      cStop(),
-    ]),
-    ...colDefs.map((col) => {
-      const typeCode = col.kind === 'int32' ? 1 : col.kind === 'double' ? 5 : 6;
-      return concatBytes([
-        cField(1, T.I32, zzVarInt(typeCode)),
-        cField(3, T.I32, zzVarInt(0)),
-        cField(4, T.STRING, cString(col.name)),
-        cStop(),
+      const dados_ = concatBytes(partes);
+      const dph = tStruct([
+        [1, TT.I32, tInt(numRows)],
+        [2, TT.I32, tInt(0)], // encoding PLAIN
+        [3, TT.I32, tInt(3)], // definition levels: RLE
+        [4, TT.I32, tInt(3)], // repetition levels: RLE
       ]);
+      const cab = tStruct([
+        [1, TT.I32, tInt(0)], // DATA_PAGE
+        [2, TT.I32, tInt(dados_.length)],
+        [3, TT.I32, tInt(dados_.length)],
+        [5, TT.STRUCT, dph],
+      ]);
+      const pagina = concatBytes([cab, dados_]);
+      const meta = tStruct([
+        [1, TT.I32, tInt(col.tipo)],
+        [2, TT.LIST, tList(TT.I32, col.opcional ? [tInt(0), tInt(3)] : [tInt(0)])],
+        [3, TT.LIST, tList(TT.BINARY, [tString(col.nome)])],
+        [4, TT.I32, tInt(0)], // UNCOMPRESSED
+        [5, TT.I64, tInt(numRows)],
+        [6, TT.I64, tInt(pagina.length)],
+        [7, TT.I64, tInt(pagina.length)],
+        [9, TT.I64, tInt(offset)],
+      ]);
+      chunks.push(tStruct([[2, TT.I64, tInt(offset)], [3, TT.STRUCT, meta]]));
+      paginas.push(pagina);
+      offset += pagina.length;
+    }
+  }
+  const corpo = concatBytes(paginas);
+
+  const schema = [
+    tStruct([[4, TT.BINARY, tString('schema')], [5, TT.I32, tInt(colunas.length)]]),
+    ...colunas.map((col) => {
+      const campos = [
+        [1, TT.I32, tInt(col.tipo)],
+        [3, TT.I32, tInt(col.opcional ? 1 : 0)], // 0 REQUIRED, 1 OPTIONAL
+        [4, TT.BINARY, tString(col.nome)],
+      ];
+      if (col.tipo === PQ.BYTE_ARRAY) campos.push([6, TT.I32, tInt(0)]); // converted_type UTF8
+      return tStruct(campos);
     }),
   ];
 
-  const columnChunks = colMetas.map((c) => {
-    const typeCode = c.kind === 'int32' ? 1 : c.kind === 'double' ? 5 : 6;
-    const meta = concatBytes([
-      cField(1, T.I32, zzVarInt(typeCode)),
-      cField(2, T.LIST, cList(T.I32, [zzVarInt(0)])),
-      cField(3, T.LIST, cList(T.STRING, [cString(c.name)])),
-      cField(4, T.I32, zzVarInt(0)),
-      cField(5, T.I64, zzVarLong(c.numValues)),
-      cField(6, T.I64, zzVarLong(c.size)),
-      cField(7, T.I64, zzVarLong(c.size)),
-      cField(9, T.I64, zzVarLong(c.offset)),
-      cStop(),
-    ]);
-    return concatBytes([
-      cField(1, T.I64, zzVarLong(c.offset)),
-      cField(2, T.STRUCT, meta),
-      cStop(),
-    ]);
-  });
+  const rowGroups = numRows > 0
+    ? [tStruct([
+      [1, TT.LIST, tList(TT.STRUCT, chunks)],
+      [2, TT.I64, tInt(corpo.length)],
+      [3, TT.I64, tInt(numRows)],
+    ])]
+    : [];
 
-  const rowGroup = concatBytes([
-    cField(1, T.LIST, cList(T.STRUCT, columnChunks)),
-    cField(2, T.I64, zzVarLong(numRows)),
-    cField(3, T.I64, zzVarLong(body.length)),
-    cStop(),
+  const fileMeta = tStruct([
+    [1, TT.I32, tInt(1)],
+    [2, TT.LIST, tList(TT.STRUCT, schema)],
+    [3, TT.I64, tInt(numRows)],
+    [4, TT.LIST, tList(TT.STRUCT, rowGroups)],
+    [6, TT.BINARY, tString('colegio-mara-lu')],
   ]);
 
-  const fileMeta = concatBytes([
-    cField(1, T.I32, zzVarInt(1)),
-    cField(2, T.LIST, cList(T.STRUCT, schemaEls)),
-    cField(3, T.I64, zzVarLong(numRows)),
-    cField(4, T.LIST, cList(T.STRUCT, [rowGroup])),
-    cField(5, T.STRING, cString('colegio-mara-lu')),
-    cStop(),
-  ]);
-
-  return concatBytes([MAGIC, body, fileMeta, u32le(fileMeta.length), MAGIC]);
+  return concatBytes([MAGIC, corpo, fileMeta, u32le(fileMeta.length), MAGIC]);
 }
 
-/**
- * ORC columnar (um stripe, sem compressão).
- * Magic "ORC\\x01" + stripe tipado + postscript com metadados da escola.
- */
+// ---------------------------------------------------------------- ORC
+// ORC v0.12 real: um stripe, sem compressão, colunas DIRECT (RLE v1), protobuf escrito à mão.
+
+const pbVar = (campo, n) => concatBytes([uvarint(campo << 3), uvarint(n)]);
+const pbBytes = (campo, bytes) => concatBytes([uvarint((campo << 3) | 2), uvarint(bytes.length), bytes]);
+const pbPacked = (campo, nums) => pbBytes(campo, concatBytes(nums.map((n) => uvarint(n))));
+
+/** RLE v1 de inteiros: só literais (até 128 por bloco). */
+function orcRleInts(valores, comSinal) {
+  const out = [];
+  for (let i = 0; i < valores.length; i += 128) {
+    const bloco = valores.slice(i, i + 128);
+    out.push(byteArr(256 - bloco.length));
+    for (const v of bloco) out.push(comSinal ? zigzag(v) : uvarint(v));
+  }
+  return concatBytes(out);
+}
+
+/** Byte RLE: só literais (até 128 por bloco). */
+function orcByteRle(bytes) {
+  const out = [];
+  for (let i = 0; i < bytes.length; i += 128) {
+    const bloco = bytes.slice(i, i + 128);
+    out.push(byteArr(256 - bloco.length), Uint8Array.from(bloco));
+  }
+  return concatBytes(out);
+}
+
+/** Boolean RLE (stream PRESENT): bits MSB primeiro, depois byte RLE. */
+function orcBooleans(flags) {
+  const bytes = [];
+  for (let i = 0; i < flags.length; i += 8) {
+    let b = 0;
+    for (let k = 0; k < 8; k++) if (flags[i + k]) b |= 0x80 >> k;
+    bytes.push(b);
+  }
+  return orcByteRle(bytes);
+}
+
+const ORC_KIND = { INT: 3, DOUBLE: 6, STRING: 7, STRUCT: 12 };
+const ORC_STREAM = { PRESENT: 0, DATA: 1, LENGTH: 2 };
+
 export function gerarOrc(dados) {
   const periodos = dados.periodos || [];
-  const linhas = linhasRelatorio(dados);
-  const meta = metaRelatorio(dados);
-  const colNames = ['numero', 'aluno', 'disciplina', ...periodos.map((p) => p.key), 'media_anual', 'situacao'];
-  const colTypes = ['int', 'string', 'string', ...periodos.map(() => 'double'), 'double', 'string'];
-
+  const rows = linhasRelatorio(dados);
+  const n = rows.length;
   const enc = getEncoder();
-  const parts = [u32le(linhas.length), u32le(colNames.length)];
-  for (let c = 0; c < colNames.length; c++) {
-    const name = enc.encode(colNames[c]);
-    const typeCode = colTypes[c] === 'int' ? 1 : colTypes[c] === 'double' ? 2 : 3;
-    parts.push(Uint8Array.from([typeCode]), u32le(name.length), name);
-    for (const row of linhas) {
-      const v = row[colNames[c]];
-      if (typeCode === 1) {
-        parts.push(u32le(Number(v) || 0));
-      } else if (typeCode === 2) {
-        const present = v == null || Number.isNaN(Number(v)) ? 0 : 1;
-        parts.push(Uint8Array.from([present]));
-        if (present) parts.push(f64le(Number(v)));
-      } else {
-        const raw = enc.encode(String(v ?? ''));
-        parts.push(u32le(raw.length), raw);
-      }
-    }
-  }
-  const metaJson = enc.encode(JSON.stringify(meta));
-  parts.push(u32le(metaJson.length), metaJson);
 
-  const stripe = concatBytes(parts);
-  const magic = enc.encode('ORC\x01');
-  const postscript = concatBytes([
-    Uint8Array.from([1]),
-    u32le(stripe.length),
-    u64le(linhas.length),
-    enc.encode('colegio-mara-lu-orc'),
+  const colunas = [
+    { nome: 'numero', kind: ORC_KIND.INT, get: (r) => Number(r.numero) || 0 },
+    { nome: 'aluno', kind: ORC_KIND.STRING, get: (r) => String(r.aluno ?? '') },
+    { nome: 'disciplina', kind: ORC_KIND.STRING, get: (r) => String(r.disciplina ?? '') },
+    ...periodos.map((p) => ({
+      nome: nomeColuna(p.key), kind: ORC_KIND.DOUBLE, get: (r) => (r[p.key] == null ? null : Number(r[p.key])),
+    })),
+    { nome: 'media_anual', kind: ORC_KIND.DOUBLE, get: (r) => (r.media_anual == null ? null : Number(r.media_anual)) },
+    { nome: 'situacao', kind: ORC_KIND.STRING, get: (r) => String(r.situacao ?? '') },
+  ];
+
+  const header = enc.encode('ORC');
+
+  // Tipos: coluna 0 = struct raiz; colunas 1..N = campos
+  const tipos = [
+    concatBytes([
+      pbVar(1, ORC_KIND.STRUCT),
+      pbPacked(2, colunas.map((_, i) => i + 1)),
+      ...colunas.map((c) => pbBytes(3, enc.encode(c.nome))),
+    ]),
+    ...colunas.map((c) => pbVar(1, c.kind)),
+  ];
+
+  const stats = [pbVar(1, n), ...colunas.map(() => pbVar(1, n))].map((s) => pbBytes(7, s));
+
+  let stripes = [];
+  let stripeBytes = new Uint8Array(0);
+
+  if (n > 0) {
+    const streams = []; // { kind, coluna, dados }
+    colunas.forEach((col, i) => {
+      const id = i + 1;
+      const valores = rows.map(col.get);
+      const presentes = valores.map((v) => v !== null && !Number.isNaN(v));
+      const naoNulos = valores.filter((_, k) => presentes[k]);
+      if (presentes.some((p) => !p)) {
+        streams.push({ kind: ORC_STREAM.PRESENT, coluna: id, dados: orcBooleans(presentes) });
+      }
+      if (col.kind === ORC_KIND.INT) {
+        streams.push({ kind: ORC_STREAM.DATA, coluna: id, dados: orcRleInts(naoNulos, true) });
+      } else if (col.kind === ORC_KIND.DOUBLE) {
+        streams.push({ kind: ORC_STREAM.DATA, coluna: id, dados: concatBytes(naoNulos.map(f64le)) });
+      } else {
+        const raws = naoNulos.map((s) => enc.encode(s));
+        streams.push({ kind: ORC_STREAM.DATA, coluna: id, dados: concatBytes(raws) });
+        streams.push({ kind: ORC_STREAM.LENGTH, coluna: id, dados: orcRleInts(raws.map((r) => r.length), false) });
+      }
+    });
+
+    const dadosStripe = concatBytes(streams.map((s) => s.dados));
+    const rodape = concatBytes([
+      ...streams.map((s) => pbBytes(1, concatBytes([
+        pbVar(1, s.kind), pbVar(2, s.coluna), pbVar(3, s.dados.length),
+      ]))),
+      ...[0, ...colunas.map(() => 0)].map(() => pbBytes(2, pbVar(1, 0))), // DIRECT
+    ]);
+    stripeBytes = concatBytes([dadosStripe, rodape]);
+    stripes = [pbBytes(3, concatBytes([
+      pbVar(1, header.length), // offset
+      pbVar(2, 0), // indexLength
+      pbVar(3, dadosStripe.length),
+      pbVar(4, rodape.length),
+      pbVar(5, n),
+    ]))];
+  }
+
+  const footer = concatBytes([
+    pbVar(1, header.length),
+    pbVar(2, stripeBytes.length),
+    ...stripes,
+    ...tipos.map((t) => pbBytes(4, t)),
+    pbVar(6, n),
+    ...stats,
   ]);
-  return concatBytes([magic, stripe, postscript, Uint8Array.from([Math.min(postscript.length, 255)])]);
+
+  const postscript = concatBytes([
+    pbVar(1, footer.length),
+    pbVar(2, 0), // compressão: NONE
+    pbPacked(4, [0, 12]),
+    pbVar(5, 0), // metadataLength
+    pbBytes(8000, enc.encode('ORC')),
+  ]);
+
+  return concatBytes([header, stripeBytes, footer, postscript, byteArr(postscript.length)]);
 }
 
 export function nomeFicheiro(dados, ext) {

@@ -11,3 +11,8 @@ backend/tmp_*
 *.pptx
 Thumbs.db
 .DS_Store
+
+# IDE / ferramentas locais
+.vs/
+*.suo
+*.user

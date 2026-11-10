@@ -2,6 +2,7 @@ const db = require('../config/database');
 const {
   podeAcederNotas, coordenadorPodeGerirTurma, turmaVisivelParaNotas,
   PERIODOS_VALIDOS, LABELS_PERIODOS, limitesNota, normalizarPeriodoKey, mediaPeriodos,
+  periodosCompletos,
 } = require('../utils/academicoRules');
 const { ensureNotasPeriodosSchema } = require('../utils/ensureNotasSchema');
 
@@ -99,6 +100,9 @@ const relatorioNotasTurma = async (req, res) => {
       }
     }
 
+    // Só há "disciplina seleccionada" quando o pedido filtrou por disciplina.
+    const disciplinaSelecionada = disciplinaId !== null && disciplinas.length === 1 ? disciplinas[0] : null;
+
     const [alunos] = await db.query(
       `SELECT m.id AS matricula_id, a.id AS aluno_id, a.nome AS aluno_nome
          FROM matriculas m
@@ -119,7 +123,7 @@ const relatorioNotasTurma = async (req, res) => {
     if (!disciplinas.length || !alunos.length) {
       return res.json({
         turma: cabecalho, limites, nota_minima: minimo, periodos, disciplinas,
-        disciplina_selecionada: disciplinas.length === 1 ? disciplinas[0] : null, alunos: [],
+        disciplina_selecionada: disciplinaSelecionada, alunos: [],
         gerado_em: new Date().toISOString(),
       });
     }
@@ -146,7 +150,8 @@ const relatorioNotasTurma = async (req, res) => {
         const mediaAnual = mediaPeriodos(p);
         return {
           disciplina_id: d.id, periodos: p, media: mediaAnual,
-          positiva: mediaAnual == null ? null : parseFloat(mediaAnual) >= minimo,
+          // Positiva/negativa só é definitiva com os 6 períodos lançados (igual a situacaoAprovacao).
+          positiva: mediaAnual == null || !periodosCompletos(p) ? null : parseFloat(mediaAnual) >= minimo,
         };
       });
       return {
@@ -158,7 +163,7 @@ const relatorioNotasTurma = async (req, res) => {
 
     return res.json({
       turma: cabecalho, limites, nota_minima: minimo, periodos, disciplinas,
-      disciplina_selecionada: disciplinas.length === 1 ? disciplinas[0] : null,
+      disciplina_selecionada: disciplinaSelecionada,
       alunos: lista, gerado_em: new Date().toISOString(),
     });
   } catch (err) {
