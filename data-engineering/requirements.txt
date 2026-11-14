@@ -1,0 +1,8 @@
+# Laboratório de Engenharia de Dados — Colégio Mara & Lu
+fastavro>=1.9.0
+pyarrow>=14.0.0
+psutil>=5.9.0
+click>=8.1.0
+pytest>=7.4.0
+# pandas é opcional; o lab usa streaming e evita carregar tudo em memória
+# pandas>=2.0.0

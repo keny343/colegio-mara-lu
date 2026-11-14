@@ -117,6 +117,14 @@ router.get('/staff/usuarios', staffMiddleware, listarUsuarios);
 router.get('/staff/equipa', staffMiddleware, listarEquipaCoordenador);
 router.post('/admin/series/sincronizar-vagas', adminMiddleware, sincronizarVagasSeries);
 
+// ===== LABORATÓRIO DE DADOS (admin) — JSONL / CSV / Avro / Parquet / SQL =====
+const labController = require('../controllers/labController');
+router.get('/admin/lab/status', adminMiddleware, labController.status);
+router.post('/admin/lab/generate', adminMiddleware, labController.generate);
+router.post('/admin/lab/validate', adminMiddleware, labController.validate);
+router.post('/admin/lab/benchmark', adminMiddleware, labController.benchmark);
+router.get('/admin/lab/download/:out_dir/:file', adminMiddleware, labController.download);
+
 // ===== ACADÉMICO (admin/coordenador) =====
 router.get('/staff/cursos', staffMiddleware, listarCursos);
 router.post('/staff/cursos', adminMiddleware, criarCurso);

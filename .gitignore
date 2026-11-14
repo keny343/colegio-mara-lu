@@ -16,3 +16,22 @@ Thumbs.db
 .vs/
 *.suo
 *.user
+# Laboratorio de engenharia de dados
+data-engineering/.venv/
+data-engineering/venv/
+data-engineering/output/
+data-engineering/logs/
+data-engineering/reports/
+data-engineering/**/__pycache__/
+data-engineering/.pytest_cache/
+data-engineering/*.db
+data-engineering/*.sqlite
+data-engineering/*.sqlite3
+data-engineering/**/*.jsonl
+data-engineering/**/*.avro
+data-engineering/**/*.parquet
+data-engineering/output/**/*.csv
+data-engineering/**/*.egg-info/
+
+# Saídas do lab no backend (painel admin)
+backend/lab-output/

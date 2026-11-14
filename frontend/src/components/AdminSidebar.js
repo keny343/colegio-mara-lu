@@ -1,6 +1,6 @@
 import React from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
-import { LayoutDashboard, FileText, Users, BookOpen, School, ClipboardList, FileUp, LogOut, MessageCircle } from 'lucide-react';
+import { LayoutDashboard, FileText, Users, BookOpen, School, ClipboardList, FileUp, LogOut, MessageCircle, Database } from 'lucide-react';
 import { podeEditarNotas } from '../utils/roles';
 import { useAuth } from '../contexts/AuthContext';
 import { useNotification } from '../contexts/NotificationContext';
@@ -36,6 +36,11 @@ export default function AdminSidebar() {
       {isAdmin && (
         <NavLink to="/admin/series" className={({ isActive }) => `admin-navlink ${isActive ? 'active' : ''}`}>
           <BookOpen size={18} /> Classes / Cursos
+        </NavLink>
+      )}
+      {isAdmin && (
+        <NavLink to="/admin/lab-dados" className={({ isActive }) => `admin-navlink ${isActive ? 'active' : ''}`}>
+          <Database size={18} /> Lab de dados
         </NavLink>
       )}
       {(isAdmin || isCoordenador || isProfessorCoord) && (
