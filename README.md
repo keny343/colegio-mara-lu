@@ -1,209 +1,95 @@
 # Colégio Mara & Lu
 
-**School enrollment & academic management platform** — Full Stack portfolio flagship.
+## Laboratório de geração e benchmark de dados
 
-React · Node.js/Express · MySQL · JWT/RBAC · Jest · Playwright · Vercel · Render
+Este projecto inclui um laboratório independente para gerar grandes volumes de dados sintéticos em lotes, persistir o mesmo conjunto em diferentes formatos e comparar desempenho, validação e consumo de disco.
 
----
+## Objetivo
 
-## Problem
+O módulo permite:
+- gerar um conjunto determinístico com seed fixa
+- processar em lotes para não carregar tudo em memória
+- escrever para JSON Lines, CSV, Avro, Parquet e SQLite
+- validar equivalência de contagens, somas e hashes
+- mediar tempo de escrita, leitura, agregação e tamanho em disco
+- exportar um resumo em JSON e um relatório Markdown
 
-Schools often manage enrollments, grades, absences, and family communication across spreadsheets, paper, and fragmented chats. That creates:
+## Estrutura
 
-- Slow enrollment review
-- Unclear vacancy control
-- Weak audit of who changed what
-- No single place for students/families to follow academic progress
+- `backend/scripts/run-data-lab.js` — comando principal de execução
+- `backend/src/data-lab/generator.js` — geração de dados determinística
+- `backend/src/data-lab/writers.js` — serialização e leitura dos formatos
 
-## Solution
+## Requisitos
 
-A role-based web system that covers the full cycle:
+- Node.js 20+
+- SQLite 3 (via `better-sqlite3`)
+- as libs do backend já são instaladas via `npm install`
 
-**Public application → staff review → enrollment → academic year (grades, absences, materials, messaging)**
+## Execução
 
-Built as a real product architecture (SPA + secured API + MySQL), not a classroom CRUD demo.
+```bash
+cd backend
+npm install
+npm run data:lab -- --count 100000 --batch 10000 --seed 42 --destinations jsonl,csv,avro,parquet,sql --repetitions 1
+```
 
-## Live demo
+Também pode usar o comando curto:
 
-| Layer | URL |
-|-------|-----|
-| Frontend | https://colegio-mara-lu.vercel.app/ |
-| Backend | https://colegio-mara-lu-backend.onrender.com |
-| Health | https://colegio-mara-lu-backend.onrender.com/health |
+```bash
+npm run data:lab:sample
+```
 
-> Render free tiers may cold-start; wait a few seconds on first request.
+## Saída
 
-### Sign in and look around
-
-The whole point of the system is that four people see four different things, so
-there is an account for each. Password for all of them: **`demo1234`**.
-
-| Role | Email | What it shows |
-|------|-------|---------------|
-| Direcção (admin) | `admin.demo@colegio.ao` | KPIs, one pending application to approve or reject, every class and user |
-| Coordenação | `coordenador.demo@colegio.ao` | The same screens narrowed to the course and level in their scope |
-| Professor | `professor.demo@colegio.ao` | Their four subjects, the class roster, grade entry and absences |
-| Aluno | `aluno.demo@colegio.ao` | Joana's timetable, grade sheet with trimester averages, and her absences |
-
-The demo carries a class with a full curriculum, a grade sheet with two of three
-trimesters filled in, three absences (one justified) and an application waiting
-for review — so no screen is empty, and the coordinator's narrower view is
-visibly narrower than the admin's.
-
-It is public, so treat it as a sandbox: anything can be edited or deleted by
-anyone. `npm run seed:demo` in `backend/` puts it back. That script only writes
-its own records, resets the four passwords, and returns the application to
-pending; it never touches other data.
-
-## Screenshots
-
-The same demo data, seen from three roles.
-
-**Direcção** — enrolment KPIs, status split, and vacancies per class and course.
-
-![Admin dashboard: KPIs, the pending/approved split, and the vacancy table](./screenshots/03-dashboard.png)
-
-An application waiting for review, with the guardian's contact beside the applicant.
-
-![Enrolment management filtered to pending applications](./screenshots/06-inscricoes.png)
-
-**Professor** — their classes with, per subject, who has grades, who does not, and how many absences.
-
-![Professor panel: four subjects, grade coverage and absences per subject](./screenshots/07-professor.png)
-
-**Aluno** — the class, the timetable, and a grade sheet with trimester and annual averages.
-
-![Student portal: enrolment details, subjects, and the grade sheet](./screenshots/05-portal.png)
-
-And the public side: the landing page and the enrolment form that starts the whole cycle.
-
-![Landing page — Colégio Mara & Lu](./screenshots/01-landing.png)
-
-![Public enrollment form](./screenshots/04-inscricao.png)
-
-More capture notes: [`screenshots/README.md`](./screenshots/README.md)
-
-## Architecture
+Os resultados são guardados em:
 
 ```text
-React (Vercel) ──HTTPS/REST──▶ Express API (Render) ──▶ MySQL
-                                      │
-                                      └──▶ File storage (Supabase)
+backend/data-lab-output/
+  run-1/
+    lab-summary.json
+    lab-report.md
+    jsonl.jsonl
+    csv.csv
+    avro.avro
+    parquet.parquet
+    dataset.sqlite
 ```
 
-Deep dive: [`docs/ARCHITECTURE.md`](./docs/ARCHITECTURE.md)
+## Esquema de dados
 
-## Features
+O conjunto usa um modelo de transações sintéticas com estes campos:
 
-| Area | Highlights |
-|------|------------|
-| **Auth & RBAC** | Admin, coordenador, professor, aluno — scoped coordinator access |
-| **Enrollments** | Public form, document upload, status workflow, vacancy sync |
-| **Academic** | Courses, subjects, classes, schedules, curriculum plans |
-| **Grades** | Period model (1PP/1PT…), grade sheets, edit rules |
-| **Attendance** | Absences + justifications |
-| **Comms** | Notifications + internal messages |
-| **Dashboards** | Staff KPIs, charts, vacancy table |
+- id
+- cliente_id
+- produto_id
+- data_transacao
+- categoria
+- quantidade
+- preco_unitario
+- valor_total
+- estado
+- descricao
+- localizacao
+- metadados
 
-## Tech stack
+## Regras determinísticas
 
-**Frontend:** React 18, React Router, Axios, Recharts, Lucide, React Toastify, CRA  
-**Backend:** Node.js, Express, mysql2, JWT, bcryptjs, Helmet, express-rate-limit, Multer, cookie-parser  
-**Data / files:** MySQL, Supabase storage  
-**Tests:** Jest + Testing Library, Playwright  
-**Deploy:** Vercel + Render  
+- a mesma seed produz sempre a mesma sequência de registos
+- a geração segue lotes com `batchSize`
+- os valores numéricos usam aritmética decimal controlada em duas casas decimais
+- as chaves e os hashes são comparados para validar equivalência entre destinos
 
-## Security
+## Validação
 
-- JWT in **httpOnly** cookies
-- bcrypt password hashing + password policy
-- Rate limiting (API, login, public enrollment)
-- Per-account login lockout
-- Helmet + CORS allowlist
-- Upload type/size filters
-- Secrets only via environment variables
+A validação principal compara:
+- contagem total de registos
+- somatório de `valor_total`
+- hashes determinísticos dos primeiros registos
 
-Details: [`docs/SECURITY.md`](./docs/SECURITY.md)
+## Observações
 
-## Tests
+- O laboratório foi desenhado para ser independente da aplicação escolar principal.
+- Não altera o fluxo normal do sistema Colégio Mara & Lu.
+- Os resultados podem ser usados para relatório técnico, benchmark e comparação de formatos.
 
-```bash
-cd frontend
-npm test          # unit / component
-npm run test:e2e  # Playwright (needs running stack)
-npm run build     # production build
-
-cd ../backend
-npm test          # unit (no DB required)
-```
-
-Guide: [`docs/TESTING.md`](./docs/TESTING.md)
-
-## Documentation
-
-| Doc | Topic |
-|-----|--------|
-| [ARCHITECTURE.md](./docs/ARCHITECTURE.md) | System design |
-| [SECURITY.md](./docs/SECURITY.md) | Auth, RBAC, hardening |
-| [API.md](./docs/API.md) | Endpoint map |
-| [DATABASE.md](./docs/DATABASE.md) | Schema & evolution |
-| [TESTING.md](./docs/TESTING.md) | Test strategy |
-| [DEPLOYMENT.md](./docs/DEPLOYMENT.md) | Vercel / Render / env |
-| [DECISIONS.md](./docs/DECISIONS.md) | ADRs |
-| [INSTALACAO.md](./INSTALACAO.md) | Local install |
-
-## Quick start
-
-```bash
-# Database
-# Create MySQL DB and run backend/database.sql
-
-# Backend
-cd backend
-cp .env.example .env   # fill DB + JWT_SECRET
-npm install
-npm run dev            # http://localhost:49152
-
-# Frontend
-cd frontend
-cp .env.example .env   # optional when using proxy
-npm install
-npm start              # http://localhost:3000
-```
-
-A fresh database has no users, and staff accounts are created by staff — there is
-no open signup. `cd backend && npm run seed:demo` creates one account per role
-(password `demo1234`) plus a class, a curriculum, a grade sheet and a pending
-application, which is enough to click through every screen. Re-running it is
-safe: each record is matched on its natural key.
-
-Full checklist: [`INSTALACAO.md`](./INSTALACAO.md)
-
-## Challenges & learnings
-
-- Cross-origin auth between Vercel and Render (cookie `Secure` / `SameSite`)
-- Coordinator scope vs global admin without leaking privileges
-- Dense admin tables at 100% zoom without useless horizontal scroll
-- Enrollment concurrency (`updated_at` / 409 conflicts)
-- Keeping Design System tokens consistent across admin, professor, and portal
-
-## Technical decisions
-
-See [`docs/DECISIONS.md`](./docs/DECISIONS.md) — cookie sessions, RBAC refresh, boot-time schema helpers, public enrollment without open signup.
-
-## Roadmap
-
-- [x] Backend automated test suite (unit: auth, RBAC, uploads, password policy)
-- [ ] OpenAPI / Swagger export
-- [ ] Expand Playwright coverage (enrollment happy path)
-- [ ] Observability (structured metrics dashboard)
-- [ ] Optional admin 2FA
-
-## Author
-
-**Adnírcio Inocêncio** — Software / Full Stack Developer  
-GitHub: [keny343](https://github.com/keny343)
-
----
-
-Licensed for portfolio demonstration. Do not commit secrets. Use `.env` examples only.

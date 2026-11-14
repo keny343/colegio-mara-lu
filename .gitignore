@@ -1,18 +1,7 @@
-node_modules/
-frontend/node_modules/
-backend/node_modules/
-frontend/build/
-.env
-frontend/.env
-backend/.env
-backend/uploads/
-backend/tmp_*
-*.log
-*.pptx
-Thumbs.db
-.DS_Store
-
-# IDE / ferramentas locais
-.vs/
-*.suo
-*.user
+backend/data-lab-output/
+backend/*.sqlite
+backend/*.db
+backend/*.avro
+backend/*.parquet
+backend/*.jsonl
+backend/*.csv
