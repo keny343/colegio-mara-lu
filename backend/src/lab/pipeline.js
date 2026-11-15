@@ -6,6 +6,9 @@ const crypto = require('crypto');
 const { generateBatches, SCHEMA_FIELDS } = require('./generator');
 const { writeAvroBuffer, writeParquetBuffer } = require('./binaryFormats');
 const db = require('../config/database');
+const { ensureDisciplinaChaveSchema } = require('../utils/ensureDisciplinaSchema');
+const { ensureConfigAvaliacaoSchema } = require('../utils/ensureConfigAvaliacaoSchema');
+const { ensureNotasPeriodosSchema } = require('../utils/ensureNotasSchema');
 
 const DEST_FILES = {
   jsonl: 'transacoes.jsonl',
@@ -47,8 +50,21 @@ function rowCsv(row) {
   }).join(',');
 }
 
+/**
+ * Garante as colunas/tabelas criadas em runtime (disciplina_chave, config_avaliacao,
+ * notas.periodo VARCHAR) antes de ler o catálogo. Sem isto, o SELECT do catálogo
+ * falha em bases onde ninguém abriu ainda o ecrã académico.
+ */
+async function ensureLabSchema() {
+  await ensureDisciplinaChaveSchema();
+  await ensureConfigAvaliacaoSchema();
+  await ensureNotasPeriodosSchema();
+}
+
 /** Apenas SELECT: obtém IDs existentes e configurações reais do sistema escolar. */
 async function loadCatalog() {
+  await ensureLabSchema();
+
   const [rows] = await db.query(`
     SELECT
       t.id AS turma_id,
@@ -102,7 +118,7 @@ async function loadCatalog() {
         serie_classe: Number(row.serie_classe),
         curso_id: row.curso_id == null ? null : Number(row.curso_id),
         curso_nome: row.curso_nome || '',
-        turno: row.turno || 'manha',
+        turno: row.turno || 'manhã',
         exame_nacional: !!Number(config.exame_nacional || 0),
         defesa_final: !!Number(config.defesa_final || 0),
         disciplinas: [],
@@ -133,62 +149,98 @@ async function loadCatalog() {
   return catalog;
 }
 
+/* ------------------------------------------------------------------ */
+/*  SQL (MySQL)                                                        */
+/* ------------------------------------------------------------------ */
+
+/**
+ * Desliga o "safe update mode" do MySQL Workbench (erro 1175) na sessão do script.
+ * Não usa variáveis de utilizador (@x): clientes como o DBeaver podem tratá-las
+ * como parâmetros ou executar cada comando numa sessão diferente.
+ */
+const SAFE_ON = 'SET SQL_SAFE_UPDATES = 0;\n';
+
+/**
+ * Padrão LIKE por prefixo (usa o índice UNIQUE de usuarios.email).
+ * Usa ESCAPE '|' em vez de barra invertida para não depender de
+ * NO_BACKSLASH_ESCAPES. O runId já foi validado por normalizeRunId.
+ */
+function labLikePattern(runId) {
+  return `lab.${runId}.`.replace(/_/g, '|_') + '%';
+}
+
 function sqlCleanup(runId) {
-  const prefix = `lab.${runId}.`;
-  const condition = `LEFT(u.email, CHAR_LENGTH(${sqlString(prefix)})) = ${sqlString(prefix)}`;
+  const like = `'${labLikePattern(runId)}' ESCAPE '|'`;
   return `-- Remove apenas alunos criados pelo laboratório na execução ${runId}.
 DELETE n
 FROM notas n
 INNER JOIN matriculas m ON m.id = n.matricula_id
 INNER JOIN alunos a ON a.id = m.aluno_id
 INNER JOIN usuarios u ON u.id = a.usuario_id
-WHERE ${condition};
+WHERE u.email LIKE ${like};
 
 DELETE m
 FROM matriculas m
 INNER JOIN alunos a ON a.id = m.aluno_id
 INNER JOIN usuarios u ON u.id = a.usuario_id
-WHERE ${condition};
+WHERE u.email LIKE ${like};
 
 DELETE a
 FROM alunos a
 INNER JOIN usuarios u ON u.id = a.usuario_id
-WHERE ${condition};
+WHERE u.email LIKE ${like};
 
 DELETE FROM usuarios
-WHERE LEFT(email, CHAR_LENGTH(${sqlString(prefix)})) = ${sqlString(prefix)};
+WHERE role = 'aluno' AND email LIKE ${like};
 `;
 }
 
 function sqlStudent(row) {
   const email = sqlString(row.email);
-  const notes = (row.notas || []).map((note) => (
-    `(@lab_matricula_id, ${Number(note.disciplina_id)}, ${sqlString(note.periodo)}, ${Number(note.nota).toFixed(2)}, ${note.professor_id == null ? 'NULL' : Number(note.professor_id)})`
-  ));
+  const noteRows = (row.notas || []).map((note, index) => {
+    const disciplina = Number(note.disciplina_id);
+    const periodo = sqlString(note.periodo);
+    const nota = Number(note.nota).toFixed(2);
+    const professor = note.professor_id == null ? 'NULL' : Number(note.professor_id);
+    return index === 0
+      ? `SELECT ${disciplina} AS disciplina_id, ${periodo} AS periodo, ${nota} AS nota, ${professor} AS professor_id`
+      : `UNION ALL SELECT ${disciplina}, ${periodo}, ${nota}, ${professor}`;
+  });
+  if (!noteRows.length) {
+    throw new Error(`Aluno ${row.id} sem notas: INSERT INTO notas ficaria inválido.`);
+  }
+  // Sem variáveis de sessão: cada INSERT localiza o registo anterior pelo email (UNIQUE).
   return `
 -- Aluno sintético ${row.id}
 INSERT INTO usuarios (nome, email, senha, role, ativo)
 VALUES (${sqlString(row.nome)}, ${email}, ${sqlString(PASSWORD_PLACEHOLDER_HASH)}, 'aluno', 0);
-SET @lab_usuario_id := LAST_INSERT_ID();
 
 INSERT INTO alunos (
   usuario_id, nome, data_nascimento, sexo, nacionalidade,
   nome_mae, nome_pai, responsavel, telefone_emergencia
-) VALUES (
-  @lab_usuario_id, ${sqlString(row.nome)}, ${sqlString(row.data_nascimento)},
+)
+SELECT u.id, ${sqlString(row.nome)}, ${sqlString(row.data_nascimento)},
   ${sqlString(row.sexo)}, 'Angolana', ${sqlString(row.nome_mae)},
   ${sqlString(row.nome_pai)}, ${sqlString(row.responsavel)},
   ${sqlString(row.telefone_emergencia)}
-);
-SET @lab_aluno_id := LAST_INSERT_ID();
+FROM usuarios u
+WHERE u.email = ${email};
 
 INSERT INTO matriculas (aluno_id, turma_id, ano_letivo, status)
-VALUES (@lab_aluno_id, ${Number(row.turma_id)}, ${Number(row.ano_letivo)}, 'ativa');
-SET @lab_matricula_id := LAST_INSERT_ID();
+SELECT a.id, ${Number(row.turma_id)}, ${Number(row.ano_letivo)}, 'ativa'
+FROM alunos a
+INNER JOIN usuarios u ON u.id = a.usuario_id
+WHERE u.email = ${email};
 
 INSERT INTO notas (matricula_id, disciplina_id, periodo, nota, professor_id)
-VALUES
-${notes.join(',\n')};
+SELECT m.id, v.disciplina_id, v.periodo, v.nota, v.professor_id
+FROM usuarios u
+INNER JOIN alunos a ON a.usuario_id = u.id
+INNER JOIN matriculas m ON m.aluno_id = a.id
+CROSS JOIN (
+${noteRows.join('\n')}
+) v
+WHERE u.email = ${email};
 `;
 }
 
@@ -199,13 +251,28 @@ function writeSql(batches, runId, outDir) {
   const header = `-- Dados escolares sintéticos de Angola; execução ${runId}.
 -- Cada registo representa um aluno e as respectivas notas.
 -- As contas são criadas inactivas e recebem um hash-placeholder não divulgado.
+--
+-- IMPORTANTE: execute na MESMA base de dados onde o gerador correu, porque
+-- turma_id, disciplina_id e professor_id vêm do catálogo dessa base.
+-- Seleccione a base antes de executar:  USE nome_da_base;
 SET NAMES utf8mb4;
-START TRANSACTION;
+${SAFE_ON}START TRANSACTION;
 
 ${sqlCleanup(runId)}
 `;
   fs.writeFileSync(createPath, header, 'utf8');
-  fs.writeFileSync(deletePath, `SET NAMES utf8mb4;\nSTART TRANSACTION;\n\n${sqlCleanup(runId)}COMMIT;\n`, 'utf8');
+  fs.writeFileSync(
+    deletePath,
+    `-- Remove os alunos, matrículas e notas da execução ${runId}.
+-- Seleccione a base antes de executar:  USE nome_da_base;
+SET NAMES utf8mb4;
+${SAFE_ON}START TRANSACTION;
+
+${sqlCleanup(runId)}
+COMMIT;
+`,
+    'utf8',
+  );
 
   let students = 0;
   let gradeRecords = 0;
@@ -229,6 +296,10 @@ ${sqlCleanup(runId)}
     write_seconds: Number(process.hrtime.bigint() - started) / 1e9,
   };
 }
+
+/* ------------------------------------------------------------------ */
+/*  Outros formatos                                                    */
+/* ------------------------------------------------------------------ */
 
 function writeJsonl(batches, filePath) {
   const fd = fs.openSync(filePath, 'w');
@@ -433,13 +504,16 @@ async function validateRun(outName, sampleSize = 100) {
   }
   if (meta.destinations.includes('sql')) {
     const sql = fs.readFileSync(path.join(outDir, 'criar_dados.sql'), 'utf8');
+    const del = fs.readFileSync(path.join(outDir, 'apagar_dados.sql'), 'utf8');
     const studentStatements = (sql.match(/INSERT INTO alunos\s*\(/gi) || []).length;
-    const noteRows = (sql.match(/\(@lab_matricula_id,/g) || []).length;
+    const noteRows = (sql.match(/^(SELECT \d+ AS disciplina_id|UNION ALL SELECT )/gm) || []).length;
+    const pattern = labLikePattern(runId);
     fps.sql = {
       count: studentStatements,
       grade_records: noteRows,
       bytes: Buffer.byteLength(sql),
-      safe_cleanup: sql.includes(`lab.${runId}.`),
+      safe_cleanup: sql.includes(pattern) && del.includes(pattern),
+      balanced_transaction: /START TRANSACTION;/.test(sql) && /COMMIT;\s*$/.test(sql),
     };
   }
 
