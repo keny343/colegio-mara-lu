@@ -1,11 +1,10 @@
 """Writer SQL — SQLite por padrão (portátil).
 
-MySQL: use o mesmo DDL (sem tipos SQLite-específicos) apontando
-DATABASE_URL / pymysql. Documentado no README. Exemplo de conexão MySQL::
+MySQL: use o mesmo DDL apontando DATABASE_URL / pymysql. Exemplo::
 
-    mysql+pymysql://user:pass@host:3306/lab_transacoes
+    mysql+pymysql://user:pass@host:3306/lab_notas_aluno
 
-A tabela ``transacoes`` espelha o schema lógico; campos aninhados
+A tabela ``notas_aluno`` espelha o schema lógico; campos aninhados
 ficam como TEXT JSON.
 """
 
@@ -18,45 +17,63 @@ from pathlib import Path
 from typing import Any, Dict, Iterable, List, Union
 
 DDL_SQLITE = """
-CREATE TABLE IF NOT EXISTS transacoes (
+CREATE TABLE IF NOT EXISTS notas_aluno (
     id INTEGER PRIMARY KEY,
-    cliente_id INTEGER NOT NULL,
-    produto_id INTEGER NOT NULL,
-    data_transacao TEXT NOT NULL,
-    categoria TEXT NOT NULL,
-    quantidade INTEGER NOT NULL,
-    preco_unitario TEXT NOT NULL,
-    valor_total TEXT NOT NULL,
-    estado TEXT NOT NULL,
-    descricao TEXT NOT NULL,
-    localizacao TEXT NOT NULL,
+    aluno_id INTEGER NOT NULL,
+    matricula_id INTEGER NOT NULL,
+    aluno_nome TEXT NOT NULL,
+    turma_id INTEGER NOT NULL,
+    turma_nome TEXT NOT NULL,
+    serie_classe INTEGER NOT NULL,
+    curso TEXT,
+    ano_letivo INTEGER NOT NULL,
+    turno TEXT NOT NULL,
+    disciplina_id INTEGER NOT NULL,
+    disciplina TEXT NOT NULL,
+    periodos TEXT NOT NULL,
+    media_anual TEXT,
+    situacao TEXT NOT NULL,
+    nota_minima INTEGER NOT NULL,
+    data_atualizacao TEXT NOT NULL,
+    turma_info TEXT NOT NULL,
     metadados TEXT
 );
 """
 
 # DDL MySQL de referência (não executado por padrão):
 DDL_MYSQL = """
-CREATE TABLE IF NOT EXISTS transacoes (
+CREATE TABLE IF NOT EXISTS notas_aluno (
     id BIGINT PRIMARY KEY,
-    cliente_id BIGINT NOT NULL,
-    produto_id BIGINT NOT NULL,
-    data_transacao VARCHAR(32) NOT NULL,
-    categoria VARCHAR(64) NOT NULL,
-    quantidade INT NOT NULL,
-    preco_unitario VARCHAR(32) NOT NULL,
-    valor_total VARCHAR(32) NOT NULL,
-    estado CHAR(2) NOT NULL,
-    descricao TEXT NOT NULL,
-    localizacao JSON NOT NULL,
-    metadados JSON NULL
+    aluno_id BIGINT NOT NULL,
+    matricula_id BIGINT NOT NULL,
+    aluno_nome VARCHAR(200) NOT NULL,
+    turma_id BIGINT NOT NULL,
+    turma_nome VARCHAR(120) NOT NULL,
+    serie_classe INT NOT NULL,
+    curso VARCHAR(120) NULL,
+    ano_letivo INT NOT NULL,
+    turno VARCHAR(32) NOT NULL,
+    disciplina_id INT NOT NULL,
+    disciplina VARCHAR(120) NOT NULL,
+    periodos JSON NOT NULL,
+    media_anual VARCHAR(16) NULL,
+    situacao VARCHAR(32) NOT NULL,
+    nota_minima INT NOT NULL,
+    data_atualizacao VARCHAR(32) NOT NULL,
+    turma_info JSON NOT NULL,
+    metadados JSON NULL,
+    INDEX idx_disciplina (disciplina),
+    INDEX idx_situacao (situacao)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 """
 
 INSERT_SQL = """
-INSERT INTO transacoes (
-    id, cliente_id, produto_id, data_transacao, categoria, quantidade,
-    preco_unitario, valor_total, estado, descricao, localizacao, metadados
-) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+INSERT INTO notas_aluno (
+    id, aluno_id, matricula_id, aluno_nome, turma_id, turma_nome,
+    serie_classe, curso, ano_letivo, turno, disciplina_id, disciplina,
+    periodos, media_anual, situacao, nota_minima, data_atualizacao,
+    turma_info, metadados
+) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 """
 
 
@@ -64,16 +81,23 @@ def _row(record: Dict[str, Any]) -> tuple:
     meta = record.get("metadados")
     return (
         record["id"],
-        record["cliente_id"],
-        record["produto_id"],
-        record["data_transacao"],
-        record["categoria"],
-        record["quantidade"],
-        record["preco_unitario"],
-        record["valor_total"],
-        record["estado"],
-        record["descricao"],
-        json.dumps(record["localizacao"], ensure_ascii=False, separators=(",", ":")),
+        record["aluno_id"],
+        record["matricula_id"],
+        record["aluno_nome"],
+        record["turma_id"],
+        record["turma_nome"],
+        record["serie_classe"],
+        record.get("curso"),
+        record["ano_letivo"],
+        record["turno"],
+        record["disciplina_id"],
+        record["disciplina"],
+        json.dumps(record["periodos"], ensure_ascii=False, separators=(",", ":")),
+        record.get("media_anual"),
+        record["situacao"],
+        record["nota_minima"],
+        record["data_atualizacao"],
+        json.dumps(record["turma_info"], ensure_ascii=False, separators=(",", ":")),
         json.dumps(meta, ensure_ascii=False, separators=(",", ":")) if meta else None,
     )
 

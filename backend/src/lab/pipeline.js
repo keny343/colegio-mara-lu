@@ -3,23 +3,21 @@
 const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
-const { generateBatches, CATEGORIAS } = require('./generator');
+const { generateBatches, DISCIPLINAS, SCHEMA_FIELDS } = require('./generator');
 const { writeAvroBuffer, writeParquetBuffer } = require('./binaryFormats');
 const db = require('../config/database');
 
 const DEST_FILES = {
-  jsonl: 'transacoes.jsonl',
-  csv: 'transacoes.csv',
-  avro: 'transacoes.avro',
-  parquet: 'transacoes.parquet',
-  sql: 'sql', // MySQL table lab_transacoes
+  jsonl: 'notas_aluno.jsonl',
+  csv: 'notas_aluno.csv',
+  avro: 'notas_aluno.avro',
+  parquet: 'notas_aluno.parquet',
+  sql: 'sql', // MySQL table lab_notas_aluno
 };
 
 const MAX_RECORDS = 25000;
-const CSV_HEADER = [
-  'id', 'cliente_id', 'produto_id', 'data_transacao', 'categoria', 'quantidade',
-  'preco_unitario', 'valor_total', 'estado', 'descricao', 'localizacao', 'metadados',
-].join(',');
+const CSV_HEADER = SCHEMA_FIELDS.join(',');
+const LAB_TABLE = 'lab_notas_aluno';
 
 let running = false;
 
@@ -39,54 +37,94 @@ function csvEscape(v) {
 
 function rowCsv(r) {
   return [
-    r.id, r.cliente_id, r.produto_id, r.data_transacao, r.categoria, r.quantidade,
-    r.preco_unitario, r.valor_total, r.estado, r.descricao,
-    JSON.stringify(r.localizacao),
+    r.id,
+    r.aluno_id,
+    r.matricula_id,
+    r.aluno_nome,
+    r.turma_id,
+    r.turma_nome,
+    r.serie_classe,
+    r.curso == null ? '' : r.curso,
+    r.ano_letivo,
+    r.turno,
+    r.disciplina_id,
+    r.disciplina,
+    JSON.stringify(r.periodos),
+    r.media_anual == null ? '' : r.media_anual,
+    r.situacao,
+    r.nota_minima,
+    r.data_atualizacao,
+    JSON.stringify(r.turma_info),
     r.metadados == null ? '' : JSON.stringify(r.metadados),
   ].map(csvEscape).join(',');
 }
 
 async function ensureLabTable() {
   await db.query(`
-    CREATE TABLE IF NOT EXISTS lab_transacoes (
+    CREATE TABLE IF NOT EXISTS ${LAB_TABLE} (
       id BIGINT PRIMARY KEY,
-      cliente_id BIGINT NOT NULL,
-      produto_id BIGINT NOT NULL,
-      data_transacao VARCHAR(32) NOT NULL,
-      categoria VARCHAR(64) NOT NULL,
-      quantidade INT NOT NULL,
-      preco_unitario VARCHAR(32) NOT NULL,
-      valor_total VARCHAR(32) NOT NULL,
-      estado CHAR(2) NOT NULL,
-      descricao TEXT NOT NULL,
-      localizacao JSON NOT NULL,
+      aluno_id BIGINT NOT NULL,
+      matricula_id BIGINT NOT NULL,
+      aluno_nome VARCHAR(200) NOT NULL,
+      turma_id BIGINT NOT NULL,
+      turma_nome VARCHAR(120) NOT NULL,
+      serie_classe INT NOT NULL,
+      curso VARCHAR(120) NULL,
+      ano_letivo INT NOT NULL,
+      turno VARCHAR(32) NOT NULL,
+      disciplina_id INT NOT NULL,
+      disciplina VARCHAR(120) NOT NULL,
+      periodos JSON NOT NULL,
+      media_anual VARCHAR(16) NULL,
+      situacao VARCHAR(32) NOT NULL,
+      nota_minima INT NOT NULL,
+      data_atualizacao VARCHAR(32) NOT NULL,
+      turma_info JSON NOT NULL,
       metadados JSON NULL,
-      INDEX idx_lab_categoria (categoria)
+      INDEX idx_lab_disciplina (disciplina),
+      INDEX idx_lab_situacao (situacao)
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
   `);
 }
 
 async function writeSql(batches) {
   await ensureLabTable();
-  await db.query('TRUNCATE TABLE lab_transacoes');
+  await db.query(`TRUNCATE TABLE ${LAB_TABLE}`);
   let count = 0;
   const t0 = process.hrtime.bigint();
   for (const batch of batches) {
     if (!batch.length) continue;
-    const placeholders = batch.map(() => '(?,?,?,?,?,?,?,?,?,?,?,?)').join(',');
+    const placeholders = batch.map(() => '(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)').join(',');
     const values = [];
     for (const r of batch) {
       values.push(
-        r.id, r.cliente_id, r.produto_id, r.data_transacao, r.categoria, r.quantidade,
-        r.preco_unitario, r.valor_total, r.estado, r.descricao,
-        JSON.stringify(r.localizacao),
+        r.id,
+        r.aluno_id,
+        r.matricula_id,
+        r.aluno_nome,
+        r.turma_id,
+        r.turma_nome,
+        r.serie_classe,
+        r.curso,
+        r.ano_letivo,
+        r.turno,
+        r.disciplina_id,
+        r.disciplina,
+        JSON.stringify(r.periodos),
+        r.media_anual,
+        r.situacao,
+        r.nota_minima,
+        r.data_atualizacao,
+        JSON.stringify(r.turma_info),
         r.metadados == null ? null : JSON.stringify(r.metadados),
       );
     }
     await db.query(
-      `INSERT INTO lab_transacoes (
-        id, cliente_id, produto_id, data_transacao, categoria, quantidade,
-        preco_unitario, valor_total, estado, descricao, localizacao, metadados
+      `INSERT INTO ${LAB_TABLE} (
+        id, aluno_id, matricula_id, aluno_nome, turma_id, turma_nome,
+        serie_classe, curso, ano_letivo, turno, disciplina_id, disciplina,
+        periodos, media_anual, situacao, nota_minima, data_atualizacao,
+        turma_info, metadados
       ) VALUES ${placeholders}`,
       values,
     );
@@ -96,9 +134,10 @@ async function writeSql(batches) {
   const [[{ bytes }]] = await db.query(
     `SELECT ROUND((DATA_LENGTH + INDEX_LENGTH)) AS bytes
      FROM information_schema.TABLES
-     WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'lab_transacoes'`,
+     WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ?`,
+    [LAB_TABLE],
   );
-  return { path: 'mysql:lab_transacoes', records: count, bytes: Number(bytes) || 0, write_seconds: elapsed };
+  return { path: `mysql:${LAB_TABLE}`, records: count, bytes: Number(bytes) || 0, write_seconds: elapsed };
 }
 
 function writeJsonl(batches, filePath) {
@@ -215,6 +254,7 @@ async function runGenerate({ records, seed = 42, batchSize = 2000, destinations,
       seed,
       batch_size: batchSize,
       destinations: dests,
+      domain: 'notas_aluno',
       writes,
       elapsed_seconds: Number(process.hrtime.bigint() - t0) / 1e9,
       created_at: new Date().toISOString(),
@@ -232,44 +272,33 @@ function fingerprintFromFile(filePath, sampleSize = 100) {
   const text = fs.readFileSync(filePath, 'utf8');
   const lines = text.replace(/^\uFEFF/, '').split(/\r?\n/).filter(Boolean);
   const isCsv = filePath.endsWith('.csv');
-  const start = isCsv ? 1 : 0;
+  if (isCsv) return null;
+
   let count = 0;
   let sum = 0;
   const samples = [];
-  for (let i = start; i < lines.length; i++) {
-    let rec;
-    if (isCsv) {
-      // parse minimal: id is first field
-      const id = Number(lines[i].split(',')[0]);
-      const m = lines[i].match(/,"?(\d+\.\d{2})"?,"?[A-Z]{2}"?/);
-      // valor_total is 8th column — use JSON from jsonl preferred
-      continue;
-    }
-    rec = JSON.parse(lines[i]);
+  for (let i = 0; i < lines.length; i++) {
+    const rec = JSON.parse(lines[i]);
     count += 1;
-    sum += Number(rec.valor_total) || 0;
+    if (rec.media_anual != null) sum += Number(rec.media_anual) || 0;
     if (samples.length < sampleSize) {
       const digest = crypto.createHash('sha256')
         .update(JSON.stringify({
           id: rec.id,
-          cliente_id: rec.cliente_id,
-          produto_id: rec.produto_id,
-          valor_total: String(rec.valor_total),
-          categoria: rec.categoria,
+          aluno_id: rec.aluno_id,
+          disciplina_id: rec.disciplina_id,
+          media_anual: rec.media_anual == null ? null : String(rec.media_anual),
+          situacao: rec.situacao,
         }))
         .digest('hex')
         .slice(0, 16);
       samples.push(`${rec.id}:${digest}`);
     }
   }
-  if (isCsv) {
-    // re-read via regenerating fingerprint from jsonl sibling if present
-    return null;
-  }
   const aggregate = crypto.createHash('sha256').update(samples.sort().join('|')).digest('hex');
   return {
     count,
-    sum_valor_total: sum.toFixed(2),
+    sum_media_anual: sum.toFixed(1),
     sample_hash: aggregate,
     samples: samples.slice(0, sampleSize),
   };
@@ -287,12 +316,11 @@ async function validateRun(outName, sampleSize = 100) {
     fps.jsonl = fingerprintFromFile(p, sampleSize);
   }
   if (dests.includes('csv') && fps.jsonl) {
-    // Contagem CSV = linhas - 1
     const raw = fs.readFileSync(path.join(outDir, DEST_FILES.csv), 'utf8');
     const lines = raw.replace(/^\uFEFF/, '').split(/\r?\n/).filter(Boolean);
     fps.csv = {
       count: Math.max(0, lines.length - 1),
-      sum_valor_total: fps.jsonl.sum_valor_total,
+      sum_media_anual: fps.jsonl.sum_media_anual,
       note: 'soma alinhada ao JSONL (mesmo gerador/seed)',
     };
   }
@@ -306,13 +334,13 @@ async function validateRun(outName, sampleSize = 100) {
   }
   if (dests.includes('sql')) {
     const [[{ c, s }]] = await db.query(
-      'SELECT COUNT(*) AS c, COALESCE(SUM(CAST(valor_total AS DECIMAL(18,2))),0) AS s FROM lab_transacoes',
+      `SELECT COUNT(*) AS c, COALESCE(SUM(CAST(media_anual AS DECIMAL(10,1))),0) AS s FROM ${LAB_TABLE}`,
     );
-    fps.sql = { count: Number(c), sum_valor_total: Number(s).toFixed(2) };
+    fps.sql = { count: Number(c), sum_media_anual: Number(s).toFixed(1) };
   }
 
   const counts = Object.values(fps).map((f) => f.count).filter((c) => typeof c === 'number');
-  const sums = Object.values(fps).map((f) => f.sum_valor_total).filter(Boolean);
+  const sums = Object.values(fps).map((f) => f.sum_media_anual).filter(Boolean);
   const equivalent =
     counts.length >= 2
     && counts.every((c) => c === counts[0])
@@ -323,8 +351,9 @@ async function validateRun(outName, sampleSize = 100) {
     equivalent,
     fingerprints: fps,
     quality: {
-      schema_fields: 12,
-      categorias: CATEGORIAS.length,
+      schema_fields: SCHEMA_FIELDS.length,
+      disciplinas: DISCIPLINAS.length,
+      domain: 'notas_aluno',
       deterministic_seed: meta.seed,
     },
     checked_at: new Date().toISOString(),
@@ -362,17 +391,19 @@ async function runBenchmark({ records, seed = 42, batchSize = 2000, destinations
     }
   }
 
-  // Agregação SQL se disponível
   let groupBy = null;
   if (gen.destinations.includes('sql')) {
     const t0 = process.hrtime.bigint();
     const [rows] = await db.query(
-      `SELECT categoria, COUNT(*) AS c, SUM(CAST(valor_total AS DECIMAL(18,2))) AS s
-       FROM lab_transacoes GROUP BY categoria ORDER BY categoria`,
+      `SELECT disciplina, COUNT(*) AS c, COALESCE(SUM(CAST(media_anual AS DECIMAL(10,1))),0) AS s
+       FROM ${LAB_TABLE} GROUP BY disciplina ORDER BY disciplina`,
     );
     groupBy = {
       seconds: Number(process.hrtime.bigint() - t0) / 1e9,
-      groups: Object.fromEntries(rows.map((r) => [r.categoria, { count: Number(r.c), sum_valor_total: Number(r.s).toFixed(2) }])),
+      groups: Object.fromEntries(rows.map((r) => [
+        r.disciplina,
+        { count: Number(r.c), sum_media_anual: Number(r.s).toFixed(1) },
+      ])),
     };
   }
 
@@ -382,8 +413,9 @@ async function runBenchmark({ records, seed = 42, batchSize = 2000, destinations
     batch_size: gen.batch_size,
     destinations: gen.destinations,
     out_dir: gen.out_dir,
+    domain: 'notas_aluno',
     formats,
-    group_by_categoria_sql: groupBy,
+    group_by_disciplina_sql: groupBy,
     created_at: new Date().toISOString(),
     engine: 'node-admin',
     note: 'Painel admin: volumes até 25k. Escalas S/M (1M/10M) via CLI Python em data-engineering/.',
@@ -414,6 +446,7 @@ function listRuns() {
         records: meta.records,
         seed: meta.seed,
         destinations: meta.destinations,
+        domain: meta.domain || 'notas_aluno',
         created_at: meta.created_at,
         elapsed_seconds: meta.elapsed_seconds,
       };
@@ -442,6 +475,7 @@ function resolveArtifact(outName, file) {
 module.exports = {
   MAX_RECORDS,
   DEST_FILES,
+  LAB_TABLE,
   runGenerate,
   validateRun,
   runBenchmark,

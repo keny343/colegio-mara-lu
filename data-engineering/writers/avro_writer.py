@@ -1,4 +1,4 @@
-"""Writer Avro com schema explícito (schemas/transacao.avsc)."""
+"""Writer Avro com schema explícito (schemas/nota_aluno.avsc)."""
 
 from __future__ import annotations
 
@@ -10,7 +10,7 @@ from typing import Any, Dict, Iterable, List, Optional, Union
 from fastavro import parse_schema, writer as avro_file_writer
 
 _DEFAULT_SCHEMA = (
-    Path(__file__).resolve().parent.parent / "schemas" / "transacao.avsc"
+    Path(__file__).resolve().parent.parent / "schemas" / "nota_aluno.avsc"
 )
 
 

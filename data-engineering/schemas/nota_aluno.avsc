@@ -1,0 +1,69 @@
+{
+  "type": "record",
+  "name": "NotaAluno",
+  "namespace": "colegio.mara_lu.lab",
+  "doc": "Linha aluno×disciplina com notas angolanas (1PP–3PT) — Colégio Mara & Lu",
+  "fields": [
+    {"name": "id", "type": "long", "doc": "Identificador único da linha"},
+    {"name": "aluno_id", "type": "long"},
+    {"name": "matricula_id", "type": "long"},
+    {"name": "aluno_nome", "type": "string"},
+    {"name": "turma_id", "type": "long"},
+    {"name": "turma_nome", "type": "string"},
+    {"name": "serie_classe", "type": "int"},
+    {"name": "curso", "type": ["null", "string"], "default": null},
+    {"name": "ano_letivo", "type": "int"},
+    {"name": "turno", "type": "string"},
+    {"name": "disciplina_id", "type": "int"},
+    {"name": "disciplina", "type": "string"},
+    {
+      "name": "periodos",
+      "type": {
+        "type": "record",
+        "name": "Periodos",
+        "fields": [
+          {"name": "1PP", "type": ["null", "string"], "default": null},
+          {"name": "1PT", "type": ["null", "string"], "default": null},
+          {"name": "2PP", "type": ["null", "string"], "default": null},
+          {"name": "2PT", "type": ["null", "string"], "default": null},
+          {"name": "3PP", "type": ["null", "string"], "default": null},
+          {"name": "3PT", "type": ["null", "string"], "default": null}
+        ]
+      }
+    },
+    {"name": "media_anual", "type": ["null", "string"], "default": null},
+    {"name": "situacao", "type": "string"},
+    {"name": "nota_minima", "type": "int"},
+    {"name": "data_atualizacao", "type": "string"},
+    {
+      "name": "turma_info",
+      "type": {
+        "type": "record",
+        "name": "TurmaInfo",
+        "fields": [
+          {"name": "escola", "type": "string"},
+          {"name": "provincia", "type": "string"},
+          {"name": "municipio", "type": "string"},
+          {"name": "latitude", "type": "double"},
+          {"name": "longitude", "type": "double"}
+        ]
+      }
+    },
+    {
+      "name": "metadados",
+      "type": [
+        "null",
+        {
+          "type": "record",
+          "name": "Metadados",
+          "fields": [
+            {"name": "professor_id", "type": "long"},
+            {"name": "origem", "type": "string"},
+            {"name": "observacao", "type": ["null", "string"], "default": null}
+          ]
+        }
+      ],
+      "default": null
+    }
+  ]
+}

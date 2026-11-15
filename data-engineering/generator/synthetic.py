@@ -1,8 +1,8 @@
-"""Gerador determinístico de transações comerciais sintéticas.
+"""Gerador determinístico de linhas aluno×disciplina (espelha o relatório de notas).
 
-Usa seed fixa (random.Random) e Decimal para valores monetários.
-Emite registros em lotes via iterator — nunca carrega o dataset inteiro
-em memória.
+Schema alinhado ao Colégio Mara & Lu / sistema angolano:
+3 trimestres × (parcial + trimestral) = 1PP, 1PT, 2PP, 2PT, 3PP, 3PT.
+Média anual e situação seguem as mesmas regras da aba Notas.
 """
 
 from __future__ import annotations
@@ -12,108 +12,190 @@ from datetime import datetime, timedelta
 from decimal import Decimal, ROUND_HALF_UP
 from typing import Any, Dict, Iterator, List, Optional
 
+PERIODOS = ("1PP", "1PT", "2PP", "2PT", "3PP", "3PT")
+
 SCHEMA_FIELDS = [
     "id",
-    "cliente_id",
-    "produto_id",
-    "data_transacao",
-    "categoria",
-    "quantidade",
-    "preco_unitario",
-    "valor_total",
-    "estado",
-    "descricao",
-    "localizacao",
+    "aluno_id",
+    "matricula_id",
+    "aluno_nome",
+    "turma_id",
+    "turma_nome",
+    "serie_classe",
+    "curso",
+    "ano_letivo",
+    "turno",
+    "disciplina_id",
+    "disciplina",
+    "periodos",
+    "media_anual",
+    "situacao",
+    "nota_minima",
+    "data_atualizacao",
+    "turma_info",
     "metadados",
 ]
 
-CATEGORIAS = (
-    "Eletronicos",
-    "Vestuario",
-    "Alimentos",
-    "Casa",
-    "Esportes",
-    "Livros",
-    "Beleza",
-    "Brinquedos",
-    "Automotivo",
-    "Saude",
+DISCIPLINAS = (
+    "Língua Portuguesa",
+    "Matemática",
+    "História",
+    "Geografia",
+    "Ciências",
+    "Educação Física",
+    "Educação Moral e Cívica",
+    "Inglês",
+    "Física",
+    "Química",
+    "Biologia",
+    "Informática",
 )
 
-ESTADOS = (
-    "SP", "RJ", "MG", "RS", "PR", "BA", "SC", "GO", "PE", "CE",
-    "DF", "ES", "PA", "MT", "MS", "AM", "MA", "PB", "RN", "AL",
+TURNOS = ("manhã", "tarde", "noite")
+
+CURSOS_SEC = (
+    None,
+    "Ciências Físicas e Biológicas",
+    "Ciências Económicas e Jurídicas",
+    "Humanidades",
 )
 
-CIDADES = {
-    "SP": ("São Paulo", -23.5505, -46.6333),
-    "RJ": ("Rio de Janeiro", -22.9068, -43.1729),
-    "MG": ("Belo Horizonte", -19.9167, -43.9345),
-    "RS": ("Porto Alegre", -30.0346, -51.2177),
-    "PR": ("Curitiba", -25.4284, -49.2733),
-    "BA": ("Salvador", -12.9714, -38.5014),
-    "SC": ("Florianópolis", -27.5954, -48.5480),
-    "GO": ("Goiânia", -16.6869, -49.2648),
-    "PE": ("Recife", -8.0476, -34.8770),
-    "CE": ("Fortaleza", -3.7172, -38.5433),
-    "DF": ("Brasília", -15.8267, -47.9218),
-    "ES": ("Vitória", -20.3155, -40.3128),
-    "PA": ("Belém", -1.4558, -48.4902),
-    "MT": ("Cuiabá", -15.6010, -56.0974),
-    "MS": ("Campo Grande", -20.4697, -54.6201),
-    "AM": ("Manaus", -3.1190, -60.0217),
-    "MA": ("São Luís", -2.5307, -44.3068),
-    "PB": ("João Pessoa", -7.1195, -34.8450),
-    "RN": ("Natal", -5.7945, -35.2110),
-    "AL": ("Maceió", -9.6658, -35.7350),
-}
+PROVINCIAS = (
+    ("Luanda", "Luanda", -8.8383, 13.2344),
+    ("Benguela", "Benguela", -12.5763, 13.4055),
+    ("Huambo", "Huambo", -12.7761, 15.7393),
+    ("Huíla", "Lubango", -14.9172, 13.4925),
+    ("Cabinda", "Cabinda", -5.5500, 12.2000),
+)
 
-CANAIS = ("online", "loja", "marketplace", "telefone")
+NOMES = (
+    "Ana", "Bruno", "Carla", "Daniel", "Elena", "Fábio", "Gisela", "Hugo",
+    "Inês", "João", "Katia", "Luis", "Maria", "Nuno", "Olga", "Paulo",
+    "Quintino", "Rita", "Sara", "Tiago", "Úrsula", "Vítor", "Wanda", "Xavier",
+)
+SOBRENOMES = (
+    "Silva", "Santos", "Costa", "Pereira", "Oliveira", "Fernandes", "Rodrigues",
+    "Martins", "Almeida", "Nascimento", "Dos Santos", "Manuel", "João",
+)
 
-_BASE_DATE = datetime(2023, 1, 1, 0, 0, 0)
-_MONEY_QUANT = Decimal("0.01")
+_BASE_DATE = datetime(2025, 2, 1, 8, 0, 0)
+_NOTE_QUANT = Decimal("0.1")
 
 
-def _money(value: Decimal) -> str:
-    return str(value.quantize(_MONEY_QUANT, rounding=ROUND_HALF_UP))
+def nota_minima_para(serie: int) -> int:
+    return 5 if 1 <= serie <= 6 else 10
 
 
-def _make_record(rng: random.Random, tx_id: int) -> Dict[str, Any]:
-    categoria = rng.choice(CATEGORIAS)
-    estado = rng.choice(ESTADOS)
-    cidade, lat0, lon0 = CIDADES[estado]
-    # Pequeno jitter determinístico na coordenada
+def limite_max_para(serie: int) -> int:
+    return 10 if serie <= 6 else 20
+
+
+def _q(n: Decimal) -> str:
+    return str(n.quantize(_NOTE_QUANT, rounding=ROUND_HALF_UP))
+
+
+def _media_trimestre(a: Optional[str], b: Optional[str]) -> Optional[Decimal]:
+    vals = [Decimal(x) for x in (a, b) if x is not None]
+    if not vals:
+        return None
+    return sum(vals) / Decimal(len(vals))
+
+
+def media_periodos(periodos: Dict[str, Optional[str]]) -> Optional[str]:
+    t1 = _media_trimestre(periodos.get("1PP"), periodos.get("1PT"))
+    t2 = _media_trimestre(periodos.get("2PP"), periodos.get("2PT"))
+    t3 = _media_trimestre(periodos.get("3PP"), periodos.get("3PT"))
+    trimestres = [t for t in (t1, t2, t3) if t is not None]
+    if not trimestres:
+        return None
+    return _q(sum(trimestres) / Decimal(len(trimestres)))
+
+
+def periodos_completos(periodos: Dict[str, Optional[str]]) -> bool:
+    return all(periodos.get(k) is not None for k in PERIODOS)
+
+
+def situacao_de(periodos: Dict[str, Optional[str]], media: Optional[str], minimo: int) -> str:
+    if media is None:
+        return "Sem notas"
+    if not periodos_completos(periodos):
+        return "Em curso"
+    return "Positiva" if Decimal(media) >= Decimal(minimo) else "Negativa"
+
+
+def _make_record(rng: random.Random, row_id: int) -> Dict[str, Any]:
+    serie = rng.randint(1, 12)
+    max_nota = limite_max_para(serie)
+    minimo = nota_minima_para(serie)
+    curso = rng.choice(CURSOS_SEC) if serie >= 10 else None
+    turno = rng.choice(TURNOS)
+    turma_id = 1 + (serie - 1) * 3 + rng.randint(0, 2)
+    turma_nome = f"{serie}ª {turno[0].upper()}{turno[1:]}"
+    if curso:
+        turma_nome = f"{serie}ª {curso.split()[0]} {turno}"
+
+    aluno_id = rng.randint(1, 80_000)
+    matricula_id = aluno_id * 10 + rng.randint(0, 9)
+    nome = f"{rng.choice(NOMES)} {rng.choice(SOBRENOMES)}"
+    disc_idx = rng.randint(0, len(DISCIPLINAS) - 1)
+    disciplina = DISCIPLINAS[disc_idx]
+    disciplina_id = disc_idx + 1
+
+    # Probabilidade de períodos em falta (em curso / sem notas)
+    fill_prob = rng.uniform(0.55, 1.0)
+    periodos: Dict[str, Optional[str]] = {}
+    for key in PERIODOS:
+        if rng.random() < fill_prob:
+            # distribuição enviesada para notas medianas
+            raw = Decimal(str(round(rng.gauss(max_nota * 0.62, max_nota * 0.18), 1)))
+            if raw < 0:
+                raw = Decimal("0")
+            if raw > max_nota:
+                raw = Decimal(max_nota)
+            periodos[key] = _q(raw)
+        else:
+            periodos[key] = None
+
+    media = media_periodos(periodos)
+    situacao = situacao_de(periodos, media, minimo)
+
+    prov, mun, lat0, lon0 = rng.choice(PROVINCIAS)
     lat = lat0 + rng.uniform(-0.05, 0.05)
     lon = lon0 + rng.uniform(-0.05, 0.05)
 
-    quantidade = rng.randint(1, 20)
-    preco = Decimal(str(round(rng.uniform(5.0, 999.99), 2)))
-    valor_total = preco * quantidade
-
-    seconds = rng.randint(0, 86400 * 700)  # ~2 anos
+    seconds = rng.randint(0, 86400 * 200)
     data = _BASE_DATE + timedelta(seconds=seconds)
 
     metadados: Optional[Dict[str, Any]] = None
-    if rng.random() < 0.7:
+    if rng.random() < 0.75:
         metadados = {
-            "canal": rng.choice(CANAIS),
-            "promocao": rng.random() < 0.25,
-            "vendedor_id": rng.randint(1, 500) if rng.random() < 0.6 else None,
+            "professor_id": rng.randint(1, 200),
+            "origem": rng.choice(("lancamento", "importacao", "laboratorio")),
+            "observacao": None if rng.random() < 0.7 else "recuperação",
         }
 
     return {
-        "id": tx_id,
-        "cliente_id": rng.randint(1, 50_000),
-        "produto_id": rng.randint(1, 5_000),
-        "data_transacao": data.strftime("%Y-%m-%dT%H:%M:%S"),
-        "categoria": categoria,
-        "quantidade": quantidade,
-        "preco_unitario": _money(preco),
-        "valor_total": _money(valor_total),
-        "estado": estado,
-        "descricao": f"{categoria} item #{rng.randint(1, 9999)}",
-        "localizacao": {
-            "cidade": cidade,
+        "id": row_id,
+        "aluno_id": aluno_id,
+        "matricula_id": matricula_id,
+        "aluno_nome": nome,
+        "turma_id": turma_id,
+        "turma_nome": turma_nome,
+        "serie_classe": serie,
+        "curso": curso,
+        "ano_letivo": 2025,
+        "turno": turno,
+        "disciplina_id": disciplina_id,
+        "disciplina": disciplina,
+        "periodos": periodos,
+        "media_anual": media,
+        "situacao": situacao,
+        "nota_minima": minimo,
+        "data_atualizacao": data.strftime("%Y-%m-%dT%H:%M:%S"),
+        "turma_info": {
+            "escola": "Colégio Mara & Lu",
+            "provincia": prov,
+            "municipio": mun,
             "latitude": round(lat, 6),
             "longitude": round(lon, 6),
         },
@@ -126,7 +208,6 @@ def generate_records(
     seed: int = 42,
     start_id: int = 1,
 ) -> Iterator[Dict[str, Any]]:
-    """Gera *n* registros um a um (streaming)."""
     rng = random.Random(seed)
     for i in range(n):
         yield _make_record(rng, start_id + i)
@@ -138,10 +219,6 @@ def generate_batches(
     batch_size: int = 5_000,
     start_id: int = 1,
 ) -> Iterator[List[Dict[str, Any]]]:
-    """Gera *n* registros em lotes de até *batch_size*.
-
-    Nunca materializa o dataset completo — apenas o lote corrente.
-    """
     if batch_size < 1:
         raise ValueError("batch_size deve ser >= 1")
     batch: List[Dict[str, Any]] = []

@@ -1,7 +1,7 @@
 """Writer CSV UTF-8 com cabeçalho.
 
 Delimitador: vírgula (`,`) — documentado como CSV_DELIMITER.
-Campos aninhados (localizacao, metadados) são serializados como JSON
+Campos aninhados (periodos, turma_info, metadados) são serializados como JSON
 em células de texto para preservar a estrutura em um CSV plano.
 """
 
@@ -19,15 +19,21 @@ from generator.synthetic import SCHEMA_FIELDS
 CSV_DELIMITER = ","
 CSV_DELIMITER_NAME = "comma"
 
+_NESTED = ("periodos", "turma_info", "metadados")
+
 
 def _flatten(record: Dict[str, Any]) -> Dict[str, Any]:
     row = {k: record.get(k) for k in SCHEMA_FIELDS}
-    for nested in ("localizacao", "metadados"):
+    for nested in _NESTED:
         val = row.get(nested)
         if val is None:
             row[nested] = ""
         else:
             row[nested] = json.dumps(val, ensure_ascii=False, separators=(",", ":"))
+    if row.get("curso") is None:
+        row["curso"] = ""
+    if row.get("media_anual") is None:
+        row["media_anual"] = ""
     return row
 
 

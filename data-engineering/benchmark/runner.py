@@ -5,7 +5,7 @@ Métricas:
 - tempo de escrita / taxa de escrita
 - tempo de leitura completa
 - leitura de coluna única (Parquet)
-- GROUP BY categoria COUNT + SUM(valor_total)
+- GROUP BY disciplina COUNT + SUM(media_anual)
 - compressão vs CSV
 - pico de memória (psutil) quando possível
 - ≥1 corrida com nota de cold-cache
@@ -24,7 +24,7 @@ from typing import Any, Callable, Dict, Iterable, List, Optional, Union
 
 from generator.synthetic import generate_batches
 from readers import READERS
-from readers.parquet_reader import parquet_group_by_categoria, read_parquet_column
+from readers.parquet_reader import parquet_group_by_disciplina, read_parquet_column
 from validation.equivalence import DEST_FILENAMES
 from writers import WRITERS
 
@@ -108,7 +108,9 @@ def _full_read(dest: str, path: Path) -> Dict[str, Any]:
     total = Decimal("0")
     for record in reader(path):
         count += 1
-        total += Decimal(str(record["valor_total"]))
+        media = record.get("media_anual")
+        if media is not None and media != "":
+            total += Decimal(str(media))
         if count % 50_000 == 0:
             sample()
     elapsed = time.perf_counter() - t0
@@ -116,17 +118,17 @@ def _full_read(dest: str, path: Path) -> Dict[str, Any]:
     return {
         "read_seconds": elapsed,
         "records": count,
-        "sum_valor_total": str(total),
+        "sum_media_anual": str(total),
         "read_records_per_sec": count / elapsed if elapsed > 0 else 0.0,
         "peak_rss_mb": state["peak"],
     }
 
 
 def _group_by_generic(dest: str, path: Path) -> Dict[str, Any]:
-    """GROUP BY categoria em streaming para qualquer formato."""
+    """GROUP BY disciplina em streaming para qualquer formato."""
     if dest == "parquet":
         t0 = time.perf_counter()
-        result = parquet_group_by_categoria(path)
+        result = parquet_group_by_disciplina(path)
         elapsed = time.perf_counter() - t0
         return {"seconds": elapsed, "groups": result}
 
@@ -134,15 +136,17 @@ def _group_by_generic(dest: str, path: Path) -> Dict[str, Any]:
     agg: Dict[str, Dict[str, Any]] = {}
     t0 = time.perf_counter()
     for record in reader(path):
-        cat = record["categoria"]
-        bucket = agg.setdefault(cat, {"count": 0, "sum_valor_total": Decimal("0")})
+        disc = record["disciplina"]
+        bucket = agg.setdefault(disc, {"count": 0, "sum_media_anual": Decimal("0")})
         bucket["count"] += 1
-        bucket["sum_valor_total"] += Decimal(str(record["valor_total"]))
+        media = record.get("media_anual")
+        if media is not None and media != "":
+            bucket["sum_media_anual"] += Decimal(str(media))
     elapsed = time.perf_counter() - t0
     return {
         "seconds": elapsed,
         "groups": {
-            k: {"count": v["count"], "sum_valor_total": str(v["sum_valor_total"])}
+            k: {"count": v["count"], "sum_media_anual": str(v["sum_media_anual"])}
             for k, v in sorted(agg.items())
         },
     }
@@ -216,10 +220,10 @@ def run_benchmark(
                 group_by = _group_by_generic(dest, path)
                 if dest == "parquet":
                     t0 = time.perf_counter()
-                    col = read_parquet_column(path, "categoria")
+                    col = read_parquet_column(path, "disciplina")
                     col_elapsed = time.perf_counter() - t0
                     col_read = {
-                        "column": "categoria",
+                        "column": "disciplina",
                         "seconds": col_elapsed,
                         "values": len(col),
                     }
@@ -235,7 +239,7 @@ def run_benchmark(
             "write_records_per_sec": _agg_stats(write_rates),
             "full_read_seconds": _agg_stats(read_times),
             "peak_rss_mb": _agg_stats(peaks) if peaks else None,
-            "group_by_categoria": group_by,
+            "group_by_disciplina": group_by,
             "single_column_read": col_read,
             "last_write": last_write,
             "last_read": last_read,

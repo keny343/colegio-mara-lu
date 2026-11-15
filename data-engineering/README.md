@@ -1,7 +1,11 @@
 # Laboratório de Engenharia de Dados — Colégio Mara & Lu
 
 Laboratório acadêmico para gerar, gravar, validar e comparar formatos de dados
-comerciais sintéticos em **streaming** (nunca carrega o dataset inteiro em memória).
+sintéticos de **alunos × disciplinas (notas)** em **streaming**
+(nunca carrega o dataset inteiro em memória).
+
+O schema espelha a aba Notas do sistema (3 trimestres × parcial + trimestral:
+1PP, 1PT, 2PP, 2PT, 3PP, 3PT), com média anual e situação.
 
 Formatos: **JSON Lines**, **CSV (UTF-8)**, **Avro**, **Parquet** e **SQL (SQLite)**.
 
@@ -27,37 +31,43 @@ Dependências principais: `fastavro`, `pyarrow`, `psutil`, `click` (opcional), `
 
 ---
 
-## 2. Schema lógico (`Transacao`)
+## 2. Schema lógico (`NotaAluno`)
 
 | Campo | Tipo | Descrição |
 |-------|------|-----------|
-| `id` | long | Identificador único |
-| `cliente_id` | long | Cliente |
-| `produto_id` | long | Produto |
-| `data_transacao` | string ISO 8601 | Data/hora |
-| `categoria` | string | Categoria do item |
-| `quantidade` | int | Quantidade ≥ 1 |
-| `preco_unitario` | Decimal (string) | Preço unitário |
-| `valor_total` | Decimal (string) | `quantidade * preco_unitario` |
-| `estado` | string (UF) | Estado brasileiro |
-| `descricao` | string | Descrição textual |
-| `localizacao` | nested | `{cidade, latitude, longitude}` |
-| `metadados` | nested opcional | `{canal, promocao, vendedor_id}` |
+| `id` | long | Identificador único da linha |
+| `aluno_id` | long | Aluno |
+| `matricula_id` | long | Matrícula |
+| `aluno_nome` | string | Nome do aluno |
+| `turma_id` / `turma_nome` | long / string | Turma |
+| `serie_classe` | int (1–12) | Classe |
+| `curso` | string \| null | Curso (secundário) |
+| `ano_letivo` | int | Ano lectivo |
+| `turno` | string | manhã / tarde / noite |
+| `disciplina_id` / `disciplina` | int / string | Disciplina |
+| `periodos` | nested | `{1PP,1PT,2PP,2PT,3PP,3PT}` (notas ou null) |
+| `media_anual` | Decimal string \| null | Média dos trimestres |
+| `situacao` | string | Positiva / Negativa / Em curso / Sem notas |
+| `nota_minima` | int | 5 (1ª–6ª) ou 10 (restantes) |
+| `data_atualizacao` | string ISO 8601 | Última actualização |
+| `turma_info` | nested | `{escola, provincia, municipio, latitude, longitude}` |
+| `metadados` | nested opcional | `{professor_id, origem, observacao}` |
 
-Schema Avro explícito: [`schemas/transacao.avsc`](schemas/transacao.avsc).
+Schema Avro explícito: [`schemas/nota_aluno.avsc`](schemas/nota_aluno.avsc).
 
 ### CSV
 
 - Encoding: **UTF-8**
 - Cabeçalho: sim
 - Delimitador: **vírgula (`,`)** — constante `CSV_DELIMITER` em `writers/csv_writer.py`
-- Campos aninhados (`localizacao`, `metadados`) serializados como JSON na célula
+- Campos aninhados (`periodos`, `turma_info`, `metadados`) serializados como JSON na célula
 
 ### SQL
 
-- **Padrão:** arquivo SQLite (`transacoes.db`) — portátil, sem servidor
+- **Padrão:** arquivo SQLite (`notas_aluno.db`) — portátil, sem servidor
 - **MySQL (referência):** DDL em `writers/sql_writer.py` (`DDL_MYSQL`). Exemplo de URL:
-  `mysql+pymysql://user:pass@host:3306/lab_transacoes`
+  `mysql+pymysql://user:pass@host:3306/lab_notas_aluno`
+- **Painel admin:** tabela MySQL `lab_notas_aluno`
 
 ---
 
@@ -90,7 +100,8 @@ python main.py validate --out output/run1 `
   --destinations jsonl,csv,avro,parquet,sql --sample-size 100
 ```
 
-Verifica: contagens, `sum(valor_total)`, hashes amostrados de chaves, regras de qualidade.
+Verifica: contagens, `sum(media_anual)`, hashes amostrados de chaves, regras de qualidade
+(notas no intervalo, média e situação consistentes).
 
 ### Benchmark
 
@@ -100,7 +111,7 @@ python main.py benchmark --records 10000 --seed 42 --batch-size 5000 `
 ```
 
 Métricas: tamanho em disco, tempo/taxa de escrita, leitura completa, leitura de
-coluna única (Parquet), `GROUP BY categoria` (COUNT + SUM), compressão vs CSV,
+coluna única (Parquet), `GROUP BY disciplina` (COUNT + SUM médias), compressão vs CSV,
 pico de RSS (`psutil`). Com `--repeats N` reporta **median / min / max**.
 A 1ª repetição é anotada como **cold-cache relativa** (ver nota no relatório JSON).
 
@@ -117,7 +128,7 @@ python main.py full --records 10000 --seed 42 --batch-size 5000 `
 
 Em produção o **admin** executa tarefas manuais em **Admin → Lab de dados** (`/admin/lab-dados`):
 
-- Gerar e gravar (JSONL, CSV, Avro, Parquet, SQL MySQL `lab_transacoes`)
+- Gerar e gravar (JSONL, CSV, Avro, Parquet, SQL MySQL `lab_notas_aluno`)
 - Validar equivalência
 - Benchmark com gráficos comparativos
 - Descarregar artefactos da última corrida
@@ -185,12 +196,12 @@ Relatório técnico (esqueleto): [`docs/RELATORIO-TECNICO.md`](docs/RELATORIO-TE
 data-engineering/
   main.py                 # python main.py ...
   lab/                    # python -m lab
-  generator/synthetic.py  # PRNG com seed + Decimal + batches
+  generator/synthetic.py  # PRNG com seed + notas angolanas + batches
   writers/                # jsonl, csv, avro, parquet, sql
   readers/                # leitores streaming
   validation/             # equivalência + qualidade
   benchmark/              # runner de métricas
-  schemas/transacao.avsc
+  schemas/nota_aluno.avsc
   tests/
   output/  logs/  reports/
 ```
@@ -201,7 +212,8 @@ data-engineering/
 
 - Gerador usa `random.Random(seed)` (não o RNG global).
 - Mesmo `--seed` + mesmo `--records` ⇒ mesmos registros em qualquer destino/máquina.
-- Valores monetários com `decimal.Decimal` e quantização `0.01`.
+- Notas com `decimal.Decimal` e quantização `0.1`.
+- Painel Node: Mulberry32 (reproduzível no admin; não bit-a-bit idêntico ao Python).
 
 ---
 

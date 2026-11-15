@@ -40,6 +40,7 @@ def test_generate_creates_all_files(small_run):
         path = Path(result["writes"][dest]["path"])
         assert path.exists()
         assert path.stat().st_size > 0
+        assert "notas_aluno" in path.name
 
 
 def test_destinations_are_equivalent(small_run):
@@ -48,7 +49,7 @@ def test_destinations_are_equivalent(small_run):
     assert report["equivalent"] is True
     counts = {d: report["fingerprints"][d]["count"] for d in DESTS}
     assert all(c == 200 for c in counts.values())
-    sums = {d: report["fingerprints"][d]["sum_valor_total"] for d in DESTS}
+    sums = {d: report["fingerprints"][d]["sum_media_anual"] for d in DESTS}
     assert len(set(sums.values())) == 1
 
 
@@ -63,5 +64,5 @@ def test_fingerprint_stable():
     a = compute_fingerprint(generate_records(80, seed=11), sample_size=20)
     b = compute_fingerprint(generate_records(80, seed=11), sample_size=20)
     assert a["count"] == b["count"]
-    assert a["sum_valor_total"] == b["sum_valor_total"]
+    assert a["sum_media_anual"] == b["sum_media_anual"]
     assert a["aggregate_sample_hash"] == b["aggregate_sample_hash"]

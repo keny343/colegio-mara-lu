@@ -1,76 +1,53 @@
 # Relatório técnico — Laboratório de Engenharia de Dados
 
-**Projecto:** Colégio Mara & Lu  
-**Âmbito:** Geração sintética e armazenamento multi-formato (JSONL · CSV · Avro · Parquet · SQL)  
-**Versão do lab:** pasta `data-engineering/` + painel admin `/admin/lab-dados`
+## Objectivo
 
----
+Comparar formatos de armazenamento (JSONL, CSV, Avro, Parquet, SQL) com um
+dataset sintético alinhado ao domínio do **Colégio Mara & Lu**: linhas
+**aluno × disciplina** com notas do sistema angolano (1PP–3PT), média anual e situação.
 
-## 1. Introdução
+O objectivo é gerar o **mesmo conjunto lógico** de registos académicos, persistí-lo
+em cinco destinos, validar equivalência e medir tamanho, escrita, leitura e agregações.
+As conclusões devem basear-se em execuções reproduzíveis (seed + parâmetros fixos).
 
-O objectivo é gerar o **mesmo conjunto lógico** de transações comerciais sintéticas, persistí-lo em cinco destinos, validar equivalência e medir tamanho, escrita, leitura e agregações. As conclusões devem basear-se em execuções reproduzíveis (seed + parâmetros fixos).
+## Ambientes
 
-## 2. Requisitos e arquitectura
+| Ambiente | Uso |
+|----------|-----|
+| CLI Python (`data-engineering/`) | Escalas S/M (1M / 10M), validação completa, gráficos HTML |
+| Painel admin (Node + MySQL) | Tarefas manuais até 25 000 registos em produção (Render), SQL em `lab_notas_aluno` |
+| Validação | Contagens, somas de `media_anual`, hashes amostrados |
 
-| Camada | Papel |
-|--------|--------|
-| CLI Python (`python main.py`) | Escalas académicas S/M (1M / 10M), streaming, Avro/Parquet via `fastavro`/`pyarrow`, SQL SQLite |
-| Painel admin (Node + MySQL) | Tarefas manuais até 25 000 registos em produção (Render), SQL em `lab_transacoes` |
-| Validação | Contagens, somas de `valor_total`, hashes amostrados |
-| Benchmark + charts | JSON de métricas + HTML SVG (`benchmark/charts.py`) / gráficos Recharts no admin |
+## Schema
 
-## 3. Modelo e geração
+Schema `NotaAluno` (≥19 campos): id, aluno_id, matricula_id, aluno_nome, turma_id,
+turma_nome, serie_classe, curso, ano_letivo, turno, disciplina_id, disciplina,
+periodos (nested 1PP–3PT), media_anual, situacao, nota_minima, data_atualizacao,
+turma_info (nested), metadados (opcional).
 
-Schema `Transacao` (≥12 campos): id, cliente_id, produto_id, data_transacao, categoria, quantidade, preco_unitario, valor_total, estado, descricao, localizacao (nested), metadados (opcional).
+Regras: nota mínima 5 (1ª–6ª) ou 10 (restantes); escala 0–10 / 0–20; situação
+derivada da média e da completude dos períodos.
 
-- Seed fixa; lotes configuráveis; Decimal/`toFixed(2)` para dinheiro.
+- Seed fixa; lotes configuráveis; Decimal/`toFixed(1)` para notas.
 - CLI: `random.Random(seed)`. Admin Node: Mulberry32 (reproduzível no painel; não bit-a-bit idêntico ao Python).
 
-## 4. Implementação
+## Destinos
 
-Ver `README.md` do lab. Destinos: JSON Lines, CSV UTF-8 (delimitador `,`), Avro (schema `schemas/transacao.avsc`), Parquet colunar, SQL (SQLite no CLI / MySQL no admin).
+Ver `README.md` do lab. Destinos: JSON Lines, CSV UTF-8 (delimitador `,`), Avro
+(schema `schemas/nota_aluno.avsc`), Parquet colunar, SQL (SQLite no CLI / MySQL no admin).
 
-## 5. Validação
+## Validação
 
-```powershell
-python main.py validate --out output/smoke --destinations jsonl,csv,avro,parquet,sql
-```
+Critérios: contagens iguais, `sum(media_anual)` alinhada, amostra de hashes de chaves.
+Qualidade: não-nulos essenciais, intervalos de nota, consistência média/situação.
 
-Critérios: contagens iguais, `sum(valor_total)` alinhada, amostra de hashes de chaves.
+## Benchmark
 
-## 6. Experiências e benchmark
+Métricas típicas: bytes em disco, taxa de escrita/leitura, `GROUP BY disciplina`,
+compressão vs CSV, pico de memória. Relatórios JSON + HTML (`benchmark/charts.py`).
 
-Ambiente a documentar em cada corrida: OS, CPU, RAM, disco, versões Python/Node/MySQL.
+## Artefactos
 
-Smoke (referência no repositório): `output/smoke/benchmark_report.json` + HTML via:
-
-```powershell
-python main.py charts --report output/smoke/benchmark_report.json
-```
-
-Escala S/M: comandos no README (`--records 1000000` / `10000000`).
-
-## 7. Análise (orientação)
-
-- **CSV/JSONL:** interoperáveis; maior tamanho; leitura full-scan.
-- **Avro:** schema embutido; bom para ingestão linha-a-linha.
-- **Parquet:** melhor para leitura selectiva de colunas e analytics.
-- **SQL:** índices, agregações (`GROUP BY`), integridade; overhead de SGBD.
-
-Confirmar sempre com as medianas das corridas no ambiente do grupo.
-
-## 8. Limitações
-
-- Cache fria vs quente; Render free (cold start); painel limitado a 25k.
-- Escrita Avro/Parquet no admin é implementação didáctica (sem compressão avançada).
-- Ameaças à validade: hardware, carga concurrente, page cache do SO.
-
-## 9. Conclusão
-
-Usar o **CLI Python** para o relatório académico (S/M). Usar o **painel admin** para demonstração operacional e tarefas manuais em produção. Trabalho futuro: compressão Snappy/ZSTD, PostgreSQL, leitura colunar nativa no Node.
-
-### Anexos
-
-- Schema: `schemas/transacao.avsc`
-- Logs/meta: `output/<run>/run_meta.json`, `benchmark_report.json`
-- Painel: `/admin/lab-dados` (role `admin`)
+- Schema: `schemas/nota_aluno.avsc`
+- Gerador: `generator/synthetic.py` (Python) e `backend/src/lab/generator.js` (admin)
+- Painel: Admin → Lab de dados

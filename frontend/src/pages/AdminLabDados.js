@@ -186,7 +186,8 @@ export default function AdminLabDados() {
           <p className="lab-eyebrow"><Database size={14} /> Engenharia de armazenamento</p>
           <h2 className="page-header-title">Laboratório de dados</h2>
           <p className="page-header-sub">
-            Gerar, gravar, validar e comparar JSONL · CSV · Avro · Parquet · SQL (MySQL).
+            Dataset sintético de alunos × disciplinas (notas 1PP–3PT, média anual e situação),
+            nos formatos JSONL · CSV · Avro · Parquet · SQL (MySQL).
             Máximo no painel: {status?.max_records?.toLocaleString('pt-PT') || '25 000'} registos.
             Escalas S/M via CLI Python em <code>data-engineering/</code>.
           </p>
@@ -266,7 +267,7 @@ export default function AdminLabDados() {
                           <Download size={14} /> Descarregar
                         </button>
                       )}
-                      {name === 'sql' && <span className="lab-sql-tag">MySQL · lab_transacoes</span>}
+                      {name === 'sql' && <span className="lab-sql-tag">MySQL · lab_notas_aluno</span>}
                     </td>
                   </tr>
                 ))}
@@ -280,7 +281,7 @@ export default function AdminLabDados() {
         <Card className="lab-card">
           <h3 className="lab-card-title">Validação</h3>
           <p className={`lab-eq ${lastValidate.equivalent ? 'ok' : 'bad'}`}>
-            {lastValidate.equivalent ? 'Equivalência confirmada (contagens/somas alinhadas).' : 'Equivalência falhou — revise fingerprints.'}
+            {lastValidate.equivalent ? 'Equivalência confirmada (contagens / soma das médias anuais).' : 'Equivalência falhou — revise fingerprints.'}
           </p>
           <pre className="lab-pre">{JSON.stringify(lastValidate.fingerprints, null, 2)}</pre>
         </Card>

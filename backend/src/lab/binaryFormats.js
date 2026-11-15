@@ -1,29 +1,52 @@
 'use strict';
 
-/** Escritores Avro OCF e Parquet v1 (PLAIN) para Transacao — sem deps nativas. */
+/** Escritores Avro OCF e Parquet v1 (PLAIN) para NotaAluno — sem deps nativas. */
 
 const AVRO_SCHEMA = {
   type: 'record',
-  name: 'Transacao',
+  name: 'NotaAluno',
   namespace: 'colegio.mara_lu.lab',
   fields: [
     { name: 'id', type: 'long' },
-    { name: 'cliente_id', type: 'long' },
-    { name: 'produto_id', type: 'long' },
-    { name: 'data_transacao', type: 'string' },
-    { name: 'categoria', type: 'string' },
-    { name: 'quantidade', type: 'int' },
-    { name: 'preco_unitario', type: 'string' },
-    { name: 'valor_total', type: 'string' },
-    { name: 'estado', type: 'string' },
-    { name: 'descricao', type: 'string' },
+    { name: 'aluno_id', type: 'long' },
+    { name: 'matricula_id', type: 'long' },
+    { name: 'aluno_nome', type: 'string' },
+    { name: 'turma_id', type: 'long' },
+    { name: 'turma_nome', type: 'string' },
+    { name: 'serie_classe', type: 'int' },
+    { name: 'curso', type: ['null', 'string'], default: null },
+    { name: 'ano_letivo', type: 'int' },
+    { name: 'turno', type: 'string' },
+    { name: 'disciplina_id', type: 'int' },
+    { name: 'disciplina', type: 'string' },
     {
-      name: 'localizacao',
+      name: 'periodos',
       type: {
         type: 'record',
-        name: 'Localizacao',
+        name: 'Periodos',
         fields: [
-          { name: 'cidade', type: 'string' },
+          { name: '1PP', type: ['null', 'string'], default: null },
+          { name: '1PT', type: ['null', 'string'], default: null },
+          { name: '2PP', type: ['null', 'string'], default: null },
+          { name: '2PT', type: ['null', 'string'], default: null },
+          { name: '3PP', type: ['null', 'string'], default: null },
+          { name: '3PT', type: ['null', 'string'], default: null },
+        ],
+      },
+    },
+    { name: 'media_anual', type: ['null', 'string'], default: null },
+    { name: 'situacao', type: 'string' },
+    { name: 'nota_minima', type: 'int' },
+    { name: 'data_atualizacao', type: 'string' },
+    {
+      name: 'turma_info',
+      type: {
+        type: 'record',
+        name: 'TurmaInfo',
+        fields: [
+          { name: 'escola', type: 'string' },
+          { name: 'provincia', type: 'string' },
+          { name: 'municipio', type: 'string' },
           { name: 'latitude', type: 'double' },
           { name: 'longitude', type: 'double' },
         ],
@@ -37,9 +60,9 @@ const AVRO_SCHEMA = {
           type: 'record',
           name: 'Metadados',
           fields: [
-            { name: 'canal', type: 'string' },
-            { name: 'promocao', type: 'boolean' },
-            { name: 'vendedor_id', type: ['null', 'long'], default: null },
+            { name: 'professor_id', type: 'long' },
+            { name: 'origem', type: 'string' },
+            { name: 'observacao', type: ['null', 'string'], default: null },
           ],
         },
       ],
@@ -96,34 +119,54 @@ function avroLong(n) {
   return zigzag(n);
 }
 
-function avroBool(b) {
-  return Buffer.from([b ? 1 : 0]);
+function avroNullableString(v) {
+  if (v == null) return zigzag(0);
+  return concatBytes([zigzag(1), avroString(v)]);
+}
+
+function encodePeriodos(p) {
+  return concatBytes([
+    avroNullableString(p['1PP']),
+    avroNullableString(p['1PT']),
+    avroNullableString(p['2PP']),
+    avroNullableString(p['2PT']),
+    avroNullableString(p['3PP']),
+    avroNullableString(p['3PT']),
+  ]);
 }
 
 function encodeRecord(r) {
   const parts = [
     avroLong(r.id),
-    avroLong(r.cliente_id),
-    avroLong(r.produto_id),
-    avroString(r.data_transacao),
-    avroString(r.categoria),
-    zigzag(r.quantidade),
-    avroString(r.preco_unitario),
-    avroString(r.valor_total),
-    avroString(r.estado),
-    avroString(r.descricao),
-    avroString(r.localizacao.cidade),
-    f64le(r.localizacao.latitude),
-    f64le(r.localizacao.longitude),
+    avroLong(r.aluno_id),
+    avroLong(r.matricula_id),
+    avroString(r.aluno_nome),
+    avroLong(r.turma_id),
+    avroString(r.turma_nome),
+    zigzag(r.serie_classe),
+    avroNullableString(r.curso),
+    zigzag(r.ano_letivo),
+    avroString(r.turno),
+    zigzag(r.disciplina_id),
+    avroString(r.disciplina),
+    encodePeriodos(r.periodos || {}),
+    avroNullableString(r.media_anual),
+    avroString(r.situacao),
+    zigzag(r.nota_minima),
+    avroString(r.data_atualizacao),
+    avroString(r.turma_info.escola),
+    avroString(r.turma_info.provincia),
+    avroString(r.turma_info.municipio),
+    f64le(r.turma_info.latitude),
+    f64le(r.turma_info.longitude),
   ];
   if (r.metadados == null) {
     parts.push(zigzag(0));
   } else {
     parts.push(zigzag(1));
-    parts.push(avroString(r.metadados.canal));
-    parts.push(avroBool(!!r.metadados.promocao));
-    if (r.metadados.vendedor_id == null) parts.push(zigzag(0));
-    else parts.push(zigzag(1), avroLong(r.metadados.vendedor_id));
+    parts.push(avroLong(r.metadados.professor_id));
+    parts.push(avroString(r.metadados.origem));
+    parts.push(avroNullableString(r.metadados.observacao));
   }
   return concatBytes(parts);
 }
@@ -194,21 +237,23 @@ function writeParquetBuffer(records) {
   const numRows = records.length;
   const colunas = [
     { nome: 'id', tipo: PQ.INT64, opcional: false, get: (r) => BigInt(r.id) },
-    { nome: 'cliente_id', tipo: PQ.INT64, opcional: false, get: (r) => BigInt(r.cliente_id) },
-    { nome: 'produto_id', tipo: PQ.INT64, opcional: false, get: (r) => BigInt(r.produto_id) },
-    { nome: 'data_transacao', tipo: PQ.BYTE_ARRAY, opcional: false, get: (r) => String(r.data_transacao) },
-    { nome: 'categoria', tipo: PQ.BYTE_ARRAY, opcional: false, get: (r) => String(r.categoria) },
-    { nome: 'quantidade', tipo: PQ.INT32, opcional: false, get: (r) => Number(r.quantidade) },
-    { nome: 'preco_unitario', tipo: PQ.BYTE_ARRAY, opcional: false, get: (r) => String(r.preco_unitario) },
-    { nome: 'valor_total', tipo: PQ.BYTE_ARRAY, opcional: false, get: (r) => String(r.valor_total) },
-    { nome: 'estado', tipo: PQ.BYTE_ARRAY, opcional: false, get: (r) => String(r.estado) },
-    { nome: 'descricao', tipo: PQ.BYTE_ARRAY, opcional: false, get: (r) => String(r.descricao) },
-    {
-      nome: 'localizacao',
-      tipo: PQ.BYTE_ARRAY,
-      opcional: false,
-      get: (r) => JSON.stringify(r.localizacao),
-    },
+    { nome: 'aluno_id', tipo: PQ.INT64, opcional: false, get: (r) => BigInt(r.aluno_id) },
+    { nome: 'matricula_id', tipo: PQ.INT64, opcional: false, get: (r) => BigInt(r.matricula_id) },
+    { nome: 'aluno_nome', tipo: PQ.BYTE_ARRAY, opcional: false, get: (r) => String(r.aluno_nome) },
+    { nome: 'turma_id', tipo: PQ.INT64, opcional: false, get: (r) => BigInt(r.turma_id) },
+    { nome: 'turma_nome', tipo: PQ.BYTE_ARRAY, opcional: false, get: (r) => String(r.turma_nome) },
+    { nome: 'serie_classe', tipo: PQ.INT32, opcional: false, get: (r) => Number(r.serie_classe) },
+    { nome: 'curso', tipo: PQ.BYTE_ARRAY, opcional: true, get: (r) => (r.curso == null ? null : String(r.curso)) },
+    { nome: 'ano_letivo', tipo: PQ.INT32, opcional: false, get: (r) => Number(r.ano_letivo) },
+    { nome: 'turno', tipo: PQ.BYTE_ARRAY, opcional: false, get: (r) => String(r.turno) },
+    { nome: 'disciplina_id', tipo: PQ.INT32, opcional: false, get: (r) => Number(r.disciplina_id) },
+    { nome: 'disciplina', tipo: PQ.BYTE_ARRAY, opcional: false, get: (r) => String(r.disciplina) },
+    { nome: 'periodos', tipo: PQ.BYTE_ARRAY, opcional: false, get: (r) => JSON.stringify(r.periodos) },
+    { nome: 'media_anual', tipo: PQ.BYTE_ARRAY, opcional: true, get: (r) => (r.media_anual == null ? null : String(r.media_anual)) },
+    { nome: 'situacao', tipo: PQ.BYTE_ARRAY, opcional: false, get: (r) => String(r.situacao) },
+    { nome: 'nota_minima', tipo: PQ.INT32, opcional: false, get: (r) => Number(r.nota_minima) },
+    { nome: 'data_atualizacao', tipo: PQ.BYTE_ARRAY, opcional: false, get: (r) => String(r.data_atualizacao) },
+    { nome: 'turma_info', tipo: PQ.BYTE_ARRAY, opcional: false, get: (r) => JSON.stringify(r.turma_info) },
     {
       nome: 'metadados',
       tipo: PQ.BYTE_ARRAY,
@@ -251,7 +296,7 @@ function writeParquetBuffer(records) {
         [4, TT.I32, tInt(3)],
       ]);
       const page = concatBytes([
-        u32le(0), // DATA_PAGE
+        u32le(0),
         u32le(dados.length),
         u32le(dph.length),
         dph,
@@ -277,21 +322,12 @@ function writeParquetBuffer(records) {
     }
   }
 
-  const schemaElements = colunas.map((col, i) => {
-    const campos = [
-      [1, TT.I32, tInt(col.tipo === PQ.INT64 ? 2 : col.tipo === PQ.INT32 ? 1 : 6)],
-      [2, TT.I32, tInt(col.opcional ? 1 : 0)], // OPTIONAL / REQUIRED
-      [3, TT.STRING, tString(col.nome)],
-      [4, TT.I32, tInt(1)], // num_children = 0 for leaves → use repetition
-    ];
-    // Parquet SchemaElement: type, repetition_type, name, num_children
-    return tStruct([
-      [1, TT.I32, tInt(col.tipo === PQ.INT64 ? 2 : col.tipo === PQ.INT32 ? 1 : 6)],
-      [3, TT.I32, tInt(col.opcional ? 1 : 0)],
-      [4, TT.STRING, tString(col.nome)],
-      [5, TT.I32, tInt(0)],
-    ]);
-  });
+  const schemaElements = colunas.map((col) => tStruct([
+    [1, TT.I32, tInt(col.tipo === PQ.INT64 ? 2 : col.tipo === PQ.INT32 ? 1 : 6)],
+    [3, TT.I32, tInt(col.opcional ? 1 : 0)],
+    [4, TT.STRING, tString(col.nome)],
+    [5, TT.I32, tInt(0)],
+  ]));
 
   const root = tStruct([
     [4, TT.STRING, tString('schema')],
@@ -305,7 +341,7 @@ function writeParquetBuffer(records) {
   ]);
 
   const footer = tStruct([
-    [1, TT.I32, tInt(1)], // version
+    [1, TT.I32, tInt(1)],
     [2, TT.LIST, tList(TT.STRUCT, [root, ...schemaElements])],
     [3, TT.I64, tInt(numRows)],
     [4, TT.LIST, tList(TT.STRUCT, numRows ? [rowGroup] : [])],

@@ -14,9 +14,10 @@ def read_sql(path: Union[str, Path]) -> Iterator[Dict[str, Any]]:
     conn.row_factory = sqlite3.Row
     try:
         cur = conn.execute(
-            "SELECT id, cliente_id, produto_id, data_transacao, categoria, "
-            "quantidade, preco_unitario, valor_total, estado, descricao, "
-            "localizacao, metadados FROM transacoes ORDER BY id"
+            "SELECT id, aluno_id, matricula_id, aluno_nome, turma_id, turma_nome, "
+            "serie_classe, curso, ano_letivo, turno, disciplina_id, disciplina, "
+            "periodos, media_anual, situacao, nota_minima, data_atualizacao, "
+            "turma_info, metadados FROM notas_aluno ORDER BY id"
         )
         while True:
             rows = cur.fetchmany(5000)
@@ -26,16 +27,23 @@ def read_sql(path: Union[str, Path]) -> Iterator[Dict[str, Any]]:
                 meta_raw = row["metadados"]
                 yield {
                     "id": row["id"],
-                    "cliente_id": row["cliente_id"],
-                    "produto_id": row["produto_id"],
-                    "data_transacao": row["data_transacao"],
-                    "categoria": row["categoria"],
-                    "quantidade": row["quantidade"],
-                    "preco_unitario": row["preco_unitario"],
-                    "valor_total": row["valor_total"],
-                    "estado": row["estado"],
-                    "descricao": row["descricao"],
-                    "localizacao": json.loads(row["localizacao"]),
+                    "aluno_id": row["aluno_id"],
+                    "matricula_id": row["matricula_id"],
+                    "aluno_nome": row["aluno_nome"],
+                    "turma_id": row["turma_id"],
+                    "turma_nome": row["turma_nome"],
+                    "serie_classe": row["serie_classe"],
+                    "curso": row["curso"],
+                    "ano_letivo": row["ano_letivo"],
+                    "turno": row["turno"],
+                    "disciplina_id": row["disciplina_id"],
+                    "disciplina": row["disciplina"],
+                    "periodos": json.loads(row["periodos"]),
+                    "media_anual": row["media_anual"],
+                    "situacao": row["situacao"],
+                    "nota_minima": row["nota_minima"],
+                    "data_atualizacao": row["data_atualizacao"],
+                    "turma_info": json.loads(row["turma_info"]),
                     "metadados": json.loads(meta_raw) if meta_raw else None,
                 }
     finally:

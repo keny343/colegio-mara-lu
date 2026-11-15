@@ -5,13 +5,17 @@ from __future__ import annotations
 import sys
 from pathlib import Path
 
-import pytest
-
 ROOT = Path(__file__).resolve().parent.parent
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from generator.synthetic import generate_batches, generate_records
+from generator.synthetic import (
+    generate_batches,
+    generate_records,
+    media_periodos,
+    nota_minima_para,
+    situacao_de,
+)
 
 
 def test_same_seed_same_records():
@@ -35,20 +39,19 @@ def test_batches_cover_all_and_preserve_order():
     assert batched == flat
 
 
-def test_money_fields_are_decimal_strings():
+def test_notas_schema_and_rules():
     rec = next(generate_records(1, seed=1))
-    assert "." in rec["preco_unitario"]
-    assert "." in rec["valor_total"]
-    from decimal import Decimal
-
-    preco = Decimal(rec["preco_unitario"])
-    qty = Decimal(rec["quantidade"])
-    total = Decimal(rec["valor_total"])
-    assert total == (preco * qty).quantize(Decimal("0.01"))
+    assert "periodos" in rec
+    assert set(rec["periodos"].keys()) == {"1PP", "1PT", "2PP", "2PT", "3PP", "3PT"}
+    assert rec["nota_minima"] == nota_minima_para(rec["serie_classe"])
+    media = media_periodos(rec["periodos"])
+    assert rec["media_anual"] == media
+    assert rec["situacao"] == situacao_de(rec["periodos"], media, rec["nota_minima"])
 
 
-def test_schema_has_nested_localizacao():
+def test_schema_has_nested_turma_info():
     rec = next(generate_records(1, seed=3))
-    assert "cidade" in rec["localizacao"]
-    assert "latitude" in rec["localizacao"]
-    assert "longitude" in rec["localizacao"]
+    assert rec["turma_info"]["escola"] == "Colégio Mara & Lu"
+    assert "provincia" in rec["turma_info"]
+    assert "latitude" in rec["turma_info"]
+    assert "longitude" in rec["turma_info"]

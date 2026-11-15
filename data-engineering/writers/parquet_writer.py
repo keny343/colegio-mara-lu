@@ -12,43 +12,53 @@ import pyarrow.parquet as pq
 
 
 def _records_to_table(batch: List[Dict[str, Any]]) -> pa.Table:
-    """Converte lote para Table; nested structs viram JSON string + colunas planas.
-
-    Para equivalência/validação, localizacao e metadados são gravados como
-    strings JSON (compatível com CSV/JSONL) e também expandimos campos úteis.
-    """
+    """Converte lote para Table; nested structs viram JSON string + colunas úteis."""
     ids = []
-    cliente_ids = []
-    produto_ids = []
+    aluno_ids = []
+    matricula_ids = []
+    nomes = []
+    turma_ids = []
+    turma_nomes = []
+    series = []
+    cursos = []
+    anos = []
+    turnos = []
+    disc_ids = []
+    disciplinas = []
+    periodos_list = []
+    medias = []
+    situacoes = []
+    minimas = []
     datas = []
-    categorias = []
-    quantidades = []
-    precos = []
-    valores = []
-    estados = []
-    descricoes = []
-    localizacoes = []
+    turma_infos = []
     metadados_list = []
-    cidades = []
-    latitudes = []
-    longitudes = []
+    provincias = []
+    municipios = []
 
     for r in batch:
         ids.append(r["id"])
-        cliente_ids.append(r["cliente_id"])
-        produto_ids.append(r["produto_id"])
-        datas.append(r["data_transacao"])
-        categorias.append(r["categoria"])
-        quantidades.append(r["quantidade"])
-        precos.append(r["preco_unitario"])
-        valores.append(r["valor_total"])
-        estados.append(r["estado"])
-        descricoes.append(r["descricao"])
-        loc = r["localizacao"]
-        localizacoes.append(json.dumps(loc, ensure_ascii=False, separators=(",", ":")))
-        cidades.append(loc["cidade"])
-        latitudes.append(loc["latitude"])
-        longitudes.append(loc["longitude"])
+        aluno_ids.append(r["aluno_id"])
+        matricula_ids.append(r["matricula_id"])
+        nomes.append(r["aluno_nome"])
+        turma_ids.append(r["turma_id"])
+        turma_nomes.append(r["turma_nome"])
+        series.append(r["serie_classe"])
+        cursos.append(r.get("curso"))
+        anos.append(r["ano_letivo"])
+        turnos.append(r["turno"])
+        disc_ids.append(r["disciplina_id"])
+        disciplinas.append(r["disciplina"])
+        periodos_list.append(
+            json.dumps(r["periodos"], ensure_ascii=False, separators=(",", ":"))
+        )
+        medias.append(r.get("media_anual"))
+        situacoes.append(r["situacao"])
+        minimas.append(r["nota_minima"])
+        datas.append(r["data_atualizacao"])
+        info = r["turma_info"]
+        turma_infos.append(json.dumps(info, ensure_ascii=False, separators=(",", ":")))
+        provincias.append(info.get("provincia"))
+        municipios.append(info.get("municipio"))
         meta = r.get("metadados")
         metadados_list.append(
             json.dumps(meta, ensure_ascii=False, separators=(",", ":")) if meta else None
@@ -57,20 +67,26 @@ def _records_to_table(batch: List[Dict[str, Any]]) -> pa.Table:
     return pa.table(
         {
             "id": pa.array(ids, type=pa.int64()),
-            "cliente_id": pa.array(cliente_ids, type=pa.int64()),
-            "produto_id": pa.array(produto_ids, type=pa.int64()),
-            "data_transacao": pa.array(datas, type=pa.string()),
-            "categoria": pa.array(categorias, type=pa.string()),
-            "quantidade": pa.array(quantidades, type=pa.int32()),
-            "preco_unitario": pa.array(precos, type=pa.string()),
-            "valor_total": pa.array(valores, type=pa.string()),
-            "estado": pa.array(estados, type=pa.string()),
-            "descricao": pa.array(descricoes, type=pa.string()),
-            "localizacao": pa.array(localizacoes, type=pa.string()),
+            "aluno_id": pa.array(aluno_ids, type=pa.int64()),
+            "matricula_id": pa.array(matricula_ids, type=pa.int64()),
+            "aluno_nome": pa.array(nomes, type=pa.string()),
+            "turma_id": pa.array(turma_ids, type=pa.int64()),
+            "turma_nome": pa.array(turma_nomes, type=pa.string()),
+            "serie_classe": pa.array(series, type=pa.int32()),
+            "curso": pa.array(cursos, type=pa.string()),
+            "ano_letivo": pa.array(anos, type=pa.int32()),
+            "turno": pa.array(turnos, type=pa.string()),
+            "disciplina_id": pa.array(disc_ids, type=pa.int32()),
+            "disciplina": pa.array(disciplinas, type=pa.string()),
+            "periodos": pa.array(periodos_list, type=pa.string()),
+            "media_anual": pa.array(medias, type=pa.string()),
+            "situacao": pa.array(situacoes, type=pa.string()),
+            "nota_minima": pa.array(minimas, type=pa.int32()),
+            "data_atualizacao": pa.array(datas, type=pa.string()),
+            "turma_info": pa.array(turma_infos, type=pa.string()),
             "metadados": pa.array(metadados_list, type=pa.string()),
-            "cidade": pa.array(cidades, type=pa.string()),
-            "latitude": pa.array(latitudes, type=pa.float64()),
-            "longitude": pa.array(longitudes, type=pa.float64()),
+            "provincia": pa.array(provincias, type=pa.string()),
+            "municipio": pa.array(municipios, type=pa.string()),
         }
     )
 
