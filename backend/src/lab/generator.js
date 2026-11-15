@@ -1,65 +1,17 @@
 'use strict';
 
 /**
- * Gerador determinístico de linhas aluno×disciplina (espelha data-engineering/generator).
- * Alinhado ao Colégio Mara & Lu / sistema angolano:
- * 3 trimestres × (parcial + trimestral) = 1PP, 1PT, 2PP, 2PT, 3PP, 3PT.
- * Seed local via Mulberry32 — reproduzível no Node; o CLI Python usa random.Random.
+ * Gerador determinístico de notas de alunos — contexto angolano.
+ * Mesma seed => mesmos dados, independentemente do tamanho do lote.
+ *
+ * Regras (backend/src/utils/academicoRules.js):
+ *  - 3 trimestres, 6 períodos por disciplina: 1PP 1PT 2PP 2PT 3PP 3PT
+ *  - 1ª–6ª classe: notas 0–10, mínimo 5 | 7ª–13ª classe: notas 0–20, mínimo 10
+ *  - situacao = nota >= nota_minima ? 'positiva' : 'negativa'
+ * Cada aluno tem todas as notas das disciplinas da sua classe/curso (pauta completa).
  */
 
-const PERIODOS = ['1PP', '1PT', '2PP', '2PT', '3PP', '3PT'];
-
-const DISCIPLINAS = [
-  'Língua Portuguesa',
-  'Matemática',
-  'História',
-  'Geografia',
-  'Ciências',
-  'Educação Física',
-  'Educação Moral e Cívica',
-  'Inglês',
-  'Física',
-  'Química',
-  'Biologia',
-  'Informática',
-];
-
-const TURNOS = ['manhã', 'tarde', 'noite'];
-
-const CURSOS_SEC = [
-  null,
-  'Ciências Físicas e Biológicas',
-  'Ciências Económicas e Jurídicas',
-  'Humanidades',
-];
-
-const PROVINCIAS = [
-  ['Luanda', 'Luanda', -8.8383, 13.2344],
-  ['Benguela', 'Benguela', -12.5763, 13.4055],
-  ['Huambo', 'Huambo', -12.7761, 15.7393],
-  ['Huíla', 'Lubango', -14.9172, 13.4925],
-  ['Cabinda', 'Cabinda', -5.55, 12.2],
-];
-
-const NOMES = [
-  'Ana', 'Bruno', 'Carla', 'Daniel', 'Elena', 'Fábio', 'Gisela', 'Hugo',
-  'Inês', 'João', 'Katia', 'Luis', 'Maria', 'Nuno', 'Olga', 'Paulo',
-  'Quintino', 'Rita', 'Sara', 'Tiago', 'Úrsula', 'Vítor', 'Wanda', 'Xavier',
-];
-
-const SOBRENOMES = [
-  'Silva', 'Santos', 'Costa', 'Pereira', 'Oliveira', 'Fernandes', 'Rodrigues',
-  'Martins', 'Almeida', 'Nascimento', 'Dos Santos', 'Manuel', 'João',
-];
-
-const BASE_MS = Date.UTC(2025, 1, 1, 8, 0, 0); // 2025-02-01
-
-const SCHEMA_FIELDS = [
-  'id', 'aluno_id', 'matricula_id', 'aluno_nome', 'turma_id', 'turma_nome',
-  'serie_classe', 'curso', 'ano_letivo', 'turno', 'disciplina_id', 'disciplina',
-  'periodos', 'media_anual', 'situacao', 'nota_minima', 'data_atualizacao',
-  'turma_info', 'metadados',
-];
+const { PERIODOS } = require('./schema');
 
 function mulberry32(seed) {
   let t = seed >>> 0;
@@ -71,167 +23,253 @@ function mulberry32(seed) {
   };
 }
 
-function pick(rng, arr) {
-  return arr[Math.floor(rng() * arr.length)];
-}
-
-function randint(rng, a, b) {
-  return a + Math.floor(rng() * (b - a + 1));
-}
-
-function uniform(rng, a, b) {
-  return a + rng() * (b - a);
-}
-
-/** Box–Muller (aproxima random.gauss do Python). */
-function gauss(rng, mu, sigma) {
-  let u = 0;
-  let v = 0;
-  while (u === 0) u = rng();
-  while (v === 0) v = rng();
-  const z = Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * v);
-  return mu + z * sigma;
-}
-
-function qNota(n) {
-  return (Math.round(Number(n) * 10) / 10).toFixed(1);
-}
-
-function notaMinimaPara(serie) {
-  return serie >= 1 && serie <= 6 ? 5 : 10;
-}
-
-function limiteMaxPara(serie) {
-  return serie <= 6 ? 10 : 20;
-}
-
-function mediaTrimestre(a, b) {
-  const vals = [a, b].filter((x) => x != null).map(Number);
-  if (!vals.length) return null;
-  return vals.reduce((s, x) => s + x, 0) / vals.length;
-}
-
-function mediaPeriodos(periodos) {
-  const t1 = mediaTrimestre(periodos['1PP'], periodos['1PT']);
-  const t2 = mediaTrimestre(periodos['2PP'], periodos['2PT']);
-  const t3 = mediaTrimestre(periodos['3PP'], periodos['3PT']);
-  const trimestres = [t1, t2, t3].filter((t) => t != null);
-  if (!trimestres.length) return null;
-  const m = trimestres.reduce((s, x) => s + x, 0) / trimestres.length;
-  return qNota(m);
-}
-
-function periodosCompletos(periodos) {
-  return PERIODOS.every((k) => periodos[k] != null);
-}
-
-function situacaoDe(periodos, media, minimo) {
-  if (media == null) return 'Sem notas';
-  if (!periodosCompletos(periodos)) return 'Em curso';
-  return Number(media) >= minimo ? 'Positiva' : 'Negativa';
-}
-
-function makeRecord(rng, rowId) {
-  const serie = randint(rng, 1, 12);
-  const maxNota = limiteMaxPara(serie);
-  const minimo = notaMinimaPara(serie);
-  const curso = serie >= 10 ? pick(rng, CURSOS_SEC) : null;
-  const turno = pick(rng, TURNOS);
-  const turmaId = 1 + (serie - 1) * 3 + randint(rng, 0, 2);
-  let turmaNome = `${serie}ª ${turno[0].toUpperCase()}${turno.slice(1)}`;
-  if (curso) turmaNome = `${serie}ª ${curso.split(' ')[0]} ${turno}`;
-
-  const alunoId = randint(rng, 1, 80000);
-  const matriculaId = alunoId * 10 + randint(rng, 0, 9);
-  const nome = `${pick(rng, NOMES)} ${pick(rng, SOBRENOMES)}`;
-  const discIdx = randint(rng, 0, DISCIPLINAS.length - 1);
-  const disciplina = DISCIPLINAS[discIdx];
-  const disciplinaId = discIdx + 1;
-
-  const fillProb = uniform(rng, 0.55, 1.0);
-  const periodos = {};
-  for (const key of PERIODOS) {
-    if (rng() < fillProb) {
-      let raw = gauss(rng, maxNota * 0.62, maxNota * 0.18);
-      raw = Math.round(raw * 10) / 10;
-      if (raw < 0) raw = 0;
-      if (raw > maxNota) raw = maxNota;
-      periodos[key] = qNota(raw);
-    } else {
-      periodos[key] = null;
+function hash32(...parts) {
+  let h = 2166136261;
+  for (const p of parts) {
+    const s = String(p);
+    for (let i = 0; i < s.length; i++) {
+      h ^= s.charCodeAt(i);
+      h = Math.imul(h, 16777619);
     }
+    h ^= 0x9e3779b9;
+    h = Math.imul(h, 16777619);
   }
+  return h >>> 0;
+}
 
-  const media = mediaPeriodos(periodos);
-  const situacao = situacaoDe(periodos, media, minimo);
+const pick = (rng, arr) => arr[Math.floor(rng() * arr.length)];
+const pad = (n, w = 2) => String(n).padStart(w, '0');
 
-  const [prov, mun, lat0, lon0] = pick(rng, PROVINCIAS);
-  const lat = lat0 + uniform(rng, -0.05, 0.05);
-  const lon = lon0 + uniform(rng, -0.05, 0.05);
+// ---------- Catálogo angolano ----------
 
-  const seconds = randint(rng, 0, 86400 * 200);
-  const data = new Date(BASE_MS + seconds * 1000);
-  const iso = data.toISOString().slice(0, 19);
+const CURSOS = {
+  INFO: 'Informática',
+  CFB: 'Ciências Físicas e Biológicas',
+  CEJ: 'Ciências Económicas e Jurídicas',
+};
+
+const DISC_1_4 = ['Língua Portuguesa', 'Matemática', 'Estudo do Meio', 'Educação Manual e Plástica', 'Educação Musical', 'Educação Física'];
+const DISC_5_6 = ['Língua Portuguesa', 'Matemática', 'Ciências da Natureza', 'História', 'Geografia', 'Educação Moral e Cívica', 'Educação Visual e Plástica', 'Educação Física'];
+const DISC_7_9 = ['Língua Portuguesa', 'Matemática', 'Inglês', 'Biologia', 'Física', 'Química', 'História', 'Geografia', 'Educação Moral e Cívica', 'Educação Física'];
+const DISC_CURSO = {
+  [CURSOS.INFO]: ['Matemática', 'Física', 'Informática', 'Programação', 'Redes de Computadores', 'Empreendedorismo'],
+  [CURSOS.CFB]: ['Matemática', 'Física', 'Química', 'Biologia', 'Geologia', 'Desenho'],
+  [CURSOS.CEJ]: ['Matemática', 'Economia', 'Direito', 'Contabilidade', 'Geografia', 'História'],
+};
+const DISC_COMUM_II_CICLO = ['Língua Portuguesa', 'Inglês', 'Educação Física'];
+
+const DISCIPLINAS_CATALOGO = [...new Set([
+  ...DISC_1_4, ...DISC_5_6, ...DISC_7_9, ...DISC_COMUM_II_CICLO, ...Object.values(DISC_CURSO).flat(),
+])];
+const DISCIPLINA_ID = Object.fromEntries(DISCIPLINAS_CATALOGO.map((n, i) => [n, i + 1]));
+
+function disciplinasDaClasse(serie, curso) {
+  if (serie <= 4) return DISC_1_4;
+  if (serie <= 6) return DISC_5_6;
+  if (serie <= 9) return DISC_7_9;
+  return [...DISC_COMUM_II_CICLO, ...DISC_CURSO[curso]];
+}
+
+// Grupos classe/curso que existem no sistema (ver séries em backend/database.sql)
+const GRUPOS = [];
+for (let s = 1; s <= 9; s++) GRUPOS.push({ serie: s, curso: null, cursoIdx: 0 });
+for (let s = 10; s <= 13; s++) GRUPOS.push({ serie: s, curso: CURSOS.INFO, cursoIdx: 1 });
+for (let s = 10; s <= 12; s++) GRUPOS.push({ serie: s, curso: CURSOS.CFB, cursoIdx: 2 });
+for (let s = 10; s <= 12; s++) GRUPOS.push({ serie: s, curso: CURSOS.CEJ, cursoIdx: 3 });
+
+const NOMES_M = ['Manuel', 'António', 'João', 'José', 'Domingos', 'Fernando', 'Paulo', 'Pedro', 'Miguel', 'Sebastião', 'Francisco', 'Mateus', 'Bernardo', 'Adilson', 'Hélder', 'Nelson', 'Jorge', 'Délcio', 'Abel', 'Garcia', 'Eduardo', 'Cláudio'];
+const NOMES_F = ['Maria', 'Ana', 'Joana', 'Isabel', 'Luzia', 'Esperança', 'Domingas', 'Teresa', 'Catarina', 'Beatriz', 'Ermelinda', 'Filomena', 'Natália', 'Sandra', 'Paula', 'Eunice', 'Albertina', 'Madalena', 'Celeste', 'Graça', 'Vanda', 'Zulmira'];
+const APELIDOS = ['Silva', 'Santos', 'Gomes', 'Fernandes', 'Pereira', 'Neto', 'Cardoso', 'Mendes', 'Ferreira', 'Domingos', 'Manuel', 'Francisco', 'Baptista', 'Quintas', 'Capita', 'Lopes', 'Sebastião', 'Tomás', 'Cassoma', 'Mateus', 'Vicente', 'Ngola', 'Kiala', 'Mbala', 'Lukamba', 'Nzuzi', 'Costa', 'Afonso', 'Bento', 'Cunha'];
+
+// Província -> municípios (a maioria dos alunos está em Luanda)
+const LOCAIS = [
+  { provincia: 'Luanda', peso: 70, municipios: { Belas: ['Camama', 'Benfica', 'Vila Flor'], Cazenga: ['Hoji-ya-Henda', 'Tala Hady'], Cacuaco: ['Sequele', 'Kicolo'], Viana: ['Zango', 'Km 30'], 'Kilamba Kiaxi': ['Golfe', 'Palanca'], Talatona: ['Talatona', 'Cidade Financeira'], Luanda: ['Maianga', 'Rangel', 'Sambizanga'] } },
+  { provincia: 'Benguela', peso: 4, municipios: { Benguela: ['Centro', 'Compão'], Lobito: ['Restinga', 'Canata'] } },
+  { provincia: 'Huambo', peso: 3, municipios: { Huambo: ['Centro', 'São Pedro'] } },
+  { provincia: 'Huíla', peso: 3, municipios: { Lubango: ['Centro', 'Mapunda'], Matala: ['Centro'] } },
+  { provincia: 'Bengo', peso: 3, municipios: { Caxito: ['Centro', 'Mabubas'] } },
+  { provincia: 'Cabinda', peso: 2, municipios: { Cabinda: ['Centro', 'Cabassango'] } },
+  { provincia: 'Malanje', peso: 2, municipios: { Malanje: ['Centro', 'Cangambo'] } },
+  { provincia: 'Uíge', peso: 2, municipios: { Uíge: ['Centro', 'Bairro Popular'] } },
+  { provincia: 'Namibe', peso: 2, municipios: { Moçâmedes: ['Centro', 'Saco Mar'] } },
+  { provincia: 'Cuanza Sul', peso: 2, municipios: { Sumbe: ['Centro', 'Chingo'] } },
+  { provincia: 'Cuanza Norte', peso: 1, municipios: { "N'dalatando": ['Centro'] } },
+  { provincia: 'Bié', peso: 1, municipios: { Cuíto: ['Centro', 'Sambo'] } },
+  { provincia: 'Moxico', peso: 1, municipios: { Luena: ['Centro'] } },
+  { provincia: 'Lunda Norte', peso: 1, municipios: { Dundo: ['Centro'] } },
+  { provincia: 'Lunda Sul', peso: 1, municipios: { Saurimo: ['Centro'] } },
+  { provincia: 'Zaire', peso: 1, municipios: { "M'Banza Kongo": ['Centro'] } },
+  { provincia: 'Cunene', peso: 1, municipios: { Ondjiva: ['Centro'] } },
+];
+const LOCAIS_TOTAL = LOCAIS.reduce((n, l) => n + l.peso, 0);
+
+function pickLocal(rng) {
+  let x = rng() * LOCAIS_TOTAL;
+  let loc = LOCAIS[0];
+  for (const l of LOCAIS) {
+    x -= l.peso;
+    if (x < 0) { loc = l; break; }
+  }
+  const municipio = pick(rng, Object.keys(loc.municipios));
+  return { provincia: loc.provincia, municipio, bairro: pick(rng, loc.municipios[municipio]) };
+}
+
+const OBS_POSITIVA = ['Aproveitamento satisfatório.', 'Bom desempenho na prova.', 'Participação activa nas aulas.', 'Evolução positiva face ao período anterior.', 'Cumpriu os objectivos do período.'];
+const OBS_NEGATIVA = ['Necessita de apoio pedagógico.', 'Dificuldades nos conteúdos do período.', 'Recomenda-se acompanhamento do encarregado de educação.', 'Resultado abaixo do mínimo exigido.', 'Faltou a aulas de revisão.'];
+const OBS_ESPECIAL = ['Prova realizada em 2ª chamada por falta justificada.', 'Avaliação com apoio de aulas de reforço.'];
+
+// ---------- Datas do ano lectivo (Setembro a Julho) ----------
+
+function dataLancamento(rng, anoLetivo, periodo) {
+  // [ano offset, mês (1-12), dia mínimo, dia máximo]
+  const mapa = {
+    '1PP': [0, 10, 15, 25], '1PT': [0, 12, 1, 10],
+    '2PP': [1, 2, 10, 20], '2PT': [1, 3, 15, 25],
+    '3PP': [1, 5, 10, 20], '3PT': [1, 7, 1, 10],
+  };
+  const [off, mes, d0, d1] = mapa[periodo];
+  const dia = d0 + Math.floor(rng() * (d1 - d0 + 1));
+  const h = 8 + Math.floor(rng() * 10);
+  const m = Math.floor(rng() * 60);
+  const s = Math.floor(rng() * 60);
+  return `${anoLetivo + off}-${pad(mes)}-${pad(dia)} ${pad(h)}:${pad(m)}:${pad(s)}`;
+}
+
+// ---------- Aluno ----------
+
+function criarAluno(seed, idx) {
+  const rng = mulberry32(hash32(seed, 'aluno', idx));
+  const grupo = pick(rng, GRUPOS);
+  const sexo = rng() < 0.5 ? 'M' : 'F';
+  const nome = `${pick(rng, sexo === 'M' ? NOMES_M : NOMES_F)} ${pick(rng, APELIDOS)} ${pick(rng, APELIDOS)}`;
+  const anoLetivo = idx % 2 === 0 ? 2024 : 2025;
+  const repetente = rng() < 0.08;
+  const idade = 5 + grupo.serie + (repetente ? 1 : 0) + Math.floor(rng() * 2);
+  const nascAno = anoLetivo - idade;
+  const nascimento = `${nascAno}-${pad(1 + Math.floor(rng() * 12))}-${pad(1 + Math.floor(rng() * 28))}`;
+  const letra = Math.floor(rng() * 3);
+  const turmaId = grupo.serie * 100 + grupo.cursoIdx * 10 + letra + 1;
+  const turno = grupo.serie >= 10 && letra === 2 ? 'noite' : (letra === 1 ? 'tarde' : 'manhã');
+  // "nível" do aluno entre ~0.35 e ~0.9 da escala (soma de 3 uniformes ≈ gaussiana)
+  const nivel = 0.62 + ((rng() + rng() + rng()) / 3 - 0.5) * 0.7;
+  const disciplinas = disciplinasDaClasse(grupo.serie, grupo.curso).map((nome_) => ({
+    nome: nome_,
+    id: DISCIPLINA_ID[nome_],
+    offset: (rng() - 0.5) * 0.2,
+  }));
+  return {
+    idx,
+    id: idx + 1,
+    matriculaId: 500000 + idx + 1,
+    nome,
+    sexo,
+    nascimento,
+    serie: grupo.serie,
+    curso: grupo.curso,
+    turmaId,
+    turno,
+    anoLetivo,
+    repetente,
+    nivel,
+    localizacao: pickLocal(rng),
+    disciplinas,
+  };
+}
+
+function linhaAluno(a) {
+  return {
+    id: a.id,
+    nome: a.nome,
+    sexo: a.sexo,
+    data_nascimento: a.nascimento,
+    nacionalidade: 'Angolana',
+    serie_classe: a.serie,
+    curso: a.curso,
+    turma_id: a.turmaId,
+    ano_letivo: a.anoLetivo,
+  };
+}
+
+// ---------- Registo de nota ----------
+
+function criarNota(seed, id, aluno, disc, periodo) {
+  const rng = mulberry32(hash32(seed, 'nota', id));
+  const escala = aluno.serie <= 6 ? 10 : 20;
+  const minimo = aluno.serie <= 6 ? 5 : 10;
+  const frac = aluno.nivel + disc.offset + (rng() + rng() - 1) * 0.16;
+  let nota = Math.round(Math.max(0, Math.min(1, frac)) * escala * 2) / 2; // meios-valores
+  nota = Math.max(0, Math.min(escala, nota));
+  const situacao = nota >= minimo ? 'positiva' : 'negativa';
+  const observacao = rng() < 0.06
+    ? pick(rng, OBS_ESPECIAL)
+    : pick(rng, situacao === 'positiva' ? OBS_POSITIVA : OBS_NEGATIVA);
+  const professorId = 1000 + ((aluno.turmaId * 31 + disc.id * 17) % 60);
 
   let metadados = null;
   if (rng() < 0.75) {
     metadados = {
-      professor_id: randint(rng, 1, 200),
-      origem: pick(rng, ['lancamento', 'importacao', 'laboratorio']),
-      observacao: rng() < 0.7 ? null : 'recuperação',
+      lancado_por: rng() < 0.9 ? 'professor' : 'admin',
+      turno: aluno.turno,
+      repetente: aluno.repetente,
+      apoio_pedagogico: situacao === 'negativa' && rng() < 0.5,
     };
   }
 
   return {
-    id: rowId,
-    aluno_id: alunoId,
-    matricula_id: matriculaId,
-    aluno_nome: nome,
-    turma_id: turmaId,
-    turma_nome: turmaNome,
-    serie_classe: serie,
-    curso,
-    ano_letivo: 2025,
-    turno,
-    disciplina_id: disciplinaId,
-    disciplina,
-    periodos,
-    media_anual: media,
-    situacao,
+    id,
+    aluno_id: aluno.id,
+    matricula_id: aluno.matriculaId,
+    turma_id: aluno.turmaId,
+    disciplina_id: disc.id,
+    professor_id: professorId,
+    ano_letivo: aluno.anoLetivo,
+    serie_classe: aluno.serie,
+    periodo,
+    data_lancamento: dataLancamento(rng, aluno.anoLetivo, periodo),
+    disciplina: disc.nome,
+    nota: nota.toFixed(2),
+    escala_max: escala,
     nota_minima: minimo,
-    data_atualizacao: iso,
-    turma_info: {
-      escola: 'Colégio Mara & Lu',
-      provincia: prov,
-      municipio: mun,
-      latitude: Math.round(lat * 1e6) / 1e6,
-      longitude: Math.round(lon * 1e6) / 1e6,
-    },
+    situacao,
+    observacao,
+    localizacao: aluno.localizacao,
     metadados,
   };
 }
 
-function* generateBatches(n, seed = 42, batchSize = 5000, startId = 1) {
+/**
+ * Gera n notas em lotes. Cada lote: { notas: [...], alunos: [...] } — `alunos` traz os alunos
+ * que aparecem pela primeira vez nesse lote (para inserir antes das notas, respeitando a FK).
+ */
+function* generateBatches(n, seed = 42, batchSize = 5000) {
   if (batchSize < 1) throw new Error('batch_size deve ser >= 1');
-  const rng = mulberry32(seed >>> 0);
-  let batch = [];
-  for (let i = 0; i < n; i++) {
-    batch.push(makeRecord(rng, startId + i));
-    if (batch.length >= batchSize) {
-      yield batch;
-      batch = [];
+  let id = 1;
+  let alunoIdx = 0;
+  let notas = [];
+  let alunos = [];
+  while (id <= n) {
+    const aluno = criarAluno(seed, alunoIdx++);
+    alunos.push(linhaAluno(aluno));
+    for (const disc of aluno.disciplinas) {
+      for (const periodo of PERIODOS) {
+        if (id > n) break;
+        notas.push(criarNota(seed, id, aluno, disc, periodo));
+        id += 1;
+        if (notas.length >= batchSize) {
+          yield { notas, alunos };
+          notas = [];
+          alunos = [];
+        }
+      }
+      if (id > n) break;
     }
   }
-  if (batch.length) yield batch;
+  if (notas.length || alunos.length) yield { notas, alunos };
 }
 
 module.exports = {
-  PERIODOS,
-  DISCIPLINAS,
+  CURSOS,
+  DISCIPLINAS_CATALOGO,
+  PROVINCIAS: LOCAIS.map((l) => l.provincia),
   generateBatches,
-  SCHEMA_FIELDS,
-  notaMinimaPara,
-  limiteMaxPara,
-  mediaPeriodos,
-  situacaoDe,
 };

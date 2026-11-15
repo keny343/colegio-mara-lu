@@ -13,7 +13,7 @@ const ALL_DESTS = [
   { id: 'csv', label: 'CSV' },
   { id: 'avro', label: 'Avro' },
   { id: 'parquet', label: 'Parquet' },
-  { id: 'sql', label: 'SQL (MySQL)' },
+  { id: 'sql', label: 'SQL (MySQL + scripts .sql)' },
 ];
 
 const PRESETS = [
@@ -36,6 +36,22 @@ function fmtSec(n) {
   return `${Number(n).toFixed(3)} s`;
 }
 
+const baseName = (p) => (typeof p === 'string' ? p.split(/[/\\]/).pop() : p);
+
+/** Com responseType 'blob' o corpo do erro vem como Blob: lê a mensagem real do servidor. */
+async function mensagemDeErro(e, padrao) {
+  const data = e?.response?.data;
+  if (data instanceof Blob) {
+    try {
+      const j = JSON.parse(await data.text());
+      if (j?.message) return j.message;
+    } catch (_) { /* não era JSON */ }
+  } else if (data?.message) {
+    return data.message;
+  }
+  return padrao;
+}
+
 export default function AdminLabDados() {
   const { error: notifyError, success: notifySuccess } = useNotification();
   const [loading, setLoading] = useState(true);
@@ -44,6 +60,7 @@ export default function AdminLabDados() {
   const [preset, setPreset] = useState('1000');
   const [seed, setSeed] = useState(42);
   const [batchSize, setBatchSize] = useState(2000);
+  const [repeats, setRepeats] = useState(5);
   const [dests, setDests] = useState(() => new Set(ALL_DESTS.map((d) => d.id)));
   const [lastGenerate, setLastGenerate] = useState(null);
   const [lastValidate, setLastValidate] = useState(null);
@@ -102,7 +119,7 @@ export default function AdminLabDados() {
       const res = await api.post('/admin/lab/generate', payload());
       setLastGenerate(res.data);
       setLastValidate(null);
-      notifySuccess(`Gerados ${res.data.records} registos em ${fmtSec(res.data.elapsed_seconds)}.`);
+      notifySuccess(`Geradas ${res.data.records} notas em ${fmtSec(res.data.elapsed_seconds)}.`);
       await loadStatus();
     } catch (e) {
       notifyError(e.response?.data?.message || 'Falha na geração.');
@@ -119,9 +136,9 @@ export default function AdminLabDados() {
     }
     setBusy('validate');
     try {
-      const res = await api.post('/admin/lab/validate', { out_dir: out, sample_size: 100 });
+      const res = await api.post('/admin/lab/validate', { out_dir: out });
       setLastValidate(res.data);
-      notifySuccess(res.data.equivalent ? 'Destinos equivalentes.' : 'Diferenças detectadas — veja o relatório.');
+      notifySuccess(res.data.equivalent ? 'Todos os destinos têm exactamente o mesmo conteúdo.' : 'Diferenças detectadas — veja o relatório.');
       await loadStatus();
     } catch (e) {
       notifyError(e.response?.data?.message || 'Falha na validação.');
@@ -133,7 +150,7 @@ export default function AdminLabDados() {
   const runBenchmark = async () => {
     setBusy('benchmark');
     try {
-      const res = await api.post('/admin/lab/benchmark', payload());
+      const res = await api.post('/admin/lab/benchmark', { ...payload(), repeats: Number(repeats) || 5 });
       setLastBench(res.data);
       setLastGenerate((prev) => ({ ...(prev || {}), out_dir: res.data.out_dir, records: res.data.records }));
       notifySuccess('Benchmark concluído.');
@@ -152,28 +169,24 @@ export default function AdminLabDados() {
       formato: name.toUpperCase(),
       bytes: m.bytes ?? 0,
       write_s: m.write_seconds?.median ?? m.write_seconds ?? 0,
-      rps: m.write_records_per_sec?.median ?? (
-        (m.write_seconds?.median || m.write_seconds)
-          ? (lastBench?.records || lastGenerate?.records || 0) / (m.write_seconds?.median || m.write_seconds)
-          : 0
-      ),
-      compressao: m.compression_vs_csv == null ? null : Number(m.compression_vs_csv),
     }));
   }, [lastBench, lastGenerate]);
 
   const download = async (file) => {
     const out = lastGenerate?.out_dir || lastBench?.out_dir || status?.latest?.out_dir;
-    if (!out) return;
+    if (!out || !file) return;
     try {
       const res = await api.get(`/admin/lab/download/${out}/${file}`, { responseType: 'blob' });
       const url = URL.createObjectURL(res.data);
       const a = document.createElement('a');
       a.href = url;
       a.download = file;
+      document.body.appendChild(a);
       a.click();
+      a.remove();
       URL.revokeObjectURL(url);
     } catch (e) {
-      notifyError(e.response?.data?.message || 'Download indisponível.');
+      notifyError(await mensagemDeErro(e, 'Download indisponível.'));
     }
   };
 
@@ -186,8 +199,8 @@ export default function AdminLabDados() {
           <p className="lab-eyebrow"><Database size={14} /> Engenharia de armazenamento</p>
           <h2 className="page-header-title">Laboratório de dados</h2>
           <p className="page-header-sub">
-            Dataset sintético de alunos × disciplinas (notas 1PP–3PT, média anual e situação),
-            nos formatos JSONL · CSV · Avro · Parquet · SQL (MySQL).
+            Notas de alunos do Colégio Mara e Lu (3 trimestres: 1PP · 1PT · 2PP · 2PT · 3PP · 3PT; escala 0–10 até à 6ª classe e 0–20 da 7ª à 13ª).
+            Gerar, gravar, validar e comparar JSONL · CSV · Avro · Parquet · SQL.
             Máximo no painel: {status?.max_records?.toLocaleString('pt-PT') || '25 000'} registos.
             Escalas S/M via CLI Python em <code>data-engineering/</code>.
           </p>
@@ -197,7 +210,7 @@ export default function AdminLabDados() {
       <Card className="lab-card">
         <h3 className="lab-card-title">Parâmetros</h3>
         <div className="lab-grid">
-          <FormField label="Volume">
+          <FormField label="Volume (notas)">
             <Select value={preset} onChange={(e) => setPreset(e.target.value)} disabled={!!busy}>
               {PRESETS.map((p) => (
                 <option key={p.id} value={p.id}>{p.label}</option>
@@ -209,6 +222,9 @@ export default function AdminLabDados() {
           </FormField>
           <FormField label="Tamanho do lote">
             <Input type="number" value={batchSize} onChange={(e) => setBatchSize(e.target.value)} disabled={!!busy} />
+          </FormField>
+          <FormField label="Repetições (benchmark, 1.ª = cold)">
+            <Input type="number" min="2" max="10" value={repeats} onChange={(e) => setRepeats(e.target.value)} disabled={!!busy} />
           </FormField>
         </div>
         <fieldset className="lab-dests" disabled={!!busy}>
@@ -241,7 +257,7 @@ export default function AdminLabDados() {
         <Card className="lab-card">
           <h3 className="lab-card-title">Última geração — {lastGenerate.out_dir}</h3>
           <p className="lab-meta">
-            {lastGenerate.records?.toLocaleString('pt-PT')} registos · seed {lastGenerate.seed} · {fmtSec(lastGenerate.elapsed_seconds)}
+            {lastGenerate.records?.toLocaleString('pt-PT')} notas · seed {lastGenerate.seed} · {fmtSec(lastGenerate.elapsed_seconds)}
           </p>
           <div className="lab-table-wrap">
             <table className="lab-table">
@@ -263,11 +279,32 @@ export default function AdminLabDados() {
                     <td>{fmtSec(w.write_seconds)}</td>
                     <td>
                       {name !== 'sql' && w.path && (
-                        <button type="button" className="lab-dl" onClick={() => download(typeof w.path === 'string' && w.path.includes('/') ? w.path.split(/[/\\]/).pop() : w.path)}>
+                        <button type="button" className="lab-dl" onClick={() => download(baseName(w.path))}>
                           <Download size={14} /> Descarregar
                         </button>
                       )}
-                      {name === 'sql' && <span className="lab-sql-tag">MySQL · lab_notas_aluno</span>}
+                      {name === 'sql' && (
+                        <>
+                          {w.path && (
+                            <button type="button" className="lab-dl" onClick={() => download(baseName(w.path))}>
+                              <Download size={14} /> SQL — criar
+                            </button>
+                          )}
+                          {' '}
+                          {w.drop_path && (
+                            <button type="button" className="lab-dl" onClick={() => download(baseName(w.drop_path))}>
+                              <Download size={14} /> SQL — eliminar
+                            </button>
+                          )}
+                          <div>
+                            <span className="lab-sql-tag">
+                              {w.db_loaded === false
+                                ? `MySQL: não carregado (${w.db_error || 'erro'}) — scripts disponíveis`
+                                : `MySQL · ${(w.tables || ['lab_alunos', 'lab_notas']).join(', ')}`}
+                            </span>
+                          </div>
+                        </>
+                      )}
                     </td>
                   </tr>
                 ))}
@@ -281,9 +318,59 @@ export default function AdminLabDados() {
         <Card className="lab-card">
           <h3 className="lab-card-title">Validação</h3>
           <p className={`lab-eq ${lastValidate.equivalent ? 'ok' : 'bad'}`}>
-            {lastValidate.equivalent ? 'Equivalência confirmada (contagens / soma das médias anuais).' : 'Equivalência falhou — revise fingerprints.'}
+            {lastValidate.equivalent
+              ? `Equivalência confirmada: o conteúdo completo de cada registo é idêntico em todos os destinos (referência: ${lastValidate.referencia}).`
+              : 'Equivalência falhou — veja as diferenças abaixo.'}
           </p>
+          {lastValidate.regras_negocio && (
+            <p className={`lab-eq ${lastValidate.regras_negocio.ok ? 'ok' : 'bad'}`}>
+              Regras do sistema (escala, nota mínima, situação, períodos):
+              {' '}
+              {lastValidate.regras_negocio.ok
+                ? `${lastValidate.regras_negocio.registos_verificados} registos cumprem todas as regras.`
+                : 'há violações.'}
+            </p>
+          )}
+          {lastValidate.diferencas && Object.keys(lastValidate.diferencas).length > 0 && (
+            <pre className="lab-pre">{JSON.stringify(lastValidate.diferencas, null, 2)}</pre>
+          )}
           <pre className="lab-pre">{JSON.stringify(lastValidate.fingerprints, null, 2)}</pre>
+        </Card>
+      )}
+
+      {lastBench?.formats && (
+        <Card className="lab-card">
+          <h3 className="lab-card-title">Benchmark — medianas (mín–máx), {lastBench.repeats?.warm_stats ?? '—'} repetições quentes</h3>
+          <p className="lab-meta">
+            1.ª repetição (cold) fora das estatísticas · {lastBench.ambiente?.cpu_nucleos ?? '?'} núcleos · {lastBench.ambiente?.ram_gb ?? '?'} GB RAM · Node {lastBench.ambiente?.node} · MySQL {lastBench.ambiente?.mysql || '—'}
+          </p>
+          <div className="lab-table-wrap">
+            <table className="lab-table">
+              <thead>
+                <tr>
+                  <th>Formato</th>
+                  <th>Escrita</th>
+                  <th>Leitura total</th>
+                  <th>GROUP BY disciplina</th>
+                  <th>Só coluna nota</th>
+                </tr>
+              </thead>
+              <tbody>
+                {Object.entries(lastBench.formats).map(([name, m]) => {
+                  const cel = (s) => (s?.median == null ? '—' : `${fmtSec(s.median)} (${fmtSec(s.min)}–${fmtSec(s.max)})`);
+                  return (
+                    <tr key={name}>
+                      <td>{name}</td>
+                      <td>{cel(m.write_seconds)}</td>
+                      <td>{cel(m.read_seconds)}</td>
+                      <td>{name === 'sql' && m.group_by_seconds_engine ? `${cel(m.group_by_seconds_engine)} · motor` : cel(m.group_by_seconds)}</td>
+                      <td>{name === 'sql' && m.column_read_seconds_engine ? `${cel(m.column_read_seconds_engine)} · motor` : cel(m.column_read_seconds)}</td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
         </Card>
       )}
 

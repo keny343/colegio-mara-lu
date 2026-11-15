@@ -1,96 +1,20 @@
 'use strict';
 
-/** Escritores Avro OCF e Parquet v1 (PLAIN) para NotaAluno — sem deps nativas. */
+/**
+ * Escritores Avro (OCF) e Parquet (PLAIN, sem compressão) em streaming — um bloco / row group por
+ * lote, sem dependências nativas. Os tipos vêm do schema do laboratório:
+ * int64/int32, enum, timestamp, decimal(5,2), texto e JSON (localizacao obrigatório, metadados opcional).
+ */
 
-const AVRO_SCHEMA = {
-  type: 'record',
-  name: 'NotaAluno',
-  namespace: 'colegio.mara_lu.lab',
-  fields: [
-    { name: 'id', type: 'long' },
-    { name: 'aluno_id', type: 'long' },
-    { name: 'matricula_id', type: 'long' },
-    { name: 'aluno_nome', type: 'string' },
-    { name: 'turma_id', type: 'long' },
-    { name: 'turma_nome', type: 'string' },
-    { name: 'serie_classe', type: 'int' },
-    { name: 'curso', type: ['null', 'string'], default: null },
-    { name: 'ano_letivo', type: 'int' },
-    { name: 'turno', type: 'string' },
-    { name: 'disciplina_id', type: 'int' },
-    { name: 'disciplina', type: 'string' },
-    {
-      name: 'periodos',
-      type: {
-        type: 'record',
-        name: 'Periodos',
-        fields: [
-          { name: '1PP', type: ['null', 'string'], default: null },
-          { name: '1PT', type: ['null', 'string'], default: null },
-          { name: '2PP', type: ['null', 'string'], default: null },
-          { name: '2PT', type: ['null', 'string'], default: null },
-          { name: '3PP', type: ['null', 'string'], default: null },
-          { name: '3PT', type: ['null', 'string'], default: null },
-        ],
-      },
-    },
-    { name: 'media_anual', type: ['null', 'string'], default: null },
-    { name: 'situacao', type: 'string' },
-    { name: 'nota_minima', type: 'int' },
-    { name: 'data_atualizacao', type: 'string' },
-    {
-      name: 'turma_info',
-      type: {
-        type: 'record',
-        name: 'TurmaInfo',
-        fields: [
-          { name: 'escola', type: 'string' },
-          { name: 'provincia', type: 'string' },
-          { name: 'municipio', type: 'string' },
-          { name: 'latitude', type: 'double' },
-          { name: 'longitude', type: 'double' },
-        ],
-      },
-    },
-    {
-      name: 'metadados',
-      type: [
-        'null',
-        {
-          type: 'record',
-          name: 'Metadados',
-          fields: [
-            { name: 'professor_id', type: 'long' },
-            { name: 'origem', type: 'string' },
-            { name: 'observacao', type: ['null', 'string'], default: null },
-          ],
-        },
-      ],
-      default: null,
-    },
-  ],
-};
+const fs = require('fs');
+const crypto = require('crypto');
+const { FIELDS, PERIODOS, SITUACOES } = require('./schema');
 
-function concatBytes(chunks) {
-  const total = chunks.reduce((n, c) => n + c.length, 0);
-  const out = Buffer.allocUnsafe(total);
-  let off = 0;
-  for (const c of chunks) {
-    Buffer.from(c).copy(out, off);
-    off += c.length;
-  }
-  return out;
-}
+const cat = (chunks) => Buffer.concat(chunks.map((c) => Buffer.from(c)));
 
 function u32le(n) {
   const b = Buffer.allocUnsafe(4);
   b.writeUInt32LE(n >>> 0, 0);
-  return b;
-}
-
-function f64le(n) {
-  const b = Buffer.allocUnsafe(8);
-  b.writeDoubleLE(Number(n), 0);
   return b;
 }
 
@@ -107,94 +31,138 @@ function uvarint(n) {
 
 function zigzag(n) {
   const v = BigInt(n);
-  return uvarint((v << 1n) ^ (v >> 63n));
+  return uvarint(BigInt.asUintN(64, (v << 1n) ^ (v >> 63n)));
 }
 
-function avroString(s) {
-  const raw = Buffer.from(String(s ?? ''), 'utf8');
-  return concatBytes([zigzag(raw.length), raw]);
-}
+const tsMillis = (s) => Date.parse(`${s.replace(' ', 'T')}Z`);
+const unscaled = (dec) => Number(String(dec).replace('.', '')); // '12.50' -> 1250 (scale 2)
 
-function avroLong(n) {
-  return zigzag(n);
-}
+// ============================ AVRO ============================
 
-function avroNullableString(v) {
-  if (v == null) return zigzag(0);
-  return concatBytes([zigzag(1), avroString(v)]);
-}
+const AVRO_SCHEMA = {
+  type: 'record',
+  name: 'NotaLancada',
+  namespace: 'ao.colegio.mara_lu.lab',
+  fields: [
+    { name: 'id', type: 'long' },
+    { name: 'aluno_id', type: 'long' },
+    { name: 'matricula_id', type: 'long' },
+    { name: 'turma_id', type: 'int' },
+    { name: 'disciplina_id', type: 'int' },
+    { name: 'professor_id', type: 'int' },
+    { name: 'ano_letivo', type: 'int' },
+    { name: 'serie_classe', type: 'int' },
+    { name: 'periodo', type: { type: 'enum', name: 'PeriodoAvaliacao', symbols: PERIODOS } },
+    { name: 'data_lancamento', type: { type: 'long', logicalType: 'timestamp-millis' } },
+    { name: 'disciplina', type: 'string' },
+    { name: 'nota', type: { type: 'bytes', logicalType: 'decimal', precision: 5, scale: 2 } },
+    { name: 'escala_max', type: 'int' },
+    { name: 'nota_minima', type: 'int' },
+    { name: 'situacao', type: { type: 'enum', name: 'SituacaoNota', symbols: SITUACOES } },
+    { name: 'observacao', type: 'string' },
+    {
+      name: 'localizacao',
+      type: {
+        type: 'record',
+        name: 'Localizacao',
+        fields: [
+          { name: 'provincia', type: 'string' },
+          { name: 'municipio', type: 'string' },
+          { name: 'bairro', type: 'string' },
+        ],
+      },
+    },
+    {
+      name: 'metadados',
+      type: [
+        'null',
+        {
+          type: 'record',
+          name: 'Metadados',
+          fields: [
+            { name: 'lancado_por', type: 'string' },
+            { name: 'turno', type: 'string' },
+            { name: 'repetente', type: 'boolean' },
+            { name: 'apoio_pedagogico', type: 'boolean' },
+          ],
+        },
+      ],
+      default: null,
+    },
+  ],
+};
 
-function encodePeriodos(p) {
-  return concatBytes([
-    avroNullableString(p['1PP']),
-    avroNullableString(p['1PT']),
-    avroNullableString(p['2PP']),
-    avroNullableString(p['2PT']),
-    avroNullableString(p['3PP']),
-    avroNullableString(p['3PT']),
-  ]);
-}
+const avroBytes = (buf) => cat([zigzag(buf.length), buf]);
+const avroString = (s) => avroBytes(Buffer.from(String(s ?? ''), 'utf8'));
+const avroBool = (b) => Buffer.from([b ? 1 : 0]);
 
-function encodeRecord(r) {
-  const parts = [
-    avroLong(r.id),
-    avroLong(r.aluno_id),
-    avroLong(r.matricula_id),
-    avroString(r.aluno_nome),
-    avroLong(r.turma_id),
-    avroString(r.turma_nome),
-    zigzag(r.serie_classe),
-    avroNullableString(r.curso),
-    zigzag(r.ano_letivo),
-    avroString(r.turno),
-    zigzag(r.disciplina_id),
-    avroString(r.disciplina),
-    encodePeriodos(r.periodos || {}),
-    avroNullableString(r.media_anual),
-    avroString(r.situacao),
-    zigzag(r.nota_minima),
-    avroString(r.data_atualizacao),
-    avroString(r.turma_info.escola),
-    avroString(r.turma_info.provincia),
-    avroString(r.turma_info.municipio),
-    f64le(r.turma_info.latitude),
-    f64le(r.turma_info.longitude),
-  ];
-  if (r.metadados == null) {
-    parts.push(zigzag(0));
-  } else {
-    parts.push(zigzag(1));
-    parts.push(avroLong(r.metadados.professor_id));
-    parts.push(avroString(r.metadados.origem));
-    parts.push(avroNullableString(r.metadados.observacao));
+/** Decimal Avro: inteiro não escalado em complemento para 2, big-endian, mínimo de bytes. */
+function avroDecimalBytes(dec) {
+  let v = BigInt(unscaled(dec));
+  const out = [];
+  while (true) {
+    out.unshift(Number(v & 0xffn));
+    v >>= 8n; // aritmético para BigInt negativo
+    const sign = out[0] & 0x80;
+    if ((v === 0n && !sign) || (v === -1n && sign)) break;
   }
-  return concatBytes(parts);
+  return avroBytes(Buffer.from(out));
 }
 
-function writeAvroBuffer(records) {
-  const sync = Buffer.alloc(16);
-  for (let i = 0; i < 16; i++) sync[i] = (Math.random() * 256) | 0;
-  const schemaJson = JSON.stringify(AVRO_SCHEMA);
-  const header = concatBytes([
-    Buffer.from('Obj\x01', 'binary'),
-    zigzag(2),
-    avroString('avro.codec'),
-    Buffer.from('\x08null', 'binary'),
-    avroString('avro.schema'),
-    avroString(schemaJson),
-    zigzag(0),
-    sync,
-  ]);
-  if (!records.length) return header;
-  const body = concatBytes(records.map(encodeRecord));
-  const block = concatBytes([zigzag(records.length), zigzag(body.length), body, sync]);
-  return concatBytes([header, block]);
+function encodeAvroRecord(r) {
+  const parts = [
+    zigzag(r.id), zigzag(r.aluno_id), zigzag(r.matricula_id),
+    zigzag(r.turma_id), zigzag(r.disciplina_id), zigzag(r.professor_id),
+    zigzag(r.ano_letivo), zigzag(r.serie_classe),
+    zigzag(PERIODOS.indexOf(r.periodo)),
+    zigzag(tsMillis(r.data_lancamento)),
+    avroString(r.disciplina),
+    avroDecimalBytes(r.nota),
+    zigzag(r.escala_max), zigzag(r.nota_minima),
+    zigzag(SITUACOES.indexOf(r.situacao)),
+    avroString(r.observacao),
+    avroString(r.localizacao.provincia), avroString(r.localizacao.municipio), avroString(r.localizacao.bairro),
+  ];
+  if (r.metadados == null) parts.push(zigzag(0));
+  else {
+    parts.push(zigzag(1), avroString(r.metadados.lancado_por), avroString(r.metadados.turno),
+      avroBool(r.metadados.repetente), avroBool(r.metadados.apoio_pedagogico));
+  }
+  return cat(parts);
 }
 
-// ---- Parquet (colunas planas; nested como JSON string) ----
+class AvroFileWriter {
+  constructor(filePath) {
+    this.fd = fs.openSync(filePath, 'w');
+    this.sync = crypto.randomBytes(16);
+    this.records = 0;
+    const header = cat([
+      Buffer.from([0x4f, 0x62, 0x6a, 0x01]), // 'Obj' + versão 1
+      zigzag(2),
+      avroString('avro.codec'), avroBytes(Buffer.from('null')),
+      avroString('avro.schema'), avroBytes(Buffer.from(JSON.stringify(AVRO_SCHEMA))),
+      zigzag(0),
+      this.sync,
+    ]);
+    fs.writeSync(this.fd, header);
+  }
 
+  writeBatch(notas) {
+    if (!notas.length) return;
+    const body = cat(notas.map(encodeAvroRecord));
+    fs.writeSync(this.fd, cat([zigzag(notas.length), zigzag(body.length), body, this.sync]));
+    this.records += notas.length;
+  }
+
+  close() { fs.closeSync(this.fd); }
+}
+
+// ============================ PARQUET ============================
+
+// Tipos do protocolo compacto Thrift
 const TT = { I32: 5, I64: 6, BINARY: 8, LIST: 9, STRUCT: 12 };
-const PQ = { INT64: 2, INT32: 1, DOUBLE: 5, BYTE_ARRAY: 6 };
+const PQ = { INT32: 1, INT64: 2, BYTE_ARRAY: 6 };
+const CONVERTED = { UTF8: 0, ENUM: 4, DECIMAL: 5, TIMESTAMP_MILLIS: 9, JSON: 19 };
 
 function tStruct(campos) {
   const out = [];
@@ -207,20 +175,19 @@ function tStruct(campos) {
     ultimo = id;
   }
   out.push(Buffer.from([0]));
-  return concatBytes(out);
+  return cat(out);
 }
 const tInt = (n) => zigzag(n);
-const tBinary = (bytes) => concatBytes([uvarint(bytes.length), bytes]);
-const tString = (s) => tBinary(Buffer.from(String(s ?? ''), 'utf8'));
+const tBinary = (buf) => cat([uvarint(buf.length), buf]);
+const tString = (s) => tBinary(Buffer.from(String(s), 'utf8'));
 function tList(tipo, itens) {
   const n = itens.length;
-  const cab = n < 15
-    ? Buffer.from([(n << 4) | tipo])
-    : concatBytes([Buffer.from([0xf0 | tipo]), uvarint(n)]);
-  return concatBytes([cab, ...itens]);
+  const cab = n < 15 ? Buffer.from([(n << 4) | tipo]) : cat([Buffer.from([0xf0 | tipo]), uvarint(n)]);
+  return cat([cab, ...itens]);
 }
 
-function pqDefLevels(presentes) {
+/** Níveis de definição (RLE, largura 1 bit) para colunas opcionais, com prefixo de tamanho. */
+function defLevels(presentes) {
   const runs = [];
   let i = 0;
   while (i < presentes.length) {
@@ -229,132 +196,133 @@ function pqDefLevels(presentes) {
     runs.push(uvarint((j - i) << 1), Buffer.from([presentes[i]]));
     i = j;
   }
-  const corpo = concatBytes(runs);
-  return concatBytes([u32le(corpo.length), corpo]);
+  const corpo = cat(runs);
+  return cat([u32le(corpo.length), corpo]);
 }
 
-function writeParquetBuffer(records) {
-  const numRows = records.length;
-  const colunas = [
-    { nome: 'id', tipo: PQ.INT64, opcional: false, get: (r) => BigInt(r.id) },
-    { nome: 'aluno_id', tipo: PQ.INT64, opcional: false, get: (r) => BigInt(r.aluno_id) },
-    { nome: 'matricula_id', tipo: PQ.INT64, opcional: false, get: (r) => BigInt(r.matricula_id) },
-    { nome: 'aluno_nome', tipo: PQ.BYTE_ARRAY, opcional: false, get: (r) => String(r.aluno_nome) },
-    { nome: 'turma_id', tipo: PQ.INT64, opcional: false, get: (r) => BigInt(r.turma_id) },
-    { nome: 'turma_nome', tipo: PQ.BYTE_ARRAY, opcional: false, get: (r) => String(r.turma_nome) },
-    { nome: 'serie_classe', tipo: PQ.INT32, opcional: false, get: (r) => Number(r.serie_classe) },
-    { nome: 'curso', tipo: PQ.BYTE_ARRAY, opcional: true, get: (r) => (r.curso == null ? null : String(r.curso)) },
-    { nome: 'ano_letivo', tipo: PQ.INT32, opcional: false, get: (r) => Number(r.ano_letivo) },
-    { nome: 'turno', tipo: PQ.BYTE_ARRAY, opcional: false, get: (r) => String(r.turno) },
-    { nome: 'disciplina_id', tipo: PQ.INT32, opcional: false, get: (r) => Number(r.disciplina_id) },
-    { nome: 'disciplina', tipo: PQ.BYTE_ARRAY, opcional: false, get: (r) => String(r.disciplina) },
-    { nome: 'periodos', tipo: PQ.BYTE_ARRAY, opcional: false, get: (r) => JSON.stringify(r.periodos) },
-    { nome: 'media_anual', tipo: PQ.BYTE_ARRAY, opcional: true, get: (r) => (r.media_anual == null ? null : String(r.media_anual)) },
-    { nome: 'situacao', tipo: PQ.BYTE_ARRAY, opcional: false, get: (r) => String(r.situacao) },
-    { nome: 'nota_minima', tipo: PQ.INT32, opcional: false, get: (r) => Number(r.nota_minima) },
-    { nome: 'data_atualizacao', tipo: PQ.BYTE_ARRAY, opcional: false, get: (r) => String(r.data_atualizacao) },
-    { nome: 'turma_info', tipo: PQ.BYTE_ARRAY, opcional: false, get: (r) => JSON.stringify(r.turma_info) },
-    {
-      nome: 'metadados',
-      tipo: PQ.BYTE_ARRAY,
-      opcional: true,
-      get: (r) => (r.metadados == null ? null : JSON.stringify(r.metadados)),
-    },
-  ];
+function colunaParquet(f) {
+  switch (f.kind) {
+    case 'int64': return { f, phys: PQ.INT64, get: (r) => BigInt(r[f.name]) };
+    case 'int32': return { f, phys: PQ.INT32, get: (r) => Number(r[f.name]) };
+    case 'timestamp': return { f, phys: PQ.INT64, conv: CONVERTED.TIMESTAMP_MILLIS, get: (r) => BigInt(tsMillis(r[f.name])) };
+    case 'decimal': return { f, phys: PQ.INT32, conv: CONVERTED.DECIMAL, get: (r) => unscaled(r[f.name]) };
+    case 'enum': return { f, phys: PQ.BYTE_ARRAY, conv: CONVERTED.ENUM, get: (r) => String(r[f.name]) };
+    case 'json': return {
+      f, phys: PQ.BYTE_ARRAY, conv: CONVERTED.JSON, get: (r) => (r[f.name] == null ? null : JSON.stringify(r[f.name])),
+    };
+    default: return { f, phys: PQ.BYTE_ARRAY, conv: CONVERTED.UTF8, get: (r) => String(r[f.name]) };
+  }
+}
 
-  const MAGIC = Buffer.from('PAR1');
-  const paginas = [];
-  const chunks = [];
-  let offset = 4;
+class ParquetFileWriter {
+  constructor(filePath) {
+    this.fd = fs.openSync(filePath, 'w');
+    this.cols = FIELDS.map(colunaParquet);
+    this.offset = 0;
+    this.rowGroups = [];
+    this.numRows = 0;
+    this.write(Buffer.from('PAR1'));
+  }
 
-  if (numRows > 0) {
-    for (const col of colunas) {
-      const valores = records.map(col.get);
+  write(buf) {
+    fs.writeSync(this.fd, buf);
+    this.offset += buf.length;
+  }
+
+  writeBatch(notas) {
+    const n = notas.length;
+    if (!n) return;
+    const chunks = [];
+    let totalBytes = 0;
+    for (const col of this.cols) {
+      const valores = notas.map(col.get);
+      const opcional = !!col.f.nullable;
       const presentes = valores.map((v) => (v === null ? 0 : 1));
-      const naoNulos = valores.filter((_, i) => presentes[i] === 1);
+      const naoNulos = valores.filter((v) => v !== null);
       const partes = [];
-      if (col.opcional) partes.push(pqDefLevels(presentes));
+      if (opcional) partes.push(defLevels(presentes));
       for (const v of naoNulos) {
-        if (col.tipo === PQ.INT32) {
+        if (col.phys === PQ.INT32) {
           const b = Buffer.allocUnsafe(4);
-          b.writeInt32LE(Number(v) | 0, 0);
+          b.writeInt32LE(v | 0, 0);
           partes.push(b);
-        } else if (col.tipo === PQ.INT64) {
+        } else if (col.phys === PQ.INT64) {
           const b = Buffer.allocUnsafe(8);
-          b.writeBigInt64LE(BigInt(v), 0);
+          b.writeBigInt64LE(v, 0);
           partes.push(b);
         } else {
-          const raw = Buffer.from(String(v), 'utf8');
+          const raw = Buffer.from(v, 'utf8');
           partes.push(u32le(raw.length), raw);
         }
       }
-      const dados = concatBytes(partes);
+      const dados = cat(partes);
       const dph = tStruct([
-        [1, TT.I32, tInt(numRows)],
-        [2, TT.I32, tInt(0)],
-        [3, TT.I32, tInt(3)],
-        [4, TT.I32, tInt(3)],
+        [1, TT.I32, tInt(n)], // num_values
+        [2, TT.I32, tInt(0)], // encoding PLAIN
+        [3, TT.I32, tInt(3)], // definition_level_encoding RLE
+        [4, TT.I32, tInt(3)], // repetition_level_encoding RLE
       ]);
-      const page = concatBytes([
-        u32le(0),
-        u32le(dados.length),
-        u32le(dph.length),
-        dph,
-        dados,
+      const header = tStruct([
+        [1, TT.I32, tInt(0)], // DATA_PAGE
+        [2, TT.I32, tInt(dados.length)],
+        [3, TT.I32, tInt(dados.length)],
+        [5, TT.STRUCT, dph],
       ]);
-      const pageOffset = offset;
-      paginas.push(page);
-      offset += page.length;
+      const pageOffset = this.offset;
+      const page = cat([header, dados]);
+      this.write(page);
+      totalBytes += page.length;
 
       const meta = tStruct([
-        [1, TT.I32, tInt(col.tipo === PQ.INT64 ? 2 : col.tipo === PQ.INT32 ? 1 : 6)],
-        [2, TT.LIST, tList(TT.I32, [tInt(0)])],
-        [3, TT.LIST, tList(TT.I32, [tInt(col.opcional ? 3 : 0)])],
-        [4, TT.I64, tInt(pageOffset)],
-        [5, TT.I64, tInt(page.length)],
-        [6, TT.I64, tInt(numRows)],
-        [7, TT.I64, tInt(naoNulos.length)],
+        [1, TT.I32, tInt(col.phys)],
+        [2, TT.LIST, tList(TT.I32, [tInt(0), tInt(3)])],
+        [3, TT.LIST, tList(TT.BINARY, [tString(col.f.name)])],
+        [4, TT.I32, tInt(0)], // UNCOMPRESSED
+        [5, TT.I64, tInt(n)],
+        [6, TT.I64, tInt(page.length)],
+        [7, TT.I64, tInt(page.length)],
+        [9, TT.I64, tInt(pageOffset)],
       ]);
       chunks.push(tStruct([
-        [1, TT.STRUCT, meta],
         [2, TT.I64, tInt(pageOffset)],
+        [3, TT.STRUCT, meta],
       ]));
     }
+    this.rowGroups.push(tStruct([
+      [1, TT.LIST, tList(TT.STRUCT, chunks)],
+      [2, TT.I64, tInt(totalBytes)],
+      [3, TT.I64, tInt(n)],
+    ]));
+    this.numRows += n;
   }
 
-  const schemaElements = colunas.map((col) => tStruct([
-    [1, TT.I32, tInt(col.tipo === PQ.INT64 ? 2 : col.tipo === PQ.INT32 ? 1 : 6)],
-    [3, TT.I32, tInt(col.opcional ? 1 : 0)],
-    [4, TT.STRING, tString(col.nome)],
-    [5, TT.I32, tInt(0)],
-  ]));
-
-  const root = tStruct([
-    [4, TT.STRING, tString('schema')],
-    [5, TT.I32, tInt(colunas.length)],
-  ]);
-
-  const rowGroup = tStruct([
-    [1, TT.LIST, tList(TT.STRUCT, chunks)],
-    [2, TT.I64, tInt(offset - 4)],
-    [3, TT.I64, tInt(numRows)],
-  ]);
-
-  const footer = tStruct([
-    [1, TT.I32, tInt(1)],
-    [2, TT.LIST, tList(TT.STRUCT, [root, ...schemaElements])],
-    [3, TT.I64, tInt(numRows)],
-    [4, TT.LIST, tList(TT.STRUCT, numRows ? [rowGroup] : [])],
-  ]);
-
-  const footerLen = footer.length;
-  return concatBytes([
-    MAGIC,
-    ...paginas,
-    footer,
-    u32le(footerLen),
-    MAGIC,
-  ]);
+  close() {
+    const root = tStruct([
+      [4, TT.BINARY, tString('schema')],
+      [5, TT.I32, tInt(this.cols.length)],
+    ]);
+    const elementos = this.cols.map((col) => {
+      const campos = [
+        [1, TT.I32, tInt(col.phys)],
+        [3, TT.I32, tInt(col.f.nullable ? 1 : 0)],
+        [4, TT.BINARY, tString(col.f.name)],
+      ];
+      if (col.conv !== undefined) campos.push([6, TT.I32, tInt(col.conv)]);
+      if (col.conv === CONVERTED.DECIMAL) {
+        campos.push([7, TT.I32, tInt(col.f.scale)], [8, TT.I32, tInt(col.f.precision)]);
+      }
+      return tStruct(campos);
+    });
+    const footer = tStruct([
+      [1, TT.I32, tInt(1)],
+      [2, TT.LIST, tList(TT.STRUCT, [root, ...elementos])],
+      [3, TT.I64, tInt(this.numRows)],
+      [4, TT.LIST, tList(TT.STRUCT, this.rowGroups)],
+      [6, TT.BINARY, tString('colegio-mara-lu lab')],
+    ]);
+    this.write(cat([footer, u32le(footer.length), Buffer.from('PAR1')]));
+    fs.closeSync(this.fd);
+  }
 }
 
-module.exports = { writeAvroBuffer, writeParquetBuffer, AVRO_SCHEMA };
+module.exports = { AvroFileWriter, ParquetFileWriter, AVRO_SCHEMA };
