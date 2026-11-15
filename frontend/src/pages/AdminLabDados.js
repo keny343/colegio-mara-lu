@@ -137,7 +137,7 @@ export default function AdminLabDados() {
     try {
       const res = await api.post('/admin/lab/benchmark', payload());
       setLastBench(res.data);
-      setLastGenerate((prev) => ({ ...(prev || {}), out_dir: res.data.out_dir, records: res.data.records }));
+      setLastGenerate({ out_dir: res.data.out_dir, records: res.data.records, seed: res.data.seed, elapsed_seconds: res.data.elapsed_seconds, writes: res.data.writes || {} });
       notifySuccess('Benchmark concluído.');
       await loadStatus();
     } catch (e) {
