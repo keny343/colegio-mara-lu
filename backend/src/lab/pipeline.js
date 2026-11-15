@@ -474,7 +474,7 @@ function resolveArtifact(outName, file) {
   if (!['transacoes.jsonl', 'transacoes.csv', 'transacoes.avro', 'transacoes.parquet', 'criar_dados.sql', 'apagar_dados.sql', 'run_meta.json', 'benchmark_report.json', 'validation_report.json'].includes(base)) {
     throw Object.assign(new Error('Ficheiro não permitido.'), { status: 403 });
   }
-  if (!/^(run|bench)_\\d+$/.test(String(outName || ''))) throw Object.assign(new Error('Execução inválida.'), { status: 400 });
+  if (!/^(run|bench)_\d+$/.test(String(outName || ''))) throw Object.assign(new Error('Execução inválida.'), { status: 400 });
   const root = path.resolve(labRoot());
   const full = path.resolve(root, outName, base);
   if (!full.startsWith(root + path.sep) || !fs.existsSync(full) || !fs.statSync(full).isFile()) {
