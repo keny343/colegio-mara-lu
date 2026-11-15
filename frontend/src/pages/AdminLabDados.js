@@ -52,8 +52,10 @@ export default function AdminLabDados() {
   const loadStatus = useCallback(async () => {
     const res = await api.get('/admin/lab/status');
     setStatus(res.data);
-    if (res.data?.latest?.benchmark) setLastBench(res.data.latest.benchmark);
-    else if (res.data?.latest?.writes) setLastGenerate(res.data.latest);
+    if (res.data?.latest?.benchmark) {
+      setLastBench(res.data.latest.benchmark);
+      if (res.data.latest.writes) setLastGenerate(res.data.latest);
+    } else if (res.data?.latest?.writes) setLastGenerate(res.data.latest);
     return res.data;
   }, []);
 
@@ -135,7 +137,7 @@ export default function AdminLabDados() {
     try {
       const res = await api.post('/admin/lab/benchmark', payload());
       setLastBench(res.data);
-      setLastGenerate((prev) => ({ ...(prev || {}), out_dir: res.data.out_dir, records: res.data.records }));
+      setLastGenerate({ out_dir: res.data.out_dir, records: res.data.records, seed: res.data.seed, elapsed_seconds: res.data.elapsed_seconds, writes: res.data.writes || {} });
       notifySuccess('Benchmark concluído.');
       await loadStatus();
     } catch (e) {
@@ -165,7 +167,7 @@ export default function AdminLabDados() {
     const out = lastGenerate?.out_dir || lastBench?.out_dir || status?.latest?.out_dir;
     if (!out) return;
     try {
-      const res = await api.get(`/admin/lab/download/${out}/${file}`, { responseType: 'blob' });
+      const res = await api.get(`/admin/lab/download/${encodeURIComponent(out)}/${encodeURIComponent(file)}`, { responseType: 'blob' });
       const url = URL.createObjectURL(res.data);
       const a = document.createElement('a');
       a.href = url;
@@ -262,11 +264,21 @@ export default function AdminLabDados() {
                     <td>{fmtSec(w.write_seconds)}</td>
                     <td>
                       {name !== 'sql' && w.path && (
-                        <button type="button" className="lab-dl" onClick={() => download(typeof w.path === 'string' && w.path.includes('/') ? w.path.split(/[/\\]/).pop() : w.path)}>
+                        <button type="button" className="lab-dl" onClick={() => download(typeof w.path === 'string' && w.path.includes('/') ? w.path.split(/[/\\\\]/).pop() : w.path)}>
                           <Download size={14} /> Descarregar
                         </button>
                       )}
-                      {name === 'sql' && <span className="lab-sql-tag">MySQL · lab_transacoes</span>}
+                      {name === 'sql' && (
+                        <div className="lab-sql-actions">
+                          <span className="lab-sql-tag">MySQL · lab_transacoes</span>
+                          <button type="button" className="lab-dl" onClick={() => download(w.create_file || 'criar_dados.sql')}>
+                            <Download size={14} /> Criar SQL
+                          </button>
+                          <button type="button" className="lab-dl" onClick={() => download(w.delete_file || 'apagar_dados.sql')}>
+                            <Download size={14} /> Apagar SQL
+                          </button>
+                        </div>
+                      )}
                     </td>
                   </tr>
                 ))}
