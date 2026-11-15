@@ -49,7 +49,8 @@ function rowCsv(r) {
 async function ensureLabTable() {
   await db.query(`
     CREATE TABLE IF NOT EXISTS lab_transacoes (
-      id BIGINT PRIMARY KEY,
+      execucao_id VARCHAR(64) NOT NULL,
+      id BIGINT NOT NULL,
       cliente_id BIGINT NOT NULL,
       produto_id BIGINT NOT NULL,
       data_transacao VARCHAR(32) NOT NULL,
@@ -61,44 +62,84 @@ async function ensureLabTable() {
       descricao TEXT NOT NULL,
       localizacao JSON NOT NULL,
       metadados JSON NULL,
-      INDEX idx_lab_categoria (categoria)
+      PRIMARY KEY (execucao_id, id),
+      INDEX idx_lab_categoria (categoria),
+      INDEX idx_lab_execucao (execucao_id)
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
   `);
+  const [cols] = await db.query(
+    "SELECT COLUMN_NAME FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'lab_transacoes'",
+  );
+  if (!cols.some((c) => c.COLUMN_NAME === 'execucao_id')) {
+    await db.query("ALTER TABLE lab_transacoes ADD COLUMN execucao_id VARCHAR(64) NOT NULL DEFAULT 'legacy' FIRST");
+    await db.query('ALTER TABLE lab_transacoes DROP PRIMARY KEY, ADD PRIMARY KEY (execucao_id, id), ADD INDEX idx_lab_execucao (execucao_id)');
+  }
 }
 
-async function writeSql(batches) {
+function sqlString(value) {
+  if (value == null) return 'NULL';
+  return "'" + String(value).replace(/\\/g, '\\\\').replace(/'/g, "''") + "'";
+}
+
+function sqlInsertRow(r, runId) {
+  return '(' + [
+    sqlString(runId), Number(r.id), Number(r.cliente_id), Number(r.produto_id),
+    sqlString(r.data_transacao), sqlString(r.categoria), Number(r.quantidade),
+    sqlString(r.preco_unitario), sqlString(r.valor_total), sqlString(r.estado),
+    sqlString(r.descricao), sqlString(JSON.stringify(r.localizacao)),
+    r.metadados == null ? 'NULL' : sqlString(JSON.stringify(r.metadados)),
+  ].join(',') + ')';
+}
+
+async function writeSql(batches, runId, outDir) {
   await ensureLabTable();
-  await db.query('TRUNCATE TABLE lab_transacoes');
+  await db.query('DELETE FROM lab_transacoes WHERE execucao_id = ?', [runId]);
   let count = 0;
   const t0 = process.hrtime.bigint();
+  const createPath = path.join(outDir, 'criar_dados.sql');
+  const deletePath = path.join(outDir, 'apagar_dados.sql');
+  const header = `-- Dados da execução ${runId}; gerado automaticamente pelo Laboratório de Dados.
+CREATE TABLE IF NOT EXISTS lab_transacoes (
+  execucao_id VARCHAR(64) NOT NULL, id BIGINT NOT NULL, cliente_id BIGINT NOT NULL,
+  produto_id BIGINT NOT NULL, data_transacao VARCHAR(32) NOT NULL, categoria VARCHAR(64) NOT NULL,
+  quantidade INT NOT NULL, preco_unitario VARCHAR(32) NOT NULL, valor_total VARCHAR(32) NOT NULL,
+  estado CHAR(2) NOT NULL, descricao TEXT NOT NULL, localizacao JSON NOT NULL, metadados JSON NULL,
+  PRIMARY KEY (execucao_id, id), INDEX idx_lab_categoria (categoria), INDEX idx_lab_execucao (execucao_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+START TRANSACTION;
+`;
+  fs.writeFileSync(createPath, header, 'utf8');
+  fs.writeFileSync(deletePath, `-- Remove exclusivamente os dados da execução ${runId}.
+DELETE FROM lab_transacoes WHERE execucao_id = '${runId}';
+`, 'utf8');
   for (const batch of batches) {
     if (!batch.length) continue;
-    const placeholders = batch.map(() => '(?,?,?,?,?,?,?,?,?,?,?,?)').join(',');
+    const placeholders = batch.map(() => '(?,?,?,?,?,?,?,?,?,?,?,?,?)').join(',');
     const values = [];
     for (const r of batch) {
-      values.push(
-        r.id, r.cliente_id, r.produto_id, r.data_transacao, r.categoria, r.quantidade,
-        r.preco_unitario, r.valor_total, r.estado, r.descricao,
-        JSON.stringify(r.localizacao),
-        r.metadados == null ? null : JSON.stringify(r.metadados),
-      );
+      values.push(runId, r.id, r.cliente_id, r.produto_id, r.data_transacao, r.categoria,
+        r.quantidade, r.preco_unitario, r.valor_total, r.estado, r.descricao,
+        JSON.stringify(r.localizacao), r.metadados == null ? null : JSON.stringify(r.metadados));
     }
-    await db.query(
-      `INSERT INTO lab_transacoes (
-        id, cliente_id, produto_id, data_transacao, categoria, quantidade,
-        preco_unitario, valor_total, estado, descricao, localizacao, metadados
-      ) VALUES ${placeholders}`,
-      values,
-    );
+    await db.query(`INSERT INTO lab_transacoes (
+      execucao_id, id, cliente_id, produto_id, data_transacao, categoria, quantidade,
+      preco_unitario, valor_total, estado, descricao, localizacao, metadados
+    ) VALUES ${placeholders}`, values);
+    fs.appendFileSync(createPath, `INSERT INTO lab_transacoes (
+      execucao_id, id, cliente_id, produto_id, data_transacao, categoria, quantidade,
+      preco_unitario, valor_total, estado, descricao, localizacao, metadados
+    ) VALUES\n${batch.map((r) => sqlInsertRow(r, runId)).join(',\n')};\n`, 'utf8');
     count += batch.length;
   }
+  fs.appendFileSync(createPath, 'COMMIT;\n', 'utf8');
   const elapsed = Number(process.hrtime.bigint() - t0) / 1e9;
   const [[{ bytes }]] = await db.query(
-    `SELECT ROUND((DATA_LENGTH + INDEX_LENGTH)) AS bytes
-     FROM information_schema.TABLES
+    `SELECT ROUND((DATA_LENGTH + INDEX_LENGTH)) AS bytes FROM information_schema.TABLES
      WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'lab_transacoes'`,
   );
-  return { path: 'mysql:lab_transacoes', records: count, bytes: Number(bytes) || 0, write_seconds: elapsed };
+  return { path: 'mysql:lab_transacoes', create_file: 'criar_dados.sql',
+    delete_file: 'apagar_dados.sql', records: count, bytes: Number(bytes) || 0,
+    write_seconds: elapsed };
 }
 
 function writeJsonl(batches, filePath) {
@@ -194,13 +235,14 @@ async function runGenerate({ records, seed = 42, batchSize = 2000, destinations,
     const dests = parseDestinations(destinations);
     const outDir = path.join(labRoot(), outName || `run_${Date.now()}`);
     ensureDir(outDir);
+    const runId = path.basename(outDir).replace(/[^a-zA-Z0-9_-]/g, '_').slice(0, 64);
 
     const writes = {};
     const t0 = process.hrtime.bigint();
     for (const dest of dests) {
       const batches = generateBatches(n, seed, batchSize);
       if (dest === 'sql') {
-        writes[dest] = await writeSql(batches);
+        writes[dest] = await writeSql(batches, runId, outDir);
       } else {
         const filePath = path.join(outDir, DEST_FILES[dest]);
         if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
@@ -306,7 +348,7 @@ async function validateRun(outName, sampleSize = 100) {
   }
   if (dests.includes('sql')) {
     const [[{ c, s }]] = await db.query(
-      'SELECT COUNT(*) AS c, COALESCE(SUM(CAST(valor_total AS DECIMAL(18,2))),0) AS s FROM lab_transacoes',
+      'SELECT COUNT(*) AS c, COALESCE(SUM(CAST(valor_total AS DECIMAL(18,2))),0) AS s FROM lab_transacoes WHERE execucao_id = ?', [path.basename(outDir)],
     );
     fps.sql = { count: Number(c), sum_valor_total: Number(s).toFixed(2) };
   }
@@ -368,7 +410,7 @@ async function runBenchmark({ records, seed = 42, batchSize = 2000, destinations
     const t0 = process.hrtime.bigint();
     const [rows] = await db.query(
       `SELECT categoria, COUNT(*) AS c, SUM(CAST(valor_total AS DECIMAL(18,2))) AS s
-       FROM lab_transacoes GROUP BY categoria ORDER BY categoria`,
+       FROM lab_transacoes WHERE execucao_id = ? GROUP BY categoria ORDER BY categoria`, [gen.out_dir],
     );
     groupBy = {
       seconds: Number(process.hrtime.bigint() - t0) / 1e9,
@@ -429,11 +471,13 @@ function getLatest() {
 
 function resolveArtifact(outName, file) {
   const base = path.basename(file);
-  if (!Object.values(DEST_FILES).includes(base) && !['run_meta.json', 'benchmark_report.json', 'validation_report.json'].includes(base)) {
+  if (!['transacoes.jsonl', 'transacoes.csv', 'transacoes.avro', 'transacoes.parquet', 'criar_dados.sql', 'apagar_dados.sql', 'run_meta.json', 'benchmark_report.json', 'validation_report.json'].includes(base)) {
     throw Object.assign(new Error('Ficheiro não permitido.'), { status: 403 });
   }
-  const full = path.join(labRoot(), outName, base);
-  if (!full.startsWith(labRoot()) || !fs.existsSync(full)) {
+  if (!/^(run|bench)_\\d+$/.test(String(outName || ''))) throw Object.assign(new Error('Execução inválida.'), { status: 400 });
+  const root = path.resolve(labRoot());
+  const full = path.resolve(root, outName, base);
+  if (!full.startsWith(root + path.sep) || !fs.existsSync(full) || !fs.statSync(full).isFile()) {
     throw Object.assign(new Error('Ficheiro não encontrado.'), { status: 404 });
   }
   return full;
