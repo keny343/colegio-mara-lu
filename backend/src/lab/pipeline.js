@@ -247,7 +247,7 @@ async function runGenerate({ records, seed = 42, batchSize = 2000, destinations,
     const n = clampRecords(records);
     const dests = parseDestinations(destinations);
     const runName = outName || `run_${Date.now()}`;
-    if (!/^(run|bench)_\\d+$/.test(String(runName))) {
+    if (!/^(run|bench)_\d+$/.test(String(runName))) {
       throw Object.assign(new Error('Identificador de execução inválido.'), { status: 400 });
     }
     const runDirName = path.basename(runName);
