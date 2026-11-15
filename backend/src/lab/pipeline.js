@@ -6,7 +6,7 @@ const path = require('path');
 const { generateBatches, DISCIPLINAS_CATALOGO } = require('./generator');
 const { AvroFileWriter, ParquetFileWriter } = require('./binaryFormats');
 const {
-  FIELDS, FIELD_NAMES, ALUNO_FIELD_NAMES, TABLE_NOTAS, TABLE_ALUNOS,
+  FIELDS, FIELD_NAMES, ALUNO_FIELD_NAMES, TABLE_NOTAS, TABLE_ALUNOS, TABLE_LEGADO,
   notaRowSql, alunoRowSql, createTablesSql, dropTablesSql, sqlHeader,
 } = require('./schema');
 const { READERS, readParquet, fingerprint, primeiraDiferenca, canon } = require('./readers');
@@ -30,6 +30,13 @@ let running = false;
 const labRoot = () => path.join(__dirname, '..', '..', 'lab-output');
 const ensureDir = (dir) => fs.mkdirSync(dir, { recursive: true });
 const secs = (t0) => Number(process.hrtime.bigint() - t0) / 1e9;
+
+/** fs.writeSync pode escrever menos bytes do que pedido: repete até gravar tudo. */
+function writeAll(fd, texto) {
+  const buf = Buffer.isBuffer(texto) ? texto : Buffer.from(texto, 'utf8');
+  let off = 0;
+  while (off < buf.length) off += fs.writeSync(fd, buf, off, buf.length - off);
+}
 
 // ---------- CSV ----------
 
@@ -58,7 +65,7 @@ function writeJsonl(batches, filePath) {
   const t0 = process.hrtime.bigint();
   try {
     for (const { notas } of batches) {
-      fs.writeSync(fd, notas.map((r) => `${JSON.stringify(r)}\n`).join(''));
+      writeAll(fd, notas.map((r) => `${JSON.stringify(r)}\n`).join(''));
       count += notas.length;
     }
   } finally { fs.closeSync(fd); }
@@ -70,9 +77,9 @@ function writeCsv(batches, filePath) {
   let count = 0;
   const t0 = process.hrtime.bigint();
   try {
-    fs.writeSync(fd, `${FIELD_NAMES.join(',')}\n`); // sem BOM (igual ao CLI Python)
+    writeAll(fd, `${FIELD_NAMES.join(',')}\n`); // sem BOM (igual ao CLI Python)
     for (const { notas } of batches) {
-      fs.writeSync(fd, notas.map((r) => `${rowCsv(r)}\n`).join(''));
+      writeAll(fd, notas.map((r) => `${rowCsv(r)}\n`).join(''));
       count += notas.length;
     }
   } finally { fs.closeSync(fd); }
@@ -107,59 +114,115 @@ const dbRow = (r) => FIELDS.map((f) => (f.kind === 'json' ? (r[f.name] == null ?
 const dbAlunoRow = (a) => ALUNO_FIELD_NAMES.map((k) => a[k]);
 
 /**
- * Destino SQL: (1) gera lab_notas_criar.sql (CREATE + INSERT) e lab_notas_eliminar.sql (DROP);
- * (2) carrega as mesmas tabelas lab_* na base MySQL do sistema. Se (2) falhar, os scripts ficam
- * disponíveis na mesma.
+ * Destino SQL: (1) gera lab_notas_criar.sql (DROP IF EXISTS + CREATE + INSERT, numa transacção) e
+ * lab_notas_eliminar.sql (DROP); (2) carrega as mesmas tabelas lab_* na base MySQL do sistema, numa
+ * TRANSACÇÃO (se algo falhar faz ROLLBACK: nunca fica uma tabela a meio). Se (2) falhar, os scripts
+ * ficam disponíveis na mesma.
+ *
+ * Tempos: `write_seconds` = tempo de persistência no MySQL (do DROP/CREATE até ao COMMIT), sem o tempo
+ * de geração dos dados nem de escrita do ficheiro .sql (`script_seconds`).
+ * Tamanho: `bytes` = espaço ocupado pelas tabelas (dados + índices) quando o MySQL foi carregado;
+ * `script_bytes` = tamanho do ficheiro .sql.
  */
 async function writeSql(batches, filePath) {
   const dropPath = path.join(path.dirname(filePath), SQL_DROP_FILE);
-  const t0 = process.hrtime.bigint();
+  const tabelasLab = [TABLE_NOTAS, TABLE_ALUNOS, TABLE_LEGADO].map((t) => `'${t}'`).join(', ');
 
-  fs.writeFileSync(dropPath, `${sqlHeader('ELIMINAR dados do laboratório', [
-    'Remove as tabelas lab_notas, lab_alunos (e lab_transacoes, da versão antiga).',
-    'Pode ser executado várias vezes (DROP TABLE IF EXISTS).',
-  ])}${dropTablesSql().map((s) => `${s};`).join('\n')}\n`);
-
-  const fd = fs.openSync(filePath, 'w');
-  fs.writeSync(fd, `${sqlHeader('CRIAR tabelas e dados', [
-    'Execute este script no MySQL (Workbench ou CLI) na base de dados do sistema.',
-    'Para repetir, execute primeiro lab_notas_eliminar.sql.',
-  ])}SET NAMES utf8mb4;\n\n${createTablesSql().map((s) => `${s};`).join('\n\n')}\n\n`);
-
+  let fileSecs = 0;
+  const timedFile = (fn) => { const t = process.hrtime.bigint(); const r = fn(); fileSecs += secs(t); return r; };
+  let dbSecs = 0;
   let dbOk = true;
   let dbError = null;
-  let dbInsert = 0;
-  const dbRun = async (sql, params) => {
+  const timedDb = async (fn) => {
     if (!dbOk) return;
     const t = process.hrtime.bigint();
-    try { await db.query(sql, params); } catch (e) { dbOk = false; dbError = e.message; }
-    dbInsert += secs(t);
+    try { await fn(); } catch (e) { dbOk = false; dbError = e.message; }
+    dbSecs += secs(t);
   };
-  for (const s of dropTablesSql()) await dbRun(s);
-  for (const s of createTablesSql()) await dbRun(s);
 
+  timedFile(() => fs.writeFileSync(dropPath, [
+    sqlHeader('ELIMINAR dados do laboratório', [
+      'Remove as tabelas lab_notas, lab_alunos (e lab_transacoes, da versão antiga).',
+      'Execute com a base de dados do sistema seleccionada. Pode ser executado várias vezes.',
+    ]),
+    `${dropTablesSql().map((s) => `${s};`).join('\n')}`,
+    '',
+    '-- Verificação: deve devolver 0.',
+    `SELECT COUNT(*) AS tabelas_lab_restantes FROM information_schema.TABLES WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME IN (${tabelasLab});`,
+    '',
+  ].join('\n')));
+
+  const fd = fs.openSync(filePath, 'w');
+  let conn = null;
   let count = 0;
   let alunosCount = 0;
   try {
+    timedFile(() => writeAll(fd, [
+      sqlHeader('CRIAR tabelas e dados', [
+        'Execute com a base de dados do sistema seleccionada (Workbench: duplo clique na base;',
+        'CLI: mysql -u USER -p NOME_DA_BASE < lab_notas_criar.sql).',
+        'Re-executável: começa por DROP TABLE IF EXISTS nas tabelas lab_* (nunca toca nas tabelas reais).',
+        'Para remover tudo da base de dados execute lab_notas_eliminar.sql.',
+      ]),
+      'SET NAMES utf8mb4;',
+      '',
+      `${dropTablesSql().map((s) => `${s};`).join('\n')}`,
+      '',
+      `${createTablesSql().map((s) => `${s};`).join('\n\n')}`,
+      '',
+      'START TRANSACTION;',
+      '',
+      '',
+    ].join('\n')));
+
+    // Carga na base MySQL (DDL faz commit implícito, por isso a transacção só começa depois dele).
+    await timedDb(async () => {
+      for (const s of [...dropTablesSql(), ...createTablesSql()]) await db.query(s);
+      conn = await db.getConnection();
+      await conn.beginTransaction();
+    });
+
     for (const { notas, alunos } of batches) {
       if (alunos.length) {
-        fs.writeSync(fd, sqlInsertBlock(TABLE_ALUNOS, ALUNO_FIELD_NAMES, alunos.map(alunoRowSql)));
+        timedFile(() => writeAll(fd, sqlInsertBlock(TABLE_ALUNOS, ALUNO_FIELD_NAMES, alunos.map(alunoRowSql))));
         for (let i = 0; i < alunos.length; i += SQL_CHUNK) {
-          await dbRun(`INSERT INTO ${TABLE_ALUNOS} (${ALUNO_FIELD_NAMES.join(',')}) VALUES ?`, [alunos.slice(i, i + SQL_CHUNK).map(dbAlunoRow)]);
+          await timedDb(() => conn.query(`INSERT INTO ${TABLE_ALUNOS} (${ALUNO_FIELD_NAMES.join(',')}) VALUES ?`, [alunos.slice(i, i + SQL_CHUNK).map(dbAlunoRow)]));
         }
         alunosCount += alunos.length;
       }
-      fs.writeSync(fd, sqlInsertBlock(TABLE_NOTAS, FIELD_NAMES, notas.map(notaRowSql)));
+      timedFile(() => writeAll(fd, sqlInsertBlock(TABLE_NOTAS, FIELD_NAMES, notas.map(notaRowSql))));
       for (let i = 0; i < notas.length; i += SQL_CHUNK) {
-        await dbRun(`INSERT INTO ${TABLE_NOTAS} (${FIELD_NAMES.join(',')}) VALUES ?`, [notas.slice(i, i + SQL_CHUNK).map(dbRow)]);
+        await timedDb(() => conn.query(`INSERT INTO ${TABLE_NOTAS} (${FIELD_NAMES.join(',')}) VALUES ?`, [notas.slice(i, i + SQL_CHUNK).map(dbRow)]));
       }
       count += notas.length;
     }
-  } finally { fs.closeSync(fd); }
 
+    timedFile(() => writeAll(fd, [
+      '',
+      'COMMIT;',
+      '',
+      `SELECT (SELECT COUNT(*) FROM ${TABLE_ALUNOS}) AS alunos, (SELECT COUNT(*) FROM ${TABLE_NOTAS}) AS notas;`,
+      '',
+    ].join('\n')));
+
+    if (conn) {
+      if (dbOk) await timedDb(() => conn.commit());
+      else await conn.rollback().catch(() => {});
+    }
+  } finally {
+    fs.closeSync(fd);
+    if (conn) {
+      if (!dbOk) await conn.rollback().catch(() => {});
+      conn.release();
+    }
+  }
+
+  // Tamanho ocupado na base. No MySQL 8 as estatísticas do information_schema ficam em cache (até 24 h):
+  // ANALYZE TABLE força a actualização antes de ler.
   let dbBytes = null;
   if (dbOk) {
     try {
+      await db.query(`ANALYZE TABLE ${TABLE_ALUNOS}, ${TABLE_NOTAS}`);
       const [[row]] = await db.query(
         `SELECT COALESCE(SUM(DATA_LENGTH + INDEX_LENGTH),0) AS bytes FROM information_schema.TABLES
           WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME IN (?, ?)`, [TABLE_NOTAS, TABLE_ALUNOS],
@@ -168,16 +231,21 @@ async function writeSql(batches, filePath) {
     } catch (_) { dbBytes = null; }
   }
 
-  const res = fileResult(filePath, count, t0);
+  const scriptBytes = fs.statSync(filePath).size;
   return {
-    ...res,
+    path: path.basename(filePath),
+    records: count,
+    bytes: dbBytes || scriptBytes,
+    write_seconds: dbOk ? dbSecs : fileSecs,
+    script_bytes: scriptBytes,
+    script_seconds: fileSecs,
     drop_path: SQL_DROP_FILE,
     alunos: alunosCount,
     tables: [TABLE_ALUNOS, TABLE_NOTAS],
     db_loaded: dbOk,
     db_error: dbError,
     db_bytes: dbBytes,
-    db_insert_seconds: dbInsert,
+    db_insert_seconds: dbSecs,
   };
 }
 
@@ -198,12 +266,29 @@ function clampRecords(n) {
   return v;
 }
 
+/** Iterador de lotes que mede o tempo gasto a GERAR dados (para o separar do tempo de persistência). */
+function meteredBatches(n, seed, batchSize) {
+  const it = generateBatches(n, seed, batchSize);
+  const meter = { gen: 0 };
+  const batches = {
+    [Symbol.iterator]() { return this; },
+    next() { const t = process.hrtime.bigint(); const r = it.next(); meter.gen += secs(t); return r; },
+  };
+  return { batches, meter };
+}
+
 async function generateOnce(n, seed, batchSize, dests, outDir) {
   const writes = {};
   for (const dest of dests) {
     const filePath = path.join(outDir, DEST_FILES[dest]);
     if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
-    writes[dest] = await WRITERS[dest](generateBatches(n, seed, batchSize), filePath);
+    const { batches, meter } = meteredBatches(n, seed, batchSize);
+    const res = await WRITERS[dest](batches, filePath);
+    // write_seconds = só persistência (sem gerar dados): comparável entre formatos.
+    // O destino SQL já devolve o tempo de persistência no MySQL sem a geração.
+    if (dest !== 'sql') res.write_seconds = Math.max(0, res.write_seconds - meter.gen);
+    res.generation_seconds = meter.gen;
+    writes[dest] = res;
   }
   return writes;
 }
@@ -359,13 +444,15 @@ function groupByRecords(it) {
   return Object.fromEntries(Object.keys(g).sort().map((k) => [k, { count: g[k].count, soma_notas: (g[k].cents / 100).toFixed(2) }]));
 }
 
+/** `repeats` = nº de repetições QUENTES (mínimo 5, como pede o enunciado); a 1.ª execução (cold) é extra e à parte. */
 async function runBenchmark({ records, seed = 42, batchSize = 2000, destinations, outName, repeats = 5 }) {
   if (running) throw Object.assign(new Error('Já existe uma tarefa do laboratório em execução.'), { status: 409 });
   running = true;
   try {
     const n = clampRecords(records);
     const dests = parseDestinations(destinations);
-    const reps = Math.min(10, Math.max(2, Number(repeats) || 5)); // 1.ª = cold (à parte) + restantes = quentes
+    const warm = Math.min(10, Math.max(5, Math.floor(Number(repeats)) || 5));
+    const reps = warm + 1; // 1.ª = cold (à parte) + `warm` repetições quentes nas estatísticas
     const outDir = path.join(labRoot(), safeName(outName) || `bench_${Date.now()}`);
     ensureDir(outDir);
 
@@ -445,7 +532,7 @@ async function runBenchmark({ records, seed = 42, batchSize = 2000, destinations
       records: n,
       seed,
       batch_size: batchSize,
-      repeats: { total: reps, cold: 1, warm_stats: reps - 1 },
+      repeats: { total: reps, cold: 1, warm_stats: warm },
       destinations: dests,
       out_dir: path.basename(outDir),
       formats,
@@ -464,7 +551,7 @@ async function runBenchmark({ records, seed = 42, batchSize = 2000, destinations
       created_at: new Date().toISOString(),
       elapsed_seconds: secs(t0),
       engine: 'node-admin',
-      note: 'A 1.ª repetição (cache fria) é reportada em cold_run e excluída das estatísticas (mediana/mín/máx).',
+      note: 'A 1.ª repetição (cache fria) é reportada em cold_run e excluída das estatísticas (mediana/mín/máx). write_seconds mede só a persistência (sem gerar dados); no SQL é o tempo no MySQL (DROP/CREATE até COMMIT) e bytes é o espaço ocupado pelas tabelas.',
     };
     const meta = {
       out_dir: path.basename(outDir), out_path: outDir, records: n, seed, batch_size: batchSize, destinations: dests,

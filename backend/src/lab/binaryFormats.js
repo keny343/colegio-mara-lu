@@ -4,13 +4,22 @@
  * Escritores Avro (OCF) e Parquet (PLAIN, sem compressão) em streaming — um bloco / row group por
  * lote, sem dependências nativas. Os tipos vêm do schema do laboratório:
  * int64/int32, enum, timestamp, decimal(5,2), texto e JSON (localizacao obrigatório, metadados opcional).
+ *
+ * Nota Avro: os símbolos de um enum têm de casar com [A-Za-z_][A-Za-z0-9_]*. Os períodos '1PP'..'3PT'
+ * começam por dígito, por isso `periodo` é gravado como string (ENUM só no MySQL). `situacao` é enum válido.
  */
 
 const fs = require('fs');
 const crypto = require('crypto');
-const { FIELDS, PERIODOS, SITUACOES } = require('./schema');
+const { FIELDS, SITUACOES } = require('./schema');
 
 const cat = (chunks) => Buffer.concat(chunks.map((c) => Buffer.from(c)));
+
+/** fs.writeSync pode escrever menos bytes do que pedido: repete até gravar tudo. */
+function writeAll(fd, buf) {
+  let off = 0;
+  while (off < buf.length) off += fs.writeSync(fd, buf, off, buf.length - off);
+}
 
 function u32le(n) {
   const b = Buffer.allocUnsafe(4);
@@ -52,7 +61,7 @@ const AVRO_SCHEMA = {
     { name: 'professor_id', type: 'int' },
     { name: 'ano_letivo', type: 'int' },
     { name: 'serie_classe', type: 'int' },
-    { name: 'periodo', type: { type: 'enum', name: 'PeriodoAvaliacao', symbols: PERIODOS } },
+    { name: 'periodo', type: 'string' }, // 1PP..3PT: não são símbolos Avro válidos (começam por dígito)
     { name: 'data_lancamento', type: { type: 'long', logicalType: 'timestamp-millis' } },
     { name: 'disciplina', type: 'string' },
     { name: 'nota', type: { type: 'bytes', logicalType: 'decimal', precision: 5, scale: 2 } },
@@ -114,7 +123,7 @@ function encodeAvroRecord(r) {
     zigzag(r.id), zigzag(r.aluno_id), zigzag(r.matricula_id),
     zigzag(r.turma_id), zigzag(r.disciplina_id), zigzag(r.professor_id),
     zigzag(r.ano_letivo), zigzag(r.serie_classe),
-    zigzag(PERIODOS.indexOf(r.periodo)),
+    avroString(r.periodo),
     zigzag(tsMillis(r.data_lancamento)),
     avroString(r.disciplina),
     avroDecimalBytes(r.nota),
@@ -134,7 +143,8 @@ function encodeAvroRecord(r) {
 class AvroFileWriter {
   constructor(filePath) {
     this.fd = fs.openSync(filePath, 'w');
-    this.sync = crypto.randomBytes(16);
+    // Marcador de sincronização determinístico (md5 do schema): mesma seed => mesmo ficheiro.
+    this.sync = crypto.createHash('md5').update(JSON.stringify(AVRO_SCHEMA)).digest();
     this.records = 0;
     const header = cat([
       Buffer.from([0x4f, 0x62, 0x6a, 0x01]), // 'Obj' + versão 1
@@ -144,13 +154,13 @@ class AvroFileWriter {
       zigzag(0),
       this.sync,
     ]);
-    fs.writeSync(this.fd, header);
+    writeAll(this.fd, header);
   }
 
   writeBatch(notas) {
     if (!notas.length) return;
     const body = cat(notas.map(encodeAvroRecord));
-    fs.writeSync(this.fd, cat([zigzag(notas.length), zigzag(body.length), body, this.sync]));
+    writeAll(this.fd, cat([zigzag(notas.length), zigzag(body.length), body, this.sync]));
     this.records += notas.length;
   }
 
@@ -162,7 +172,7 @@ class AvroFileWriter {
 // Tipos do protocolo compacto Thrift
 const TT = { I32: 5, I64: 6, BINARY: 8, LIST: 9, STRUCT: 12 };
 const PQ = { INT32: 1, INT64: 2, BYTE_ARRAY: 6 };
-const CONVERTED = { UTF8: 0, ENUM: 4, DECIMAL: 5, TIMESTAMP_MILLIS: 9, JSON: 19 };
+const CONVERTED = { UTF8: 0, DECIMAL: 5, TIMESTAMP_MILLIS: 9, JSON: 19 };
 
 function tStruct(campos) {
   const out = [];
@@ -206,7 +216,8 @@ function colunaParquet(f) {
     case 'int32': return { f, phys: PQ.INT32, get: (r) => Number(r[f.name]) };
     case 'timestamp': return { f, phys: PQ.INT64, conv: CONVERTED.TIMESTAMP_MILLIS, get: (r) => BigInt(tsMillis(r[f.name])) };
     case 'decimal': return { f, phys: PQ.INT32, conv: CONVERTED.DECIMAL, get: (r) => unscaled(r[f.name]) };
-    case 'enum': return { f, phys: PQ.BYTE_ARRAY, conv: CONVERTED.ENUM, get: (r) => String(r[f.name]) };
+    // UTF8 (e não ENUM): leitores como pyarrow/pandas devolvem texto em vez de bytes.
+    case 'enum': return { f, phys: PQ.BYTE_ARRAY, conv: CONVERTED.UTF8, get: (r) => String(r[f.name]) };
     case 'json': return {
       f, phys: PQ.BYTE_ARRAY, conv: CONVERTED.JSON, get: (r) => (r[f.name] == null ? null : JSON.stringify(r[f.name])),
     };
@@ -225,7 +236,7 @@ class ParquetFileWriter {
   }
 
   write(buf) {
-    fs.writeSync(this.fd, buf);
+    writeAll(this.fd, buf);
     this.offset += buf.length;
   }
 
