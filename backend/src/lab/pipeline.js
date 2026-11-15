@@ -72,7 +72,20 @@ async function ensureLabTable() {
   );
   if (!cols.some((c) => c.COLUMN_NAME === 'execucao_id')) {
     await db.query("ALTER TABLE lab_transacoes ADD COLUMN execucao_id VARCHAR(64) NOT NULL DEFAULT 'legacy' FIRST");
-    await db.query('ALTER TABLE lab_transacoes DROP PRIMARY KEY, ADD PRIMARY KEY (execucao_id, id), ADD INDEX idx_lab_execucao (execucao_id)');
+  }
+
+  // Concluir a migração mesmo se uma execução anterior tiver sido interrompida
+  // depois de adicionar a coluna, mas antes de alterar a chave primária.
+  const [primaryKey] = await db.query(
+    "SELECT COLUMN_NAME FROM information_schema.STATISTICS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'lab_transacoes' AND INDEX_NAME = 'PRIMARY' ORDER BY SEQ_IN_INDEX",
+  );
+  const pkColumns = primaryKey.map((row) => row.COLUMN_NAME);
+  if (pkColumns.length !== 2 || pkColumns[0] !== 'execucao_id' || pkColumns[1] !== 'id') {
+    const [indexes] = await db.query(
+      "SELECT INDEX_NAME FROM information_schema.STATISTICS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'lab_transacoes' AND INDEX_NAME = 'idx_lab_execucao' LIMIT 1",
+    );
+    await db.query('ALTER TABLE lab_transacoes DROP PRIMARY KEY, ADD PRIMARY KEY (execucao_id, id)');
+    if (!indexes.length) await db.query('ALTER TABLE lab_transacoes ADD INDEX idx_lab_execucao (execucao_id)');
   }
 }
 
@@ -233,9 +246,14 @@ async function runGenerate({ records, seed = 42, batchSize = 2000, destinations,
   try {
     const n = clampRecords(records);
     const dests = parseDestinations(destinations);
-    const outDir = path.join(labRoot(), outName || `run_${Date.now()}`);
+    const runName = outName || `run_${Date.now()}`;
+    if (!/^(run|bench)_\\d+$/.test(String(runName))) {
+      throw Object.assign(new Error('Identificador de execução inválido.'), { status: 400 });
+    }
+    const runDirName = path.basename(runName);
+    const outDir = path.join(labRoot(), runDirName);
     ensureDir(outDir);
-    const runId = path.basename(outDir).replace(/[^a-zA-Z0-9_-]/g, '_').slice(0, 64);
+    const runId = runDirName;
 
     const writes = {};
     const t0 = process.hrtime.bigint();
