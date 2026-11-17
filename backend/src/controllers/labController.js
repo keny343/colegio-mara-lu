@@ -17,7 +17,7 @@ async function status(req, res) {
       destinations: Object.keys(lab.DEST_FILES),
       latest: lab.getLatest(),
       runs: lab.listRuns().slice(0, 20),
-      note: 'Volumes académicos S/M (1M/10M) correm no CLI Python (data-engineering/).',
+      note: 'Laboratório executado em JavaScript no backend. O benchmark repete a leitura dos artefactos e mede CPU/RSS do processo.',
     });
   } catch (err) {
     return sendErr(res, err);
@@ -45,8 +45,7 @@ async function validate(req, res) {
     const outName = req.body?.out_dir || req.query?.out_dir;
     if (!outName) return res.status(400).json({ message: 'Informe out_dir.' });
     const sample = Number(req.body?.sample_size || req.query?.sample_size || 100);
-    const result = await lab.validateRun(outName, sample);
-    return res.json(result);
+    return res.json(await lab.validateRun(outName, sample));
   } catch (err) {
     return sendErr(res, err);
   }
@@ -54,13 +53,14 @@ async function validate(req, res) {
 
 async function benchmark(req, res) {
   try {
-    const { records, seed, batch_size, destinations, out_name } = req.body || {};
+    const { records, seed, batch_size, destinations, out_name, repeats } = req.body || {};
     const result = await lab.runBenchmark({
       records,
       seed: seed == null ? 42 : Number(seed),
       batchSize: batch_size == null ? 2000 : Number(batch_size),
       destinations,
       outName: out_name,
+      repeats: repeats == null ? 5 : Number(repeats),
     });
     return res.json(result);
   } catch (err) {
