@@ -1,0 +1,9 @@
+.admin-sidebar-nav {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+  overscroll-behavior: contain;
+}
+
+.admin-sidebar-nav::-webkit-scrollbar {
+  display: none;
+}

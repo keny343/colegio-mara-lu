@@ -36,6 +36,10 @@ function fmtSec(n) {
   return `${Number(n).toFixed(3)} s`;
 }
 
+function basename(value) {
+  return typeof value === 'string' ? value.split(/[/\\]/).pop() : value;
+}
+
 export default function AdminLabDados() {
   const { error: notifyError, success: notifySuccess } = useNotification();
   const [loading, setLoading] = useState(true);
@@ -77,7 +81,6 @@ export default function AdminLabDados() {
     () => PRESETS.find((p) => p.id === preset)?.records || 1000,
     [preset],
   );
-
   const destList = useMemo(() => [...dests].join(','), [dests]);
 
   const toggleDest = (id) => {
@@ -101,13 +104,14 @@ export default function AdminLabDados() {
   const runGenerate = async () => {
     setBusy('generate');
     try {
-      const res = await api.post('/admin/lab/generate', payload());
+      // A geração corre no servidor; não há razão para o cliente cancelar aos 30 s.
+      const res = await api.post('/admin/lab/generate', payload(), { timeout: 0 });
       setLastGenerate(res.data);
       setLastValidate(null);
       notifySuccess(`Gerados ${res.data.records} registos em ${fmtSec(res.data.elapsed_seconds)}.`);
       await loadStatus();
     } catch (e) {
-      notifyError(e.response?.data?.message || 'Falha na geração.');
+      notifyError(e.response?.data?.message || 'Falha na geração. Consulte os limites do painel e os logs do servidor.');
     } finally {
       setBusy(null);
     }
@@ -121,7 +125,7 @@ export default function AdminLabDados() {
     }
     setBusy('validate');
     try {
-      const res = await api.post('/admin/lab/validate', { out_dir: out, sample_size: 100 });
+      const res = await api.post('/admin/lab/validate', { out_dir: out, sample_size: 100 }, { timeout: 0 });
       setLastValidate(res.data);
       notifySuccess(res.data.equivalent ? 'Destinos equivalentes.' : 'Diferenças detectadas — veja o relatório.');
       await loadStatus();
@@ -135,7 +139,7 @@ export default function AdminLabDados() {
   const runBenchmark = async () => {
     setBusy('benchmark');
     try {
-      const res = await api.post('/admin/lab/benchmark', payload());
+      const res = await api.post('/admin/lab/benchmark', payload(), { timeout: 0 });
       setLastBench(res.data);
       setLastGenerate({ out_dir: res.data.out_dir, records: res.data.records, seed: res.data.seed, elapsed_seconds: res.data.elapsed_seconds, writes: res.data.writes || {} });
       notifySuccess('Benchmark concluído.');
@@ -163,20 +167,13 @@ export default function AdminLabDados() {
     }));
   }, [lastBench, lastGenerate]);
 
-  const download = async (file) => {
+  // Deixa o browser fazer o download da resposta como stream, sem guardar uma cópia
+  // completa do artefacto em Blob na memória da aplicação React.
+  const downloadHref = (file) => {
     const out = lastGenerate?.out_dir || lastBench?.out_dir || status?.latest?.out_dir;
-    if (!out) return;
-    try {
-      const res = await api.get(`/admin/lab/download/${encodeURIComponent(out)}/${encodeURIComponent(file)}`, { responseType: 'blob' });
-      const url = URL.createObjectURL(res.data);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = file;
-      a.click();
-      URL.revokeObjectURL(url);
-    } catch (e) {
-      notifyError(e.response?.data?.message || 'Download indisponível.');
-    }
+    if (!out || !file) return undefined;
+    const base = String(api.defaults.baseURL || '/api').replace(/\/$/, '');
+    return `${base}/admin/lab/download/${encodeURIComponent(out)}/${encodeURIComponent(file)}`;
   };
 
   if (loading) return <LoadingState />;
@@ -192,6 +189,9 @@ export default function AdminLabDados() {
             Máximo no painel: {status?.max_records?.toLocaleString('pt-PT') || '25 000'} registos.
             Escalas S/M via CLI Python em <code>data-engineering/</code>.
           </p>
+          <p className="lab-limit-note" role="note">
+            O painel web está limitado a 25 000 registos por execução. Para volumes de 1M ou superiores, execute o CLI em <code>data-engineering/</code> na máquina documentada; não aumente este limite no servidor web, pois a execução pode exceder os limites de memória e tempo da plataforma.
+          </p>
         </div>
       </header>
 
@@ -200,61 +200,39 @@ export default function AdminLabDados() {
         <div className="lab-grid">
           <FormField label="Volume">
             <Select value={preset} onChange={(e) => setPreset(e.target.value)} disabled={!!busy}>
-              {PRESETS.map((p) => (
-                <option key={p.id} value={p.id}>{p.label}</option>
-              ))}
+              {PRESETS.map((p) => <option key={p.id} value={p.id}>{p.label}</option>)}
             </Select>
           </FormField>
           <FormField label="Seed">
             <Input type="number" value={seed} onChange={(e) => setSeed(e.target.value)} disabled={!!busy} />
           </FormField>
           <FormField label="Tamanho do lote">
-            <Input type="number" value={batchSize} onChange={(e) => setBatchSize(e.target.value)} disabled={!!busy} />
+            <Input type="number" min="1" value={batchSize} onChange={(e) => setBatchSize(e.target.value)} disabled={!!busy} />
           </FormField>
         </div>
         <fieldset className="lab-dests" disabled={!!busy}>
           <legend>Destinos</legend>
           {ALL_DESTS.map((d) => (
             <label key={d.id} className="lab-check">
-              <input
-                type="checkbox"
-                checked={dests.has(d.id)}
-                onChange={() => toggleDest(d.id)}
-              />
+              <input type="checkbox" checked={dests.has(d.id)} onChange={() => toggleDest(d.id)} />
               {d.label}
             </label>
           ))}
         </fieldset>
         <div className="lab-actions">
-          <Button variant="primary" icon={<Play size={16} />} loading={busy === 'generate'} disabled={!!busy} onClick={runGenerate}>
-            Gerar e gravar
-          </Button>
-          <Button variant="secondary" icon={<ShieldCheck size={16} />} loading={busy === 'validate'} disabled={!!busy} onClick={runValidate}>
-            Validar equivalência
-          </Button>
-          <Button variant="secondary" icon={<Gauge size={16} />} loading={busy === 'benchmark'} disabled={!!busy} onClick={runBenchmark}>
-            Benchmark
-          </Button>
+          <Button variant="primary" icon={<Play size={16} />} loading={busy === 'generate'} disabled={!!busy} onClick={runGenerate}>Gerar e gravar</Button>
+          <Button variant="secondary" icon={<ShieldCheck size={16} />} loading={busy === 'validate'} disabled={!!busy} onClick={runValidate}>Validar equivalência</Button>
+          <Button variant="secondary" icon={<Gauge size={16} />} loading={busy === 'benchmark'} disabled={!!busy} onClick={runBenchmark}>Benchmark</Button>
         </div>
       </Card>
 
       {lastGenerate && (
         <Card className="lab-card">
           <h3 className="lab-card-title">Última geração — {lastGenerate.out_dir}</h3>
-          <p className="lab-meta">
-            {lastGenerate.records?.toLocaleString('pt-PT')} registos · seed {lastGenerate.seed} · {fmtSec(lastGenerate.elapsed_seconds)}
-          </p>
+          <p className="lab-meta">{lastGenerate.records?.toLocaleString('pt-PT')} registos · seed {lastGenerate.seed} · {fmtSec(lastGenerate.elapsed_seconds)}</p>
           <div className="lab-table-wrap">
             <table className="lab-table">
-              <thead>
-                <tr>
-                  <th>Destino</th>
-                  <th>Registos</th>
-                  <th>Tamanho</th>
-                  <th>Escrita</th>
-                  <th></th>
-                </tr>
-              </thead>
+              <thead><tr><th>Destino</th><th>Registos</th><th>Tamanho</th><th>Escrita</th><th></th></tr></thead>
               <tbody>
                 {Object.entries(lastGenerate.writes || {}).map(([name, w]) => (
                   <tr key={name}>
@@ -264,19 +242,15 @@ export default function AdminLabDados() {
                     <td>{fmtSec(w.write_seconds)}</td>
                     <td>
                       {name !== 'sql' && w.path && (
-                        <button type="button" className="lab-dl" onClick={() => download(typeof w.path === 'string' && w.path.includes('/') ? w.path.split(/[/\\\\]/).pop() : w.path)}>
+                        <a className="lab-dl" href={downloadHref(basename(w.path))} download={basename(w.path)}>
                           <Download size={14} /> Descarregar
-                        </button>
+                        </a>
                       )}
                       {name === 'sql' && (
                         <div className="lab-sql-actions">
                           <span className="lab-sql-tag">MySQL · lab_transacoes</span>
-                          <button type="button" className="lab-dl" onClick={() => download(w.create_file || 'criar_dados.sql')}>
-                            <Download size={14} /> Criar SQL
-                          </button>
-                          <button type="button" className="lab-dl" onClick={() => download(w.delete_file || 'apagar_dados.sql')}>
-                            <Download size={14} /> Apagar SQL
-                          </button>
+                          <a className="lab-dl" href={downloadHref(w.create_file || 'criar_dados.sql')} download="criar_dados.sql"><Download size={14} /> Criar SQL</a>
+                          <a className="lab-dl" href={downloadHref(w.delete_file || 'apagar_dados.sql')} download="apagar_dados.sql"><Download size={14} /> Apagar SQL</a>
                         </div>
                       )}
                     </td>
@@ -305,26 +279,13 @@ export default function AdminLabDados() {
             <div className="lab-chart">
               <h4>Tamanho em disco</h4>
               <ResponsiveContainer width="100%" height={260}>
-                <BarChart data={chartData}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="var(--borda)" />
-                  <XAxis dataKey="formato" tick={{ fill: 'var(--castanho-medio)', fontSize: 12 }} />
-                  <YAxis tick={{ fill: 'var(--castanho-medio)', fontSize: 12 }} />
-                  <Tooltip formatter={(v) => fmtBytes(v)} />
-                  <Bar dataKey="bytes" name="Bytes" fill="var(--laranja)" radius={[2, 2, 0, 0]} />
-                </BarChart>
+                <BarChart data={chartData}><CartesianGrid strokeDasharray="3 3" stroke="var(--borda)" /><XAxis dataKey="formato" tick={{ fill: 'var(--castanho-medio)', fontSize: 12 }} /><YAxis tick={{ fill: 'var(--castanho-medio)', fontSize: 12 }} /><Tooltip formatter={(v) => fmtBytes(v)} /><Bar dataKey="bytes" name="Bytes" fill="var(--laranja)" radius={[2, 2, 0, 0]} /></BarChart>
               </ResponsiveContainer>
             </div>
             <div className="lab-chart">
               <h4>Tempo de escrita</h4>
               <ResponsiveContainer width="100%" height={260}>
-                <BarChart data={chartData}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="var(--borda)" />
-                  <XAxis dataKey="formato" tick={{ fill: 'var(--castanho-medio)', fontSize: 12 }} />
-                  <YAxis tick={{ fill: 'var(--castanho-medio)', fontSize: 12 }} />
-                  <Tooltip formatter={(v) => fmtSec(v)} />
-                  <Legend />
-                  <Bar dataKey="write_s" name="Segundos" fill="var(--castanho-medio)" radius={[2, 2, 0, 0]} />
-                </BarChart>
+                <BarChart data={chartData}><CartesianGrid strokeDasharray="3 3" stroke="var(--borda)" /><XAxis dataKey="formato" tick={{ fill: 'var(--castanho-medio)', fontSize: 12 }} /><YAxis tick={{ fill: 'var(--castanho-medio)', fontSize: 12 }} /><Tooltip formatter={(v) => fmtSec(v)} /><Legend /><Bar dataKey="write_s" name="Segundos" fill="var(--castanho-medio)" radius={[2, 2, 0, 0]} /></BarChart>
               </ResponsiveContainer>
             </div>
           </div>
@@ -336,10 +297,7 @@ export default function AdminLabDados() {
           <h3 className="lab-card-title">Histórico recente</h3>
           <ul className="lab-runs">
             {status.runs.map((r) => (
-              <li key={r.out_dir}>
-                <strong>{r.out_dir}</strong>
-                <span>{r.records?.toLocaleString('pt-PT')} · seed {r.seed} · {r.created_at ? new Date(r.created_at).toLocaleString('pt-PT') : '—'}</span>
-              </li>
+              <li key={r.out_dir}><strong>{r.out_dir}</strong><span>{r.records?.toLocaleString('pt-PT')} · seed {r.seed} · {r.created_at ? new Date(r.created_at).toLocaleString('pt-PT') : '—'}</span></li>
             ))}
           </ul>
         </Card>
