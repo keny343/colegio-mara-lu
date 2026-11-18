@@ -67,6 +67,13 @@ async function job(req, res) {
   return res.json(found);
 }
 
+async function cancel(req, res) {
+  try {
+    const found = lab.cancelJob(req.params.id);
+    return res.status(found.status === 'cancelled' ? 200 : 202).json(found);
+  } catch (err) { return sendErr(res, err); }
+}
+
 /** Cria um link de descarga assinado (60 s, uso único). Funciona entre Vercel e Render sem cookies. */
 async function downloadLink(req, res) {
   try {
@@ -107,4 +114,4 @@ function download(req, res) {
   }
 }
 
-module.exports = { status, generate, validate, benchmark, job, downloadLink, download };
+module.exports = { status, generate, validate, benchmark, job, cancel, downloadLink, download };

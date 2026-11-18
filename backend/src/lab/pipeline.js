@@ -33,6 +33,12 @@ let currentJob = null;
 /* ------------------------------ utilitários ------------------------------ */
 
 function httpError(message, status = 400) { return Object.assign(new Error(message), { status }); }
+function isActiveJob(job) { return !!job && (job.status === 'running' || job.status === 'cancelling'); }
+function assertJobActive(job) {
+  if (job?.cancelRequested) {
+    throw Object.assign(new Error('Operação cancelada pelo utilizador.'), { code: 'LAB_JOB_CANCELLED' });
+  }
+}
 function labRoot() { return process.env.LAB_OUTPUT_DIR || path.join(__dirname, '..', '..', 'lab-output'); }
 function ensureDir(dir) { fs.mkdirSync(dir, { recursive: true }); }
 const hr = () => process.hrtime.bigint();
@@ -59,6 +65,15 @@ function rowCsv(row) {
 
 function logLine(outDir, message) {
   try { fs.appendFileSync(path.join(outDir, 'run.log'), `${new Date().toISOString()} ${message}\n`); } catch { /* log é best-effort */ }
+}
+
+function createRunDir(job, runId) {
+  const outDir = path.join(labRoot(), runId);
+  if (fs.existsSync(outDir)) throw httpError('Já existe uma execução com este identificador. Use outro nome.', 409);
+  ensureDir(outDir);
+  job.outDir = outDir;
+  job.cleanupOnCancel = true;
+  return outDir;
 }
 
 function freeDiskBytes(dir) {
@@ -130,8 +145,9 @@ function catalogHash(catalog) {
 /* ------------------------------ escritores ------------------------------- */
 
 /** Mede o tempo gasto a GERAR dados para o separar do tempo de ESCRITA. */
-function* timedBatches(iterator, acc) {
+function* timedBatches(iterator, acc, job) {
   for (;;) {
+    assertJobActive(job);
     const t = hr();
     const next = iterator.next();
     acc.generation += Number(hr() - t) / 1e9;
@@ -143,8 +159,8 @@ function* timedBatches(iterator, acc) {
 async function runWriter(ctx, body) {
   const started = hr();
   const acc = { generation: 0 };
-  const stats = { records: 0, grade_records: 0 };
-  const batches = timedBatches(generateBatches(ctx.records, ctx.seed, ctx.batchSize, ctx.catalog, ctx.tag), acc);
+  const stats = { records: 0, grade_records: 0, batch_count: 0, batch_size_distribution: {} };
+  const batches = timedBatches(generateBatches(ctx.records, ctx.seed, ctx.batchSize, ctx.catalog, ctx.tag), acc, ctx.job);
   const result = await body(batches, stats);
   const total = secondsSince(started);
   const writeSeconds = Math.max(0, total - acc.generation);
@@ -158,10 +174,22 @@ async function runWriter(ctx, body) {
 }
 
 function afterBatch(ctx, stats, batch) {
+  stats.batch_count += 1;
+  stats.batch_size_distribution[batch.length] = (stats.batch_size_distribution[batch.length] || 0) + 1;
   stats.records += batch.length;
   for (const row of batch) stats.grade_records += (row.notas || []).length;
   ctx.onRecords(batch.length);
-  return yieldLoop();
+  const progress = ctx.job.batch_progress[ctx.destination];
+  progress.batch_count = stats.batch_count;
+  progress.records = stats.records;
+  progress.batch_size_distribution = { ...stats.batch_size_distribution };
+  return yieldLoop().then(() => assertJobActive(ctx.job));
+}
+
+async function checkBatchCancellation(ctx, index) {
+  if ((index & 0xff) !== 0) return;
+  await yieldLoop();
+  assertJobActive(ctx.job);
 }
 
 async function writeJsonl(ctx) {
@@ -170,7 +198,10 @@ async function writeJsonl(ctx) {
   try {
     const out = await runWriter(ctx, async (batches, stats) => {
       for (const batch of batches) {
-        for (const row of batch) await buf.push(`${JSON.stringify(row)}\n`);
+        for (let i = 0; i < batch.length; i += 1) {
+          await checkBatchCancellation(ctx, i);
+          await buf.push(`${JSON.stringify(batch[i])}\n`);
+        }
         await afterBatch(ctx, stats, batch);
       }
       await buf.flush();
@@ -178,7 +209,7 @@ async function writeJsonl(ctx) {
       return {};
     });
     return { ...out, path: path.basename(ctx.filePath), bytes: sink.bytes };
-  } catch (err) { sink.abort(); throw err; }
+  } catch (err) { await sink.abort(); throw err; }
 }
 
 async function writeCsv(ctx) {
@@ -188,7 +219,10 @@ async function writeCsv(ctx) {
     const out = await runWriter(ctx, async (batches, stats) => {
       await buf.push(`${CSV_HEADER}\n`);
       for (const batch of batches) {
-        for (const row of batch) await buf.push(`${rowCsv(row)}\n`);
+        for (let i = 0; i < batch.length; i += 1) {
+          await checkBatchCancellation(ctx, i);
+          await buf.push(`${rowCsv(batch[i])}\n`);
+        }
         await afterBatch(ctx, stats, batch);
       }
       await buf.flush();
@@ -196,7 +230,7 @@ async function writeCsv(ctx) {
       return {};
     });
     return { ...out, path: path.basename(ctx.filePath), bytes: sink.bytes };
-  } catch (err) { sink.abort(); throw err; }
+  } catch (err) { await sink.abort(); throw err; }
 }
 
 async function writeAvro(ctx) {
@@ -212,7 +246,7 @@ async function writeAvro(ctx) {
       return {};
     });
     return { ...out, path: path.basename(ctx.filePath), bytes: sink.bytes, codec: AVRO_CODEC };
-  } catch (err) { sink.abort(); throw err; }
+  } catch (err) { await sink.abort(); throw err; }
 }
 
 async function writeParquet(ctx) {
@@ -230,7 +264,7 @@ async function writeParquet(ctx) {
       return {};
     });
     return { ...out, path: path.basename(ctx.filePath), bytes: sink.bytes, codec: PARQUET_COMPRESSION, row_groups: writer.rowGroups.length };
-  } catch (err) { sink.abort(); throw err; }
+  } catch (err) { await sink.abort(); throw err; }
 }
 
 function sqlCleanup(tag) {
@@ -250,7 +284,10 @@ async function writeSql(ctx) {
     const out = await runWriter(ctx, async (batches, stats) => {
       await buf.push(`SET NAMES utf8mb4;\nSTART TRANSACTION;\n${sqlCleanup(ctx.tag)}COMMIT;\nSTART TRANSACTION;\n`);
       for (const batch of batches) {
-        for (const row of batch) await buf.push(sqlStudent(row));
+        for (let i = 0; i < batch.length; i += 1) {
+          await checkBatchCancellation(ctx, i);
+          await buf.push(sqlStudent(batch[i]));
+        }
         // Uma transacção por lote: nunca existe uma transacção gigante no MySQL.
         await buf.push('\nCOMMIT;\nSTART TRANSACTION;\n');
         await afterBatch(ctx, stats, batch);
@@ -262,7 +299,7 @@ async function writeSql(ctx) {
     });
     fs.writeFileSync(path.join(ctx.dir, 'apagar_dados.sql'), `SET NAMES utf8mb4;\nSTART TRANSACTION;\n${sqlCleanup(ctx.tag)}COMMIT;\n`, 'utf8');
     return { ...out, path: path.basename(ctx.filePath), create_file: 'criar_dados.sql', delete_file: 'apagar_dados.sql', bytes: sink.bytes };
-  } catch (err) { sink.abort(); throw err; }
+  } catch (err) { await sink.abort(); throw err; }
 }
 
 const WRITERS = { jsonl: writeJsonl, csv: writeCsv, avro: writeAvro, parquet: writeParquet, sql: writeSql };
@@ -319,15 +356,16 @@ function assertDisk(catalog, p) {
 
 function publicJob(job) {
   if (!job) return null;
-  const { id, type, status, phase, percent, started_at, finished_at, error, error_status, result, params } = job;
-  return { id, type, status, phase, percent: Math.round(percent * 10) / 10, started_at, finished_at, error, error_status, params, result };
+  const { id, type, status, phase, percent, started_at, finished_at, error, error_status, result, params, batch_progress } = job;
+  return { id, type, status, phase, percent: Math.round(percent * 10) / 10, started_at, finished_at, error, error_status, params, result, batch_progress };
 }
 
 function startJob(type, params, work) {
-  if (currentJob && currentJob.status === 'running') throw httpError('Já existe uma tarefa do laboratório em execução.', 409);
+  if (isActiveJob(currentJob)) throw httpError('Já existe uma tarefa do laboratório em execução.', 409);
   const job = {
     id: `job_${Date.now()}_${crypto.randomBytes(3).toString('hex')}`, type, status: 'running', phase: 'a preparar',
     percent: 0, started_at: new Date().toISOString(), finished_at: null, error: null, error_status: null, result: null, params,
+    batch_progress: {}, cancelRequested: false,
   };
   jobs.set(job.id, job);
   currentJob = job;
@@ -339,11 +377,26 @@ function startJob(type, params, work) {
       job.percent = 100;
       job.phase = 'concluído';
     } catch (err) {
-      job.status = 'error';
-      job.error = err.message || 'Erro desconhecido.';
-      job.error_status = err.status || 500;
-      job.phase = 'falhou';
-      if (!err.status || err.status >= 500) console.error(`[lab] ${type} falhou:`, err);
+      if (err.code === 'LAB_JOB_CANCELLED') {
+        job.status = 'cancelled';
+        job.error = null;
+        job.error_status = null;
+        job.phase = 'cancelado pelo utilizador';
+        if (job.cleanupOnCancel && job.outDir) {
+          const root = path.resolve(labRoot());
+          const target = path.resolve(job.outDir);
+          if (target.startsWith(root + path.sep)) {
+            try { fs.rmSync(target, { recursive: true, force: true }); }
+            catch (cleanupError) { console.warn('[lab] limpeza da execução cancelada falhou:', cleanupError.message); }
+          }
+        }
+      } else {
+        job.status = 'error';
+        job.error = err.message || 'Erro desconhecido.';
+        job.error_status = err.status || 500;
+        job.phase = 'falhou';
+        if (!err.status || err.status >= 500) console.error(`[lab] ${type} falhou:`, err);
+      }
     } finally {
       job.finished_at = new Date().toISOString();
     }
@@ -352,7 +405,17 @@ function startJob(type, params, work) {
 }
 
 function getJob(id) { return publicJob(jobs.get(String(id))); }
-function isRunning() { return !!(currentJob && currentJob.status === 'running'); }
+function cancelJob(id) {
+  const job = jobs.get(String(id));
+  if (!job) throw httpError('Tarefa não encontrada (o servidor pode ter reiniciado).', 404);
+  if (job.status === 'cancelling' || job.status === 'cancelled') return publicJob(job);
+  if (job.status !== 'running') throw httpError('A tarefa já terminou e não pode ser cancelada.', 409);
+  job.cancelRequested = true;
+  job.status = 'cancelling';
+  job.phase = 'a cancelar';
+  return publicJob(job);
+}
+function isRunning() { return isActiveJob(currentJob); }
 function currentJobSummary() { return currentJob ? publicJob(currentJob) : null; }
 
 /* ------------------------------- geração --------------------------------- */
@@ -361,22 +424,25 @@ async function writeAll({ job, p, catalog, outDir, weightStart = 0, weightSpan =
   const writes = {};
   const done = { n: 0 };
   const perDest = p.destinations.length;
+  job.batch_progress = {};
   for (let i = 0; i < perDest; i += 1) {
+    assertJobActive(job);
     const destination = p.destinations[i];
     const filePath = path.join(outDir, DEST_FILES[destination]);
     if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
     const ctx = {
-      filePath, dir: outDir, records: p.records, seed: p.seed, batchSize: p.batchSize, catalog, tag: seedTag(p.seed),
+      filePath, dir: outDir, records: p.records, seed: p.seed, batchSize: p.batchSize, catalog, tag: seedTag(p.seed), job, destination,
       onRecords: (count) => {
         done.n += count;
         const frac = (i + Math.min(1, (done.n - i * p.records) / p.records)) / perDest;
         job.percent = weightStart + weightSpan * Math.max(0, Math.min(1, frac));
       },
     };
+    job.batch_progress[destination] = { batch_count: 0, records: 0, batch_size_distribution: {} };
     job.phase = `${phasePrefix} ${destination.toUpperCase()}`;
-    logLine(outDir, `início ${destination} (${p.records} registos, lote ${p.batchSize})`);
+    logLine(outDir, `início ${destination} (${p.records} registos, lote configurado ${p.batchSize})`);
     writes[destination] = await WRITERS[destination](ctx);
-    logLine(outDir, `fim ${destination}: ${writes[destination].bytes} bytes, ${writes[destination].write_seconds.toFixed(3)} s de escrita`);
+    logLine(outDir, `fim ${destination}: ${writes[destination].bytes} bytes, ${writes[destination].write_seconds.toFixed(3)} s de escrita, ${writes[destination].batch_count} lotes observados (${JSON.stringify(writes[destination].batch_size_distribution)})`);
   }
   return writes;
 }
@@ -395,12 +461,14 @@ function startGenerate(input) {
   const p = parseParams(input, 'run');
   return startJob('generate', { records: p.records, seed: p.seed, batch_size: p.batchSize, destinations: p.destinations }, async (job) => {
     const catalog = await loadCatalog();
+    assertJobActive(job);
     const estimate = assertDisk(catalog, p);
-    const outDir = path.join(labRoot(), p.runId);
-    ensureDir(outDir);
+    assertJobActive(job);
+    const outDir = createRunDir(job, p.runId);
     fs.writeFileSync(path.join(outDir, 'schema.avsc'), JSON.stringify(AVRO_SCHEMA, null, 2));
     const started = hr();
     const writes = await writeAll({ job, p, catalog, outDir });
+    assertJobActive(job);
     const first = Object.values(writes)[0] || {};
     const result = {
       out_dir: p.runId, records: p.records, grade_records: Number(first.grade_records || 0), seed: p.seed,
@@ -421,7 +489,7 @@ function startGenerate(input) {
 const canonical = (row) => `${row.id}|${row.email}|${row.turma_id}|${(row.notas || []).map((n) => `${n.disciplina_id}:${n.periodo}:${Math.round(Number(n.nota) * 100)}:${n.professor_id ?? ''}`).join(',')}`;
 const SQL_NOTE = /^\(@lab_matricula_id, (\d+), '([^']*)', ([0-9.]+), (NULL|\d+)\)/;
 
-async function fingerprintRows(iterable, sampleSize) {
+async function fingerprintRows(iterable, sampleSize, job) {
   let count = 0; let grades = 0; let cents = 0; let hi = 0; let lo = 0;
   const sample = [];
   for await (const row of iterable) {
@@ -432,7 +500,10 @@ async function fingerprintRows(iterable, sampleSize) {
     hi = (hi + digest.readUInt32LE(0)) % 4294967296;
     lo = (lo + digest.readUInt32LE(4)) % 4294967296;
     if (sample.length < sampleSize) sample.push(`${row.id}:${crypto.createHash('sha256').update(text).digest('hex').slice(0, 16)}`);
-    if ((count & 0x3ff) === 0) await yieldLoop();
+    if ((count & 0x3ff) === 0) {
+      await yieldLoop();
+      assertJobActive(job);
+    }
   }
   return {
     count, grade_records: grades, sum_notas: (cents / 100).toFixed(2),
@@ -441,7 +512,7 @@ async function fingerprintRows(iterable, sampleSize) {
   };
 }
 
-async function fingerprintSql(filePath) {
+async function fingerprintSql(filePath, job) {
   let count = 0; let grades = 0; let cents = 0; let n = 0;
   for await (const line of readers.readLines(filePath)) {
     if (line.startsWith('INSERT INTO alunos')) count += 1;
@@ -450,7 +521,10 @@ async function fingerprintSql(filePath) {
       if (m) { grades += 1; cents += Math.round(Number(m[3]) * 100); }
     }
     n += 1;
-    if ((n & 0x3fff) === 0) await yieldLoop();
+    if ((n & 0x3fff) === 0) {
+      await yieldLoop();
+      assertJobActive(job);
+    }
   }
   return { count, grade_records: grades, sum_notas: (cents / 100).toFixed(2), rows_digest: null, sample_hash: null };
 }
@@ -477,12 +551,13 @@ async function validateInternal(job, runId, sampleSize) {
   const fingerprints = {};
   const dests = meta.destinations;
   for (let i = 0; i < dests.length; i += 1) {
+    assertJobActive(job);
     const format = dests[i];
     job.phase = `a validar ${format.toUpperCase()}`;
     const file = fileFor(outDir, meta, format);
     fingerprints[format] = format === 'sql'
-      ? await fingerprintSql(file)
-      : await fingerprintRows({ jsonl: readers.readJsonl, csv: readers.readCsv, avro: readers.readAvro, parquet: readers.readParquet }[format](file), sampleSize);
+      ? await fingerprintSql(file, job)
+      : await fingerprintRows({ jsonl: readers.readJsonl, csv: readers.readCsv, avro: readers.readAvro, parquet: readers.readParquet }[format](file), sampleSize, job);
     fingerprints[format].bytes = fs.statSync(file).size;
     job.percent = ((i + 1) / dests.length) * 100;
   }
@@ -507,6 +582,7 @@ async function validateInternal(job, runId, sampleSize) {
     quality: { schema_fields: SCHEMA_FIELDS.length, student_records_expected: expectedRecords, grade_records_expected: expectedGrades, deterministic_seed: meta.seed },
     checked_at: new Date().toISOString(),
   };
+  assertJobActive(job);
   fs.writeFileSync(path.join(outDir, 'validation_report.json'), JSON.stringify(result, null, 2));
   logLine(outDir, `validação: ${result.status}`);
   return result;
@@ -524,9 +600,10 @@ function startBenchmark(input) {
   const p = parseParams(input, 'bench');
   return startJob('benchmark', { records: p.records, seed: p.seed, batch_size: p.batchSize, destinations: p.destinations, repeats: p.repeats }, async (job) => {
     const catalog = await loadCatalog();
+    assertJobActive(job);
     assertDisk(catalog, p);
-    const outDir = path.join(labRoot(), p.runId);
-    ensureDir(outDir);
+    assertJobActive(job);
+    const outDir = createRunDir(job, p.runId);
     fs.writeFileSync(path.join(outDir, 'schema.avsc'), JSON.stringify(AVRO_SCHEMA, null, 2));
     const started = hr();
     // Escrita: 1 execução fria (reportada à parte) + `repeats` medidas.
@@ -534,6 +611,7 @@ function startBenchmark(input) {
     const writeRuns = {};
     let lastWrites = null;
     for (let r = 0; r < rounds; r += 1) {
+      assertJobActive(job);
       lastWrites = await writeAll({
         job, p, catalog, outDir, weightStart: (r / rounds) * 60, weightSpan: 60 / rounds,
         phasePrefix: `escrita ${r === 0 ? '(fria)' : `${r}/${p.repeats}`} ·`,
@@ -546,8 +624,10 @@ function startBenchmark(input) {
     job.phase = 'a medir leituras';
     const reads = await benchmarkReads({
       files, destinations: p.destinations, repeats: p.repeats,
+      checkCancelled: () => assertJobActive(job),
       onProgress: (frac, label) => { job.percent = 60 + frac * 40; job.phase = label; },
     });
+    assertJobActive(job);
     const { summary } = require('./benchmark');
     const csvBytes = lastWrites.csv?.bytes || null;
     const formats = {};
@@ -632,6 +712,6 @@ function diskInfo() { return { free_bytes: freeDiskBytes(labRoot()), keep_runs: 
 
 module.exports = {
   MAX_RECORDS, MAX_BATCH, DEST_FILES,
-  startGenerate, startValidate, startBenchmark, getJob, currentJobSummary, isRunning,
+  startGenerate, startValidate, startBenchmark, getJob, cancelJob, currentJobSummary, isRunning,
   listRuns, getLatest, resolveArtifact, parseDestinations, diskInfo,
 };

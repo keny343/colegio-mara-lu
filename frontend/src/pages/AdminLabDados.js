@@ -4,7 +4,9 @@ import React, {
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
 } from 'recharts';
-import { Database, Play, ShieldCheck, Gauge, Download, Cpu, HardDrive } from 'lucide-react';
+import {
+  Database, Play, ShieldCheck, Gauge, Download, Cpu, HardDrive, XCircle,
+} from 'lucide-react';
 import api from '../services/api';
 import { useNotification } from '../contexts/NotificationContext';
 import { Button, Card, Select, Input, FormField, LoadingState } from '../components/ui';
@@ -62,6 +64,8 @@ export default function AdminLabDados() {
   const mounted = useRef(true);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(null);
+  const [activeJobId, setActiveJobId] = useState(null);
+  const [cancelRequested, setCancelRequested] = useState(false);
   const [progress, setProgress] = useState(null);
   const [status, setStatus] = useState(null);
   const [records, setRecords] = useState(1000);
@@ -134,9 +138,12 @@ export default function AdminLabDados() {
   /** Lança a tarefa (202 + job_id) e faz polling até terminar. Erros de rede passageiros não interrompem. */
   const runJob = async (kind, url, body) => {
     setBusy(kind);
+    setActiveJobId(null);
+    setCancelRequested(false);
     setProgress({ percent: 0, phase: 'a iniciar' });
     try {
       const { data } = await api.post(url, body);
+      setActiveJobId(data.job_id);
       for (;;) {
         await sleep(POLL_MS);
         if (!mounted.current) return null;
@@ -149,16 +156,48 @@ export default function AdminLabDados() {
           if (code === 401 || code === 403) throw e;
           continue; // 429 / rede: tenta no próximo ciclo
         }
-        setProgress({ percent: job.percent || 0, phase: job.phase || '' });
+        setProgress({ percent: job.percent || 0, phase: job.phase || '', batch_progress: job.batch_progress || {} });
         if (job.status === 'done') return job.result;
+        if (job.status === 'cancelled') {
+          setStatus((previous) => previous ? { ...previous, running: false, current_job: job } : previous);
+          notifySuccess('Operação cancelada. Os ficheiros incompletos não foram publicados como execução concluída.');
+          return null;
+        }
+        if (job.status === 'cancelling') setCancelRequested(true);
         if (job.status === 'error') throw new Error(job.error || 'A tarefa falhou.');
       }
     } finally {
-      if (mounted.current) { setBusy(null); setProgress(null); }
+      if (mounted.current) {
+        setBusy(null);
+        setActiveJobId(null);
+        setCancelRequested(false);
+        setProgress(null);
+      }
     }
   };
 
   const failMessage = (e, fallback) => e.response?.data?.message || e.message || fallback;
+
+  const cancelActiveJob = async () => {
+    const id = activeJobId || status?.current_job?.id;
+    if (!id || cancelRequested) return;
+    setCancelRequested(true);
+    try {
+      const { data } = await api.post(`/admin/lab/jobs/${id}/cancel`);
+      setStatus((previous) => previous ? {
+        ...previous,
+        running: data.status === 'running' || data.status === 'cancelling',
+        current_job: data,
+      } : previous);
+      if (data.status === 'cancelling') {
+        setProgress((previous) => ({ ...(previous || {}), percent: data.percent || 0, phase: data.phase }));
+        notifySuccess('Pedido de cancelamento aceite. A tarefa irá parar num ponto seguro.');
+      }
+    } catch (e) {
+      setCancelRequested(false);
+      notifyError(failMessage(e, 'Não foi possível cancelar a tarefa.'));
+    }
+  };
 
   const runGenerate = async () => {
     try {
@@ -222,7 +261,12 @@ export default function AdminLabDados() {
   if (loading) return <LoadingState />;
 
   const working = !!busy || !!status?.running;
-  const shownProgress = progress || (status?.running ? { percent: status.current_job?.percent || 0, phase: status.current_job?.phase || 'em execução' } : null);
+  const shownProgress = progress || (status?.running ? {
+    percent: status.current_job?.percent || 0,
+    phase: status.current_job?.phase || 'em execução',
+    batch_progress: status.current_job?.batch_progress || {},
+  } : null);
+  const cancellableJobId = activeJobId || status?.current_job?.id;
 
   return (
     <div className="lab-page">
@@ -262,6 +306,18 @@ export default function AdminLabDados() {
           <Button variant="primary" icon={<Play size={16} />} loading={busy === 'generate'} disabled={working} onClick={runGenerate}>Gerar e gravar</Button>
           <Button variant="secondary" icon={<ShieldCheck size={16} />} loading={busy === 'validate'} disabled={working} onClick={runValidate}>Validar equivalência</Button>
           <Button variant="secondary" icon={<Gauge size={16} />} loading={busy === 'benchmark'} disabled={working} onClick={runBenchmark}>{`Benchmark · ${Number(repeats) || 5} repetições`}</Button>
+          {working && cancellableJobId && (
+            <Button
+              variant="danger"
+              icon={<XCircle size={16} />}
+              loading={cancelRequested}
+              disabled={cancelRequested}
+              onClick={cancelActiveJob}
+              aria-label="Cancelar a tarefa do laboratório"
+            >
+              {cancelRequested ? 'A cancelar…' : 'Cancelar tarefa'}
+            </Button>
+          )}
         </div>
         {shownProgress && (
           <div className="lab-progress" role="status" aria-live="polite" style={{ marginTop: 16 }}>
@@ -269,6 +325,13 @@ export default function AdminLabDados() {
               <div style={{ width: `${Math.min(100, shownProgress.percent)}%`, height: '100%', background: 'var(--laranja)', transition: 'width 0.4s' }} />
             </div>
             <p className="lab-meta" style={{ marginTop: 6 }}>{shownProgress.phase} · {Math.round(shownProgress.percent)} %</p>
+            {Object.keys(shownProgress.batch_progress || {}).length > 0 && (
+              <p className="lab-meta" style={{ marginTop: 4 }}>
+                Lotes concluídos: {Object.entries(shownProgress.batch_progress).map(([format, batch]) => (
+                  `${format.toUpperCase()} ${batch.batch_count} (${Object.entries(batch.batch_size_distribution || {}).map(([size, count]) => `${count}×${size}`).join(', ')})`
+                )).join(' · ')}
+              </p>
+            )}
           </div>
         )}
       </Card>
@@ -279,12 +342,13 @@ export default function AdminLabDados() {
           <p className="lab-meta">{lastGenerate.records?.toLocaleString('pt-PT')} alunos · seed {lastGenerate.seed} · {fmtSec(lastGenerate.elapsed_seconds)}</p>
           <div className="lab-table-wrap">
             <table className="lab-table">
-              <thead><tr><th>Destino</th><th>Registos</th><th>Tamanho</th><th>Escrita</th><th>Geração</th><th /></tr></thead>
+              <thead><tr><th>Destino</th><th>Registos</th><th>Lotes observados</th><th>Tamanho</th><th>Escrita</th><th>Geração</th><th /></tr></thead>
               <tbody>
                 {Object.entries(lastGenerate.writes || {}).map(([name, w]) => (
                   <tr key={name}>
                     <td>{name.toUpperCase()}</td>
                     <td>{w.records?.toLocaleString('pt-PT') ?? '—'}</td>
+                    <td>{w.batch_count == null ? '—' : `${w.batch_count} · ${Object.entries(w.batch_size_distribution || {}).map(([size, count]) => `${count}×${size}`).join(', ')}`}</td>
                     <td>{fmtBytes(w.bytes)}</td>
                     <td>{fmtSec(w.write_seconds)}</td>
                     <td>{fmtSec(w.generation_seconds)}</td>
