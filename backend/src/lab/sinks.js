@@ -34,7 +34,11 @@ class FileSink {
   }
 
   abort() {
-    try { this.stream.destroy(); } catch { /* ignorar */ }
+    if (this.stream.closed) return Promise.resolve();
+    return new Promise((resolve) => {
+      this.stream.once('close', resolve);
+      this.stream.destroy();
+    });
   }
 }
 

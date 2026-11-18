@@ -45,71 +45,92 @@ function reader(format, file) {
 }
 
 /** Leitura completa + descodificação de todos os registos. */
-async function opFullRead(format, file) {
+async function opFullRead(format, file, checkCancelled) {
+  checkCancelled();
   let records = 0; let grades = 0; let cents = 0;
   if (format === 'sql') {
+    let n = 0;
     for await (const line of readLines(file)) {
       if (line.startsWith('INSERT INTO alunos')) records += 1;
       else if (line.startsWith('(@lab_matricula_id,')) {
         const m = SQL_NOTE.exec(line);
         if (m) { grades += 1; cents += Math.round(Number(m[3]) * 100); }
       }
-      if (((records + grades) & 0x3fff) === 0) await yieldLoop();
+      n += 1;
+      if ((n & 0x3fff) === 0) {
+        await yieldLoop();
+        checkCancelled();
+      }
     }
     return { records, grades, sum_notas: (cents / 100).toFixed(2), mode: 'script_scan' };
   }
   for await (const row of reader(format, file)) {
     records += 1;
     for (const n of row.notas || []) { grades += 1; cents += Math.round(Number(n.nota) * 100); }
-    if ((records & 0x3ff) === 0) await yieldLoop();
+    if ((records & 0x3ff) === 0) {
+      await yieldLoop();
+      checkCancelled();
+    }
   }
   return { records, grades, sum_notas: (cents / 100).toFixed(2), mode: 'decoded' };
 }
 
 /** Leitura de uma só coluna (turma_id). Só o Parquet faz projecção real de colunas. */
-async function opColumnRead(format, file) {
+async function opColumnRead(format, file, checkCancelled) {
+  checkCancelled();
   if (format === 'sql') return null;
   let n = 0; let sum = 0;
   if (format === 'parquet') {
     for await (const { columns } of readParquetColumns(file, ['turma_id'])) {
       for (const v of columns.turma_id) { n += 1; sum += v; }
       await yieldLoop();
+      checkCancelled();
     }
     return { values: n, checksum: sum, mode: 'column_projection' };
   }
   for await (const row of reader(format, file)) {
     n += 1; sum += Number(row.turma_id);
-    if ((n & 0x3ff) === 0) await yieldLoop();
+    if ((n & 0x3ff) === 0) {
+      await yieldLoop();
+      checkCancelled();
+    }
   }
   return { values: n, checksum: sum, mode: 'full_decode_then_project' };
 }
 
 /** GROUP BY curso_nome com COUNT(alunos) e SUM(nota). */
-async function opAggregate(format, file) {
+async function opAggregate(format, file, checkCancelled) {
+  checkCancelled();
   if (format === 'sql') return null;
   const groups = new Map();
-  const add = (curso, notasJson) => {
+  const add = (curso, notas) => {
     const key = curso || '(sem curso)';
     let g = groups.get(key);
     if (!g) { g = { alunos: 0, notas: 0, cents: 0 }; groups.set(key, g); }
     g.alunos += 1;
-    for (const n of notasJson) { g.notas += 1; g.cents += Math.round(Number(n.nota) * 100); }
+    for (const n of notas || []) {
+      g.notas += 1;
+      g.cents += Math.round(Number(n.nota) * 100);
+    }
   };
   if (format === 'parquet') {
     for await (const { rows, columns } of readParquetColumns(file, ['curso_nome', 'notas'])) {
       for (let i = 0; i < rows; i += 1) {
-        let notas = [];
-        try { notas = JSON.parse(columns.notas[i] || '[]'); } catch { /* sem notas */ }
+        const notas = JSON.parse(columns.notas[i] || '[]');
         add(columns.curso_nome[i], notas);
       }
       await yieldLoop();
+      checkCancelled();
     }
   } else {
     let i = 0;
     for await (const row of reader(format, file)) {
-      add(row.curso_nome, row.notas || []);
+      add(row.curso_nome, row.notas);
       i += 1;
-      if ((i & 0x3ff) === 0) await yieldLoop();
+      if ((i & 0x3ff) === 0) {
+        await yieldLoop();
+        checkCancelled();
+      }
     }
   }
   const out = {};
@@ -119,9 +140,11 @@ async function opAggregate(format, file) {
   return { groups: out, mode: format === 'parquet' ? 'column_projection' : 'full_decode' };
 }
 
-async function measure(fn) {
+async function measure(fn, checkCancelled) {
+  checkCancelled();
   const finish = createSampler();
   const result = await fn();
+  checkCancelled();
   return { ...finish(), result };
 }
 
@@ -141,19 +164,20 @@ function environment() {
  * Benchmark de leitura/consulta. Faz 1 execução "fria" (reportada à parte, sem limpar a cache
  * do SO) e depois `repeats` execuções medidas, de que se reportam mediana, mínimo e máximo.
  */
-async function benchmarkReads({ files, destinations, repeats = 5, onProgress = () => {} }) {
+async function benchmarkReads({ files, destinations, repeats = 5, onProgress = () => {}, checkCancelled = () => {} }) {
   const n = Math.max(1, Number(repeats) || 5);
   const formats = {};
   let step = 0;
   const totalSteps = destinations.length * (n + 1);
   for (const format of destinations) {
+    checkCancelled();
     const file = files[format];
     const runs = { full: [], column: [], agg: [] };
     let cold = null;
     for (let i = 0; i <= n; i += 1) {
-      const full = await measure(() => opFullRead(format, file));
-      const column = await measure(() => opColumnRead(format, file));
-      const agg = await measure(() => opAggregate(format, file));
+      const full = await measure(() => opFullRead(format, file, checkCancelled), checkCancelled);
+      const column = await measure(() => opColumnRead(format, file, checkCancelled), checkCancelled);
+      const agg = await measure(() => opAggregate(format, file, checkCancelled), checkCancelled);
       if (i === 0) {
         cold = { full_read_seconds: full.seconds, column_read_seconds: column.result ? column.seconds : null, aggregation_seconds: agg.result ? agg.seconds : null };
       } else {
@@ -162,6 +186,7 @@ async function benchmarkReads({ files, destinations, repeats = 5, onProgress = (
       step += 1;
       onProgress(step / totalSteps, `${format}: leitura ${i === 0 ? '(fria)' : `${i}/${n}`}`);
       await yieldLoop();
+      checkCancelled();
     }
     const first = runs.full[0];
     const hasColumn = !!runs.column[0].result;

@@ -8,17 +8,21 @@
 
 const fs = require('fs');
 const zlib = require('zlib');
-const readline = require('readline');
+
 
 /* ---------------------------- JSONL / CSV ---------------------------- */
 
 async function* readLines(filePath) {
   const stream = fs.createReadStream(filePath, { encoding: 'utf8', highWaterMark: 1 << 20 });
-  const rl = readline.createInterface({ input: stream, crlfDelay: Infinity });
+  let tail = '';
   try {
-    for await (const line of rl) yield line;
+    for await (const chunk of stream) {
+      const parts = (tail + chunk).split(/\r?\n/);
+      tail = parts.pop(); // última linha pode estar incompleta; fica para o próximo chunk
+      for (const line of parts) yield line;
+    }
+    if (tail) yield tail;
   } finally {
-    rl.close();
     stream.destroy();
   }
 }
