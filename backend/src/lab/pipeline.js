@@ -67,6 +67,21 @@ function logLine(outDir, message) {
   try { fs.appendFileSync(path.join(outDir, 'run.log'), `${new Date().toISOString()} ${message}\n`); } catch { /* log é best-effort */ }
 }
 
+function sqlDatabaseName() {
+  return String(process.env.DB_NAME || 'colegio_mara_lu');
+}
+
+function sqlIdentifier(value) {
+  const name = String(value);
+  if (!name || /[\0\r\n]/.test(name)) throw httpError('DB_NAME inválido para o script SQL.', 500);
+  return `\`${name.replace(/`/g, '``')}\``;
+}
+
+function sqlScriptHeader() {
+  const database = sqlDatabaseName();
+  return `-- Seleciona o banco configurado no backend e mostra o destino ativo.\nUSE ${sqlIdentifier(database)};\nSELECT DATABASE() AS banco_alvo;\n`;
+}
+
 function createRunDir(job, runId) {
   const outDir = path.join(labRoot(), runId);
   if (fs.existsSync(outDir)) throw httpError('Já existe uma execução com este identificador. Use outro nome.', 409);
@@ -269,8 +284,9 @@ async function writeParquet(ctx) {
 
 function sqlCleanup(tag) {
   const prefix = `lab.${tag}.`;
-  const condition = `LEFT(u.email, CHAR_LENGTH(${sqlString(prefix)})) = ${sqlString(prefix)}`;
-  return `-- Remove apenas alunos criados pelo laboratório com a tag ${tag}.\nDELETE n FROM notas n INNER JOIN matriculas m ON m.id=n.matricula_id INNER JOIN alunos a ON a.id=m.aluno_id INNER JOIN usuarios u ON u.id=a.usuario_id WHERE ${condition};\nDELETE m FROM matriculas m INNER JOIN alunos a ON a.id=m.aluno_id INNER JOIN usuarios u ON u.id=a.usuario_id WHERE ${condition};\nDELETE a FROM alunos a INNER JOIN usuarios u ON u.id=a.usuario_id WHERE ${condition};\nDELETE FROM usuarios WHERE LEFT(email, CHAR_LENGTH(${sqlString(prefix)})) = ${sqlString(prefix)};\n`;
+  const suffix = '@aluno.colegiomaralu.local';
+  const condition = (alias) => `${alias}.role = 'aluno' AND LEFT(${alias}.email, CHAR_LENGTH(${sqlString(prefix)})) = ${sqlString(prefix)} AND RIGHT(${alias}.email, CHAR_LENGTH(${sqlString(suffix)})) = ${sqlString(suffix)}`;
+  return `-- Remove apenas alunos sintéticos do laboratório com a tag ${tag} e o domínio reservado.\nDELETE n FROM notas n INNER JOIN matriculas m ON m.id=n.matricula_id INNER JOIN alunos a ON a.id=m.aluno_id INNER JOIN usuarios u ON u.id=a.usuario_id WHERE ${condition('u')};\nDELETE m FROM matriculas m INNER JOIN alunos a ON a.id=m.aluno_id INNER JOIN usuarios u ON u.id=a.usuario_id WHERE ${condition('u')};\nDELETE a FROM alunos a INNER JOIN usuarios u ON u.id=a.usuario_id WHERE ${condition('u')};\nDELETE u FROM usuarios u WHERE ${condition('u')};\n`;
 }
 function sqlStudent(row) {
   const notes = (row.notas || []).map((note) => `(@lab_matricula_id, ${Number(note.disciplina_id)}, ${sqlString(note.periodo)}, ${Number(note.nota).toFixed(2)}, ${note.professor_id == null ? 'NULL' : Number(note.professor_id)})`);
@@ -282,7 +298,7 @@ async function writeSql(ctx) {
   const buf = new LineBuffer(sink);
   try {
     const out = await runWriter(ctx, async (batches, stats) => {
-      await buf.push(`SET NAMES utf8mb4;\nSTART TRANSACTION;\n${sqlCleanup(ctx.tag)}COMMIT;\nSTART TRANSACTION;\n`);
+      await buf.push(`${sqlScriptHeader()}SET NAMES utf8mb4;\nSTART TRANSACTION;\n${sqlCleanup(ctx.tag)}COMMIT;\nSTART TRANSACTION;\n`);
       for (const batch of batches) {
         for (let i = 0; i < batch.length; i += 1) {
           await checkBatchCancellation(ctx, i);
@@ -297,8 +313,11 @@ async function writeSql(ctx) {
       await sink.close();
       return {};
     });
-    fs.writeFileSync(path.join(ctx.dir, 'apagar_dados.sql'), `SET NAMES utf8mb4;\nSTART TRANSACTION;\n${sqlCleanup(ctx.tag)}COMMIT;\n`, 'utf8');
-    return { ...out, path: path.basename(ctx.filePath), create_file: 'criar_dados.sql', delete_file: 'apagar_dados.sql', bytes: sink.bytes };
+    fs.writeFileSync(path.join(ctx.dir, 'apagar_dados.sql'), `${sqlScriptHeader()}SET NAMES utf8mb4;\nSTART TRANSACTION;\n${sqlCleanup(ctx.tag)}COMMIT;\n`, 'utf8');
+    return {
+      ...out, path: path.basename(ctx.filePath), create_file: 'criar_dados.sql',
+      delete_file: 'apagar_dados.sql', target_database: sqlDatabaseName(), bytes: sink.bytes,
+    };
   } catch (err) { await sink.abort(); throw err; }
 }
 
