@@ -6,6 +6,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { useNotification } from '../contexts/NotificationContext';
 import SidebarUserBlock from './SidebarUserBlock';
 import MobileDrawer from './MobileDrawer';
+import './AdminSidebar.css';
 
 export default function AdminSidebar() {
   const { user, logout } = useAuth();
@@ -89,7 +90,7 @@ export default function AdminSidebar() {
           </div>
         </div>
         <SidebarUserBlock user={user} perfilPath="/admin/perfil" />
-        <nav className="admin-sidebar-nav">{nav}</nav>
+        <nav className="admin-sidebar-nav" aria-label="Navegação administrativa">{nav}</nav>
         <div className="admin-sidebar-footer">
           <button type="button" className="admin-sidebar-logout" onClick={sair} aria-label="Sair">
             <LogOut size={16} /> Sair
