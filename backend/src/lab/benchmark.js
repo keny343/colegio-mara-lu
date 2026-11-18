@@ -48,13 +48,15 @@ function reader(format, file) {
 async function opFullRead(format, file) {
   let records = 0; let grades = 0; let cents = 0;
   if (format === 'sql') {
+    let n = 0;
     for await (const line of readLines(file)) {
       if (line.startsWith('INSERT INTO alunos')) records += 1;
       else if (line.startsWith('(@lab_matricula_id,')) {
         const m = SQL_NOTE.exec(line);
         if (m) { grades += 1; cents += Math.round(Number(m[3]) * 100); }
       }
-      if (((records + grades) & 0x3fff) === 0) await yieldLoop();
+      n += 1;
+      if ((n & 0x3fff) === 0) await yieldLoop();
     }
     return { records, grades, sum_notas: (cents / 100).toFixed(2), mode: 'script_scan' };
   }
