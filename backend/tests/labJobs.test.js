@@ -47,11 +47,14 @@ async function waitForFirstBatch(id) {
 describe('laboratory jobs', () => {
   let outputDir;
   let previousOutputDir;
+  let previousDatabaseName;
 
   beforeEach(() => {
     outputDir = fs.mkdtempSync(path.join(os.tmpdir(), 'lab-jobs-'));
     previousOutputDir = process.env.LAB_OUTPUT_DIR;
+    previousDatabaseName = process.env.DB_NAME;
     process.env.LAB_OUTPUT_DIR = outputDir;
+    process.env.DB_NAME = 'lab_prod_test';
     db.query.mockImplementation(async (sql) => (
       sql.includes('config_avaliacao') ? [[]] : [[catalogRow]]
     ));
@@ -60,6 +63,8 @@ describe('laboratory jobs', () => {
   afterEach(() => {
     if (previousOutputDir == null) delete process.env.LAB_OUTPUT_DIR;
     else process.env.LAB_OUTPUT_DIR = previousOutputDir;
+    if (previousDatabaseName == null) delete process.env.DB_NAME;
+    else process.env.DB_NAME = previousDatabaseName;
     fs.rmSync(outputDir, { recursive: true, force: true });
     db.query.mockReset();
   });
@@ -96,5 +101,27 @@ describe('laboratory jobs', () => {
     expect(write.batch_size_distribution).toEqual({ 1: 1, 2: 2 });
     expect(log).toContain('3 lotes observados');
     expect(log).toContain('{"1":1,"2":2}');
+  });
+
+  test('generates DBeaver scripts for the configured database and scopes cleanup to lab students', async () => {
+    const runId = `run_${Date.now()}`;
+    const job = lab.startGenerate({
+      records: 1, seed: 42, batchSize: 1, destinations: 'sql', outName: runId,
+    });
+
+    const completed = await waitForJob(job.id);
+    const runDir = path.join(outputDir, runId);
+    const createSql = fs.readFileSync(path.join(runDir, 'criar_dados.sql'), 'utf8');
+    const deleteSql = fs.readFileSync(path.join(runDir, 'apagar_dados.sql'), 'utf8');
+    const metadata = JSON.parse(fs.readFileSync(path.join(runDir, 'run_meta.json'), 'utf8'));
+
+    expect(completed.status).toBe('done');
+    expect(createSql).toContain('USE `lab_prod_test`;');
+    expect(createSql).toContain('SELECT DATABASE() AS banco_alvo;');
+    expect(createSql).toContain("u.role = 'aluno'");
+    expect(createSql).toContain("'@aluno.colegiomaralu.local'");
+    expect(deleteSql).toContain('USE `lab_prod_test`;');
+    expect(deleteSql).toContain("u.role = 'aluno'");
+    expect(metadata.writes.sql.target_database).toBe('lab_prod_test');
   });
 });

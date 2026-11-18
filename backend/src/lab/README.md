@@ -55,7 +55,7 @@ O tamanho configurado, isoladamente, não prova quantos lotes foram realmente pr
 
 Em caso de cancelamento, consulte o estado final do job. Os contadores visíveis durante a execução indicam apenas lotes completos; o cancelamento não transforma uma execução parcial numa execução concluída.
 
-Os artefactos de benchmark incluídos como amostra foram produzidos antes da adição desses contadores e, por isso, não contêm `batch_count` nem `batch_size_distribution`. As novas execuções incluem estes campos; a amostra histórica não foi alterada para evitar apresentar valores inferidos como medições observadas.
+Os artefactos de benchmark incluídos como amostra foram produzidos antes dos contadores de lotes e do alvo SQL por `DB_NAME`; por isso não contêm `batch_count`, `batch_size_distribution` nem `target_database`, e os scripts SQL históricos não incluem o novo seletor de base de dados nem o filtro de limpeza mais restrito. Gere uma nova execução para obter os scripts atualizados. A amostra histórica não foi alterada para evitar apresentar valores inferidos como medições observadas.
 
 O módulo `pipeline.js` é chamado pelo controlador HTTP do backend; não aceita os argumentos `--records` ou `--seed` como comando de linha de comandos. Os limites de volume e de lotes são configurados pelas variáveis `LAB_MAX_RECORDS` e `LAB_MAX_BATCH`.
 
@@ -95,3 +95,15 @@ GROUP BY COALESCE(c.nome, '(sem curso)');
 Neste contexto, `soma_notas` é uma soma de notas escolares, não um valor monetário.
 
 O destino SQL é gerado como script para execução no MySQL configurado pelo sistema. O benchmark de leitura dos formatos de ficheiro não executa uma consulta SQL no servidor; a carga e consulta SQL dependem do ambiente configurado.
+
+### Executar os scripts SQL no DBeaver
+
+Para produção, gere os ficheiros através da instância do laboratório ligada à base de dados de produção. Os identificadores de `turmas` e `disciplinas` vêm do catálogo dessa base; um SQL gerado em desenvolvimento pode referenciar IDs que não existem em produção.
+
+Os scripts começam por selecionar o `DB_NAME` configurado no backend com `USE` e executar `SELECT DATABASE() AS banco_alvo`. Antes de continuar no DBeaver, confirme que o resultado é a base de produção pretendida. Execute o ficheiro inteiro com **Execute SQL Script**, na mesma ligação, para manter as variáveis MySQL (`@lab_*`) e as transações por lote na mesma sessão; não execute apenas a instrução corrente.
+
+Antes da carga, confirme que `notas.periodo` é `VARCHAR(3)` e que as tabelas `usuarios`, `alunos`, `matriculas` e `notas` têm o schema esperado pelo sistema. O script de dados não altera o schema. Se a verificação falhar, não execute a carga: faça backup e aplique a migração de schema apropriada antes.
+
+`criar_dados.sql` remove primeiro apenas dados de laboratório com a mesma seed, `role = 'aluno'` e o domínio reservado `@aluno.colegiomaralu.local`, e depois insere os novos registos em transações por lote. `apagar_dados.sql`, gerado para a mesma seed, usa o mesmo filtro. Assim, executar a limpeza não apaga contas escolares comuns. Guarde os dois ficheiros da mesma execução e confirme sempre o banco selecionado antes de executar qualquer `DELETE` ou `INSERT`.
+
+Os scripts foram verificados contra o schema versionado do projeto e testados quanto ao conteúdo e ao alvo configurado. Não foram executados na base de dados de produção; a validação final nesse ambiente deve ser feita pelo operador autorizado no DBeaver, após confirmar o banco e o backup.
