@@ -108,12 +108,13 @@ function makeNotes(rng, turma) {
   return notes;
 }
 
-function makeRecord(rng, id, turma, runId) {
+function makeRecord(rng, id, turma, tag) {
   const nome = makeName(rng);
   const sexo = rng() < 0.5 ? 'M' : 'F';
   const nomeMae = makeName(rng);
   const nomePai = makeName(rng);
-  const email = `lab.${runId}.${id}@aluno.colegiomaralu.local`;
+  // A tag é derivada da seed (ex.: s42): a mesma seed produz exactamente os mesmos registos em qualquer execução.
+  const email = `lab.${tag}.${id}@aluno.colegiomaralu.local`;
   return {
     id,
     nome,
@@ -138,7 +139,7 @@ function makeRecord(rng, id, turma, runId) {
   };
 }
 
-function* generateBatches(n, seed = 42, batchSize = 2000, catalog = [], runId = 'run_0', startId = 1) {
+function* generateBatches(n, seed = 42, batchSize = 2000, catalog = [], tag = 's42', startId = 1) {
   if (!Number.isInteger(Number(batchSize)) || Number(batchSize) < 1) {
     throw new Error('batch_size deve ser >= 1');
   }
@@ -149,7 +150,7 @@ function* generateBatches(n, seed = 42, batchSize = 2000, catalog = [], runId = 
   let batch = [];
   for (let i = 0; i < n; i += 1) {
     const turma = pick(rng, catalog);
-    batch.push(makeRecord(rng, startId + i, turma, runId));
+    batch.push(makeRecord(rng, startId + i, turma, tag));
     if (batch.length >= batchSize) {
       yield batch;
       batch = [];

@@ -123,7 +123,10 @@ router.get('/admin/lab/status', adminMiddleware, labController.status);
 router.post('/admin/lab/generate', adminMiddleware, labController.generate);
 router.post('/admin/lab/validate', adminMiddleware, labController.validate);
 router.post('/admin/lab/benchmark', adminMiddleware, labController.benchmark);
-router.get('/admin/lab/download/:out_dir/:file', adminMiddleware, labController.download);
+router.get('/admin/lab/jobs/:id', adminMiddleware, labController.job);
+router.post('/admin/lab/download-link', adminMiddleware, labController.downloadLink);
+// A descarga valida o seu próprio token assinado (60 s, uso único) ou, sem token, a sessão de admin.
+router.get('/admin/lab/download/:out_dir/:file', labController.download);
 
 // ===== ACADÉMICO (admin/coordenador) =====
 router.get('/staff/cursos', staffMiddleware, listarCursos);

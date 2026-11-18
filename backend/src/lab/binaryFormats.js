@@ -92,20 +92,32 @@ function encodeRecord(row) {
   return concatBytes(parts);
 }
 
-function writeAvroBuffer(records) {
+const zlib = require('zlib');
+const { promisify } = require('util');
+const deflateRaw = promisify(zlib.deflateRaw);
+const gzip = promisify(zlib.gzip);
+
+/** Marcador de sincronização determinístico (mesmo schema → mesmo marcador). */
+function avroSyncMarker() {
+  return crypto.createHash('sha256').update(JSON.stringify(AVRO_SCHEMA)).digest().subarray(0, 16);
+}
+
+/** Cabeçalho OCF. codec: 'null' | 'deflate'. */
+function avroHeader(codec = 'deflate') {
   const schemaJson = JSON.stringify(AVRO_SCHEMA);
-  const sync = crypto.createHash('sha256')
-    .update(records.map((r) => `${r.id}:${r.email}`).join('|'))
-    .digest().subarray(0, 16);
-  const header = concatBytes([
+  return concatBytes([
     Buffer.from('Obj\x01', 'binary'), zigzag(2),
-    avroString('avro.codec'), Buffer.from('\x08null', 'binary'),
-    avroString('avro.schema'), avroString(schemaJson), zigzag(0), sync,
+    avroString('avro.codec'), avroString(codec),
+    avroString('avro.schema'), avroString(schemaJson), zigzag(0), avroSyncMarker(),
   ]);
-  if (!records.length) return header;
-  const body = concatBytes(records.map(encodeRecord));
-  const block = concatBytes([zigzag(records.length), zigzag(body.length), body, sync]);
-  return concatBytes([header, block]);
+}
+
+/** Um bloco OCF por lote: nunca é preciso ter todos os registos em memória. */
+async function avroBlock(records, codec = 'deflate') {
+  if (!records.length) return Buffer.alloc(0);
+  let body = concatBytes(records.map(encodeRecord));
+  if (codec === 'deflate') body = await deflateRaw(body, { level: 1 });
+  return concatBytes([zigzag(records.length), zigzag(body.length), body, avroSyncMarker()]);
 }
 
 // ---- Parquet: colunas planas; o array de notas é serializado como JSON. ----
@@ -146,132 +158,143 @@ function pqDefLevels(present) {
   return concatBytes([u32le(body.length), body]);
 }
 
-function writeParquetBuffer(records) {
-  const numRows = records.length;
-  const columns = [
-    { name: 'id', type: PQ.INT64, optional: false, get: (r) => BigInt(r.id) },
-    { name: 'nome', type: PQ.BYTE_ARRAY, optional: false, get: (r) => r.nome },
-    { name: 'email', type: PQ.BYTE_ARRAY, optional: false, get: (r) => r.email },
-    { name: 'role', type: PQ.BYTE_ARRAY, optional: false, get: (r) => r.role },
-    { name: 'ativo', type: PQ.INT32, optional: false, get: (r) => r.ativo },
-    { name: 'data_nascimento', type: PQ.BYTE_ARRAY, optional: false, get: (r) => r.data_nascimento },
-    { name: 'sexo', type: PQ.BYTE_ARRAY, optional: false, get: (r) => r.sexo },
-    { name: 'nacionalidade', type: PQ.BYTE_ARRAY, optional: false, get: (r) => r.nacionalidade },
-    { name: 'nome_mae', type: PQ.BYTE_ARRAY, optional: false, get: (r) => r.nome_mae },
-    { name: 'nome_pai', type: PQ.BYTE_ARRAY, optional: false, get: (r) => r.nome_pai },
-    { name: 'responsavel', type: PQ.BYTE_ARRAY, optional: false, get: (r) => r.responsavel },
-    { name: 'telefone_emergencia', type: PQ.BYTE_ARRAY, optional: false, get: (r) => r.telefone_emergencia },
-    { name: 'turma_id', type: PQ.INT64, optional: false, get: (r) => BigInt(r.turma_id) },
-    { name: 'turma_nome', type: PQ.BYTE_ARRAY, optional: false, get: (r) => r.turma_nome },
-    { name: 'curso_id', type: PQ.INT64, optional: true, get: (r) => r.curso_id == null ? null : BigInt(r.curso_id) },
-    { name: 'curso_nome', type: PQ.BYTE_ARRAY, optional: false, get: (r) => r.curso_nome },
-    { name: 'serie_classe', type: PQ.INT32, optional: false, get: (r) => r.serie_classe },
-    { name: 'ano_letivo', type: PQ.INT32, optional: false, get: (r) => r.ano_letivo },
-    { name: 'turno', type: PQ.BYTE_ARRAY, optional: false, get: (r) => r.turno },
-    { name: 'notas', type: PQ.BYTE_ARRAY, optional: false, get: (r) => JSON.stringify(r.notas || []) },
-  ];
+const PARQUET_COLUMNS = [
+  { name: 'id', type: PQ.INT64, optional: false, get: (r) => BigInt(r.id) },
+  { name: 'nome', type: PQ.BYTE_ARRAY, optional: false, get: (r) => r.nome },
+  { name: 'email', type: PQ.BYTE_ARRAY, optional: false, get: (r) => r.email },
+  { name: 'role', type: PQ.BYTE_ARRAY, optional: false, get: (r) => r.role },
+  { name: 'ativo', type: PQ.INT32, optional: false, get: (r) => r.ativo },
+  { name: 'data_nascimento', type: PQ.BYTE_ARRAY, optional: false, get: (r) => r.data_nascimento },
+  { name: 'sexo', type: PQ.BYTE_ARRAY, optional: false, get: (r) => r.sexo },
+  { name: 'nacionalidade', type: PQ.BYTE_ARRAY, optional: false, get: (r) => r.nacionalidade },
+  { name: 'nome_mae', type: PQ.BYTE_ARRAY, optional: false, get: (r) => r.nome_mae },
+  { name: 'nome_pai', type: PQ.BYTE_ARRAY, optional: false, get: (r) => r.nome_pai },
+  { name: 'responsavel', type: PQ.BYTE_ARRAY, optional: false, get: (r) => r.responsavel },
+  { name: 'telefone_emergencia', type: PQ.BYTE_ARRAY, optional: false, get: (r) => r.telefone_emergencia },
+  { name: 'turma_id', type: PQ.INT64, optional: false, get: (r) => BigInt(r.turma_id) },
+  { name: 'turma_nome', type: PQ.BYTE_ARRAY, optional: false, get: (r) => r.turma_nome },
+  { name: 'curso_id', type: PQ.INT64, optional: true, get: (r) => (r.curso_id == null ? null : BigInt(r.curso_id)) },
+  { name: 'curso_nome', type: PQ.BYTE_ARRAY, optional: false, get: (r) => r.curso_nome },
+  { name: 'serie_classe', type: PQ.INT32, optional: false, get: (r) => r.serie_classe },
+  { name: 'ano_letivo', type: PQ.INT32, optional: false, get: (r) => r.ano_letivo },
+  { name: 'turno', type: PQ.BYTE_ARRAY, optional: false, get: (r) => r.turno },
+  { name: 'notas', type: PQ.BYTE_ARRAY, optional: false, get: (r) => JSON.stringify(r.notas || []) },
+];
+const typeEnum = (type) => (type === PQ.INT64 ? 2 : type === PQ.INT32 ? 1 : 6);
 
-  const typeEnum = (type) => type === PQ.INT64 ? 2 : type === PQ.INT32 ? 1 : 6;
-  const magic = Buffer.from('PAR1');
-  const pages = [];
-  const columnChunks = [];
-  const schemaElements = [];
-  let offset = 4;
-  let rowGroupUncompressedSize = 0;
-
-  schemaElements.push(tStruct([
-    [4, TT.STRING, tString('schema')],
-    [5, TT.I32, tInt(columns.length)],
-  ]));
-
-  for (const column of columns) {
-    schemaElements.push(tStruct([
-      [1, TT.I32, tInt(typeEnum(column.type))],
-      [3, TT.I32, tInt(column.optional ? 1 : 0)], // OPTIONAL / REQUIRED
-      [4, TT.STRING, tString(column.name)],
-    ]));
+/**
+ * Escritor Parquet incremental: um row group por lote.
+ * Uso: header() → rowGroup(lote)* → footer(). Cada chamada devolve Buffers prontos a escrever,
+ * por isso a memória fica limitada ao tamanho de um lote.
+ */
+class ParquetStreamWriter {
+  constructor({ compression = 'gzip' } = {}) {
+    this.compression = compression === 'none' ? 'none' : 'gzip';
+    this.codec = this.compression === 'gzip' ? 2 : 0; // 0 UNCOMPRESSED, 2 GZIP
+    this.offset = 0;
+    this.numRows = 0;
+    this.rowGroups = [];
   }
 
-  if (numRows > 0) {
-    for (const column of columns) {
-      const values = records.map(column.get);
-      const present = values.map((value) => value === null ? 0 : 1);
-      const nonNull = values.filter((_, index) => present[index] === 1);
-      const dataParts = [];
+  header() {
+    const magic = Buffer.from('PAR1');
+    this.offset += magic.length;
+    return magic;
+  }
 
+  async rowGroup(records) {
+    if (!records.length) return Buffer.alloc(0);
+    const numRows = records.length;
+    const parts = [];
+    const chunks = [];
+    let groupSize = 0;
+    for (const column of PARQUET_COLUMNS) {
+      const values = records.map(column.get);
+      const present = values.map((value) => (value === null ? 0 : 1));
+      const dataParts = [];
       if (column.optional) dataParts.push(pqDefLevels(present));
-      for (const value of nonNull) {
+      for (let i = 0; i < values.length; i += 1) {
+        const value = values[i];
+        if (value === null) continue;
         if (column.type === PQ.INT32) {
-          const buffer = Buffer.allocUnsafe(4);
-          buffer.writeInt32LE(Number(value) | 0, 0);
-          dataParts.push(buffer);
+          const b = Buffer.allocUnsafe(4);
+          b.writeInt32LE(Number(value) | 0, 0);
+          dataParts.push(b);
         } else if (column.type === PQ.INT64) {
-          const buffer = Buffer.allocUnsafe(8);
-          buffer.writeBigInt64LE(BigInt(value), 0);
-          dataParts.push(buffer);
+          const b = Buffer.allocUnsafe(8);
+          b.writeBigInt64LE(BigInt(value), 0);
+          dataParts.push(b);
         } else {
           const raw = Buffer.from(String(value), 'utf8');
           dataParts.push(u32le(raw.length), raw);
         }
       }
-
-      const pageData = concatBytes(dataParts);
+      const raw = concatBytes(dataParts);
+      const pageData = this.codec === 2 ? await gzip(raw, { level: 1 }) : raw;
       const dataPageHeader = tStruct([
-        [1, TT.I32, tInt(numRows)], // num_values
+        [1, TT.I32, tInt(numRows)],
         [2, TT.I32, tInt(0)], // PLAIN
-        [3, TT.I32, tInt(3)], // RLE definition levels
-        [4, TT.I32, tInt(3)], // RLE repetition levels
+        [3, TT.I32, tInt(3)], // RLE (níveis de definição)
+        [4, TT.I32, tInt(3)], // RLE (níveis de repetição)
       ]);
       const pageHeader = tStruct([
         [1, TT.I32, tInt(0)], // DATA_PAGE
-        [2, TT.I32, tInt(pageData.length)],
+        [2, TT.I32, tInt(raw.length)],
         [3, TT.I32, tInt(pageData.length)],
         [5, TT.STRUCT, dataPageHeader],
       ]);
-      const page = concatBytes([pageHeader, pageData]);
-      const pageOffset = offset;
-      pages.push(page);
-      offset += page.length;
-      rowGroupUncompressedSize += page.length;
-
+      const pageOffset = this.offset;
+      parts.push(pageHeader, pageData);
+      const written = pageHeader.length + pageData.length;
+      this.offset += written;
+      groupSize += pageHeader.length + raw.length;
       const columnMetaData = tStruct([
         [1, TT.I32, tInt(typeEnum(column.type))],
-        [2, TT.LIST, tList(TT.I32, [tInt(0), tInt(3)])], // PLAIN, RLE
+        [2, TT.LIST, tList(TT.I32, [tInt(0), tInt(3)])],
         [3, TT.LIST, tList(TT.STRING, [tString(column.name)])],
-        [4, TT.I32, tInt(0)], // UNCOMPRESSED
+        [4, TT.I32, tInt(this.codec)],
         [5, TT.I64, tInt(numRows)],
-        [6, TT.I64, tInt(page.length)],
-        [7, TT.I64, tInt(page.length)],
-        [9, TT.I64, tInt(pageOffset)], // data_page_offset
+        [6, TT.I64, tInt(pageHeader.length + raw.length)],
+        [7, TT.I64, tInt(written)],
+        [9, TT.I64, tInt(pageOffset)],
       ]);
-      columnChunks.push(tStruct([
+      chunks.push(tStruct([
         [2, TT.I64, tInt(pageOffset)],
         [3, TT.STRUCT, columnMetaData],
       ]));
     }
+    this.rowGroups.push(tStruct([
+      [1, TT.LIST, tList(TT.STRUCT, chunks)],
+      [2, TT.I64, tInt(groupSize)],
+      [3, TT.I64, tInt(numRows)],
+    ]));
+    this.numRows += numRows;
+    return concatBytes(parts);
   }
 
-  const rowGroups = numRows > 0 ? [tStruct([
-    [1, TT.LIST, tList(TT.STRUCT, columnChunks)],
-    [2, TT.I64, tInt(rowGroupUncompressedSize)],
-    [3, TT.I64, tInt(numRows)],
-  ])] : [];
-
-  const fileMetaData = tStruct([
-    [1, TT.I32, tInt(1)],
-    [2, TT.LIST, tList(TT.STRUCT, schemaElements)],
-    [3, TT.I64, tInt(numRows)],
-    [4, TT.LIST, tList(TT.STRUCT, rowGroups)],
-    [6, TT.STRING, tString('colegio-mara-lu data-lab')],
-  ]);
-
-  return concatBytes([
-    magic,
-    ...pages,
-    fileMetaData,
-    u32le(fileMetaData.length),
-    magic,
-  ]);
+  footer() {
+    const schemaElements = [tStruct([
+      [4, TT.STRING, tString('schema')],
+      [5, TT.I32, tInt(PARQUET_COLUMNS.length)],
+    ])];
+    for (const column of PARQUET_COLUMNS) {
+      const fields = [
+        [1, TT.I32, tInt(typeEnum(column.type))],
+        [3, TT.I32, tInt(column.optional ? 1 : 0)], // 0 REQUIRED, 1 OPTIONAL
+        [4, TT.STRING, tString(column.name)],
+      ];
+      if (column.type === PQ.BYTE_ARRAY) fields.push([6, TT.I32, tInt(0)]); // converted_type UTF8
+      schemaElements.push(tStruct(fields));
+    }
+    const fileMetaData = tStruct([
+      [1, TT.I32, tInt(1)],
+      [2, TT.LIST, tList(TT.STRUCT, schemaElements)],
+      [3, TT.I64, tInt(this.numRows)],
+      [4, TT.LIST, tList(TT.STRUCT, this.rowGroups)],
+      [6, TT.STRING, tString('colegio-mara-lu data-lab')],
+    ]);
+    return concatBytes([fileMetaData, u32le(fileMetaData.length), Buffer.from('PAR1')]);
+  }
 }
 
-module.exports = { writeAvroBuffer, writeParquetBuffer, AVRO_SCHEMA };
+module.exports = { AVRO_SCHEMA, avroHeader, avroBlock, ParquetStreamWriter, PARQUET_COLUMNS };
