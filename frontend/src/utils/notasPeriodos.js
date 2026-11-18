@@ -13,13 +13,13 @@ export const TRIMESTRES = [
   { id: 3, titulo: '3º Trimestre', parcial: '3PP', trimestral: '3PT' },
 ];
 
+/**
+ * Só os seis códigos canónicos podem alimentar as médias.
+ * Os rótulos legados ('1º', '2º', '3º', 'final') não têm equivalência
+ * inequívoca e devem ser corrigidos após auditoria, nunca remapeados no UI.
+ */
 export function normalizarPeriodos(periodos = {}) {
-  const out = { ...periodos };
-  if (out['1º'] != null && out['1PP'] == null) out['1PP'] = out['1º'];
-  if (out['2º'] != null && out['1PT'] == null) out['1PT'] = out['2º'];
-  delete out['1º'];
-  delete out['2º'];
-  return out;
+  return { ...periodos };
 }
 
 export function mediaTrimestre(periodos, parcial, trimestral) {

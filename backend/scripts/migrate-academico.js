@@ -53,7 +53,7 @@ const statements = [
     id INT AUTO_INCREMENT PRIMARY KEY,
     matricula_id INT NOT NULL,
     disciplina_id INT NOT NULL,
-    periodo ENUM('1º','2º','3º','final') NOT NULL,
+    periodo VARCHAR(10) NOT NULL COMMENT '1PP,1PT,2PP,2PT,3PP,3PT,EXN,DEF,CH2,REC',
     nota DECIMAL(5,2) NOT NULL,
     professor_id INT NULL,
     data_lancamento TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
